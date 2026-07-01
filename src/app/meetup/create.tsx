@@ -1,0 +1,252 @@
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import { Button } from '@/components/ui/button';
+import { TextField } from '@/components/ui/text-field';
+import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth';
+import { useTheme } from '@/hooks/use-theme';
+import { formatMeetupTime } from '@/lib/format';
+import { supabase } from '@/lib/supabase';
+
+function defaultStart(): Date {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  return d;
+}
+
+export default function CreateMeetup() {
+  const theme = useTheme();
+  const router = useRouter();
+  const { session } = useAuth();
+
+  const [title, setTitle] = useState('');
+  const [location, setLocation] = useState('');
+  const [region, setRegion] = useState('');
+  const [description, setDescription] = useState('');
+  const [start, setStart] = useState<Date>(defaultStart());
+  const [showIosPicker, setShowIosPicker] = useState(false);
+  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [skillMin, setSkillMin] = useState(2.0);
+  const [skillMax, setSkillMax] = useState(8.0);
+  const [saving, setSaving] = useState(false);
+
+  function openPicker() {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: start,
+        mode: 'date',
+        minimumDate: new Date(),
+        onChange: (_e, date) => {
+          if (!date) return;
+          DateTimePickerAndroid.open({
+            value: date,
+            mode: 'time',
+            is24Hour: true,
+            onChange: (_e2, time) => {
+              if (!time) return;
+              const merged = new Date(date);
+              merged.setHours(time.getHours(), time.getMinutes(), 0, 0);
+              setStart(merged);
+            },
+          });
+        },
+      });
+    } else {
+      setShowIosPicker(true);
+    }
+  }
+
+  function adjust(setter: (fn: (v: number) => number) => void, delta: number, min: number, max: number) {
+    setter((v) => Math.min(max, Math.max(min, Math.round((v + delta) * 10) / 10)));
+  }
+
+  async function onSubmit() {
+    if (!title.trim() || !location.trim()) {
+      Alert.alert('입력 확인', '제목과 장소를 입력해주세요.');
+      return;
+    }
+    if (skillMin > skillMax) {
+      Alert.alert('실력 범위', '최소 실력이 최대 실력보다 클 수 없습니다.');
+      return;
+    }
+    if (!session?.user.id) return;
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('meetups')
+      .insert({
+        host_id: session.user.id,
+        title: title.trim(),
+        location_name: location.trim(),
+        region: region.trim(),
+        description: description.trim(),
+        start_time: start.toISOString(),
+        max_players: maxPlayers,
+        skill_min: skillMin,
+        skill_max: skillMax,
+      })
+      .select('id')
+      .single();
+    setSaving(false);
+    if (error) {
+      Alert.alert('생성 실패', error.message);
+      return;
+    }
+    router.replace(`/meetup/${data.id}`);
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <TextField
+          label="제목"
+          value={title}
+          onChangeText={setTitle}
+          placeholder="예: 평일 저녁 즐겜 복식"
+          maxLength={40}
+        />
+        <TextField
+          label="장소"
+          value={location}
+          onChangeText={setLocation}
+          placeholder="예: 올림픽공원 피클볼장"
+        />
+        <TextField
+          label="지역"
+          value={region}
+          onChangeText={setRegion}
+          placeholder="예: 서울 송파구"
+        />
+
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>날짜 · 시간</Text>
+          <Pressable
+            onPress={openPicker}
+            style={[styles.dateBtn, { backgroundColor: theme.backgroundElement }]}>
+            <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+            <Text style={[styles.dateTxt, { color: theme.text }]}>{formatMeetupTime(start.toISOString())}</Text>
+          </Pressable>
+          {Platform.OS === 'ios' && showIosPicker && (
+            <DateTimePicker
+              value={start}
+              mode="datetime"
+              display="inline"
+              minimumDate={new Date()}
+              onChange={(_e, date) => date && setStart(date)}
+            />
+          )}
+        </View>
+
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>정원</Text>
+          <Stepper
+            value={`${maxPlayers}명`}
+            onMinus={() => setMaxPlayers((v) => Math.max(2, v - 1))}
+            onPlus={() => setMaxPlayers((v) => Math.min(32, v + 1))}
+            theme={theme}
+          />
+        </View>
+
+        <View style={styles.row2}>
+          <View style={[styles.field, { flex: 1 }]}>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>최소 실력</Text>
+            <Stepper
+              value={skillMin.toFixed(1)}
+              onMinus={() => adjust(setSkillMin as any, -0.5, 2, 8)}
+              onPlus={() => adjust(setSkillMin as any, 0.5, 2, 8)}
+              theme={theme}
+            />
+          </View>
+          <View style={[styles.field, { flex: 1 }]}>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>최대 실력</Text>
+            <Stepper
+              value={skillMax.toFixed(1)}
+              onMinus={() => adjust(setSkillMax as any, -0.5, 2, 8)}
+              onPlus={() => adjust(setSkillMax as any, 0.5, 2, 8)}
+              theme={theme}
+            />
+          </View>
+        </View>
+
+        <TextField
+          label="설명 (선택)"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="모임 안내, 준비물, 비용 등"
+          multiline
+          maxLength={300}
+          style={{ minHeight: 90, textAlignVertical: 'top' }}
+        />
+
+        <Button title="모임 만들기" onPress={onSubmit} loading={saving} style={{ marginTop: Spacing.two }} />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function Stepper({
+  value,
+  onMinus,
+  onPlus,
+  theme,
+}: {
+  value: string;
+  onMinus: () => void;
+  onPlus: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <View style={[styles.stepper, { backgroundColor: theme.backgroundElement }]}>
+      <Pressable onPress={onMinus} style={styles.stepBtn}>
+        <Text style={[styles.stepTxt, { color: theme.primary }]}>−</Text>
+      </Pressable>
+      <Text style={[styles.stepVal, { color: theme.text }]}>{value}</Text>
+      <Pressable onPress={onPlus} style={styles.stepBtn}>
+        <Text style={[styles.stepTxt, { color: theme.primary }]}>+</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  field: { gap: 6 },
+  label: { fontSize: 13, fontWeight: '600', marginLeft: 2 },
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: Spacing.three,
+    height: 50,
+    borderRadius: 12,
+  },
+  dateTxt: { fontSize: 16, fontWeight: '600' },
+  row2: { flexDirection: 'row', gap: Spacing.three },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    paddingHorizontal: Spacing.two,
+    height: 50,
+  },
+  stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  stepTxt: { fontSize: 26, fontWeight: '800' },
+  stepVal: { fontSize: 17, fontWeight: '700' },
+});
