@@ -12,8 +12,10 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { LoadingOverlay } from '@/components/ui/loading-overlay';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/auth';
+import { LoadingProvider } from '@/contexts/loading';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
@@ -41,6 +43,11 @@ function RootNavigator() {
       router.replace('/(tabs)');
     }
   }, [session, initializing, segments, router]);
+
+  // 앱 부팅(세션 확인) 중에는 로딩 팝업을 띄운다
+  if (initializing) {
+    return <LoadingOverlay visible message="loading..." />;
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -74,9 +81,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
           <AuthProvider>
-            <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
-              <RootNavigator />
-            </View>
+            <LoadingProvider>
+              <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
+                <RootNavigator />
+              </View>
+            </LoadingProvider>
           </AuthProvider>
           <StatusBar style="auto" />
         </ThemeProvider>

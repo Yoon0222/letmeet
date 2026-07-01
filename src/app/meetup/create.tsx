@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { useLoading } from '@/contexts/loading';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +34,7 @@ export default function CreateMeetup() {
   const theme = useTheme();
   const router = useRouter();
   const { session } = useAuth();
+  const { show, hide } = useLoading();
 
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
@@ -86,6 +88,7 @@ export default function CreateMeetup() {
     }
     if (!session?.user.id) return;
     setSaving(true);
+    show();
     const { data, error } = await supabase
       .from('meetups')
       .insert({
@@ -102,6 +105,7 @@ export default function CreateMeetup() {
       .select('id')
       .single();
     setSaving(false);
+    hide();
     if (error) {
       Alert.alert('생성 실패', error.message);
       return;

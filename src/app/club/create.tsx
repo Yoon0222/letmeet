@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { useLoading } from '@/contexts/loading';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 
@@ -13,6 +14,7 @@ export default function CreateClub() {
   const theme = useTheme();
   const router = useRouter();
   const { session } = useAuth();
+  const { show, hide } = useLoading();
 
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
@@ -26,6 +28,7 @@ export default function CreateClub() {
     }
     if (!session?.user.id) return;
     setSaving(true);
+    show();
     const { data, error } = await supabase
       .from('clubs')
       .insert({
@@ -37,6 +40,7 @@ export default function CreateClub() {
       .select('id')
       .single();
     setSaving(false);
+    hide();
     if (error) {
       Alert.alert('생성 실패', error.message);
       return;

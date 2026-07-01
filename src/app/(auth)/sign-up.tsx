@@ -16,12 +16,14 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { useLoading } from '@/contexts/loading';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function SignUp() {
   const theme = useTheme();
   const router = useRouter();
   const { signUp, signIn } = useAuth();
+  const { show, hide } = useLoading();
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,6 +39,7 @@ export default function SignUp() {
       return;
     }
     setLoading(true);
+    show();
     try {
       await signUp(email.trim(), password, nickname.trim());
       // 이메일 인증이 꺼져 있으면 바로 로그인 시도
@@ -53,6 +56,7 @@ export default function SignUp() {
       Alert.alert('회원가입 실패', translateError(e?.message));
     } finally {
       setLoading(false);
+      hide();
     }
   }
 

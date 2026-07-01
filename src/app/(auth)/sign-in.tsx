@@ -17,11 +17,13 @@ import { KakaoButton } from '@/components/ui/kakao-button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { useLoading } from '@/contexts/loading';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function SignIn() {
   const theme = useTheme();
   const { signIn, signInWithKakao } = useAuth();
+  const { withLoading } = useLoading();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,7 @@ export default function SignIn() {
   async function onKakao() {
     setKakaoLoading(true);
     try {
-      await signInWithKakao();
+      await withLoading(signInWithKakao());
       // 성공 시 루트 가드가 (tabs) 로 이동시킴 (웹은 리다이렉트)
     } catch (e: any) {
       Alert.alert('카카오 로그인 실패', translateError(e?.message));
@@ -46,7 +48,7 @@ export default function SignIn() {
     }
     setLoading(true);
     try {
-      await signIn(email.trim(), password);
+      await withLoading(signIn(email.trim(), password));
       // 성공 시 루트 가드가 (tabs) 로 이동시킴
     } catch (e: any) {
       Alert.alert('로그인 실패', translateError(e?.message));
