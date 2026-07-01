@@ -95,6 +95,50 @@ export type ClubMemberWithProfile = ClubMember & {
   profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
 };
 
+// ---- 대회(tournaments) ----
+export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancelled';
+export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+
+export type Tournament = {
+  id: string;
+  organizer_id: string;
+  title: string;
+  description: string;
+  region: string;
+  venue: string;
+  start_at: string;
+  registration_deadline: string | null;
+  max_participants: number;
+  skill_min: number;
+  skill_max: number;
+  fee: number;
+  format: string;
+  status: TournamentStatus;
+  created_at: string;
+};
+
+/** tournaments_with_counts 뷰 결과 */
+export type TournamentWithCounts = Tournament & {
+  organizer_nickname: string;
+  organizer_avatar_url: string | null;
+  approved_count: number;
+  pending_count: number;
+};
+
+export type TournamentEntry = {
+  tournament_id: string;
+  user_id: string;
+  status: EntryStatus;
+  partner_name: string | null;
+  seed: number | null;
+  created_at: string;
+};
+
+/** 참가신청 + 프로필 (조인 결과) */
+export type TournamentEntryWithProfile = TournamentEntry & {
+  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+};
+
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
 type WriteDefaults<T> = Partial<T>;
 
@@ -136,6 +180,22 @@ export interface Database {
         Update: WriteDefaults<ClubMember>;
         Relationships: [];
       };
+      tournaments: {
+        Row: Tournament;
+        Insert: WriteDefaults<Tournament> & {
+          organizer_id: string;
+          title: string;
+          start_at: string;
+        };
+        Update: WriteDefaults<Tournament>;
+        Relationships: [];
+      };
+      tournament_entries: {
+        Row: TournamentEntry;
+        Insert: { tournament_id: string; user_id: string } & WriteDefaults<TournamentEntry>;
+        Update: WriteDefaults<TournamentEntry>;
+        Relationships: [];
+      };
     };
     Views: {
       meetups_with_counts: {
@@ -144,6 +204,10 @@ export interface Database {
       };
       clubs_with_counts: {
         Row: ClubWithCounts;
+        Relationships: [];
+      };
+      tournaments_with_counts: {
+        Row: TournamentWithCounts;
         Relationships: [];
       };
     };

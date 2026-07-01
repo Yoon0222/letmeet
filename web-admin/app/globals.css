@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* 관리자 툴은 라이트 테마 고정 — 색상은 Tailwind 유틸리티로 제어 */
+body {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}

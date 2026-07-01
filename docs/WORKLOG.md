@@ -3,6 +3,9 @@
 피클볼 커뮤니티 슈퍼앱의 핵심 결정·작업 기록. 날짜 섹션(`## YYYY-MM-DD`)이 최신순으로 위에 오고, 같은 날짜 안에서는 최신 작업(`### 제목`)이 위로 온다.
 
 ## 열린 항목
+- [x] Supabase에 `0004_tournaments.sql` 실행 (대회 테이블) — 적용됨(테이블 200 확인)
+- [ ] 권한(역할) 체계 (모델 B): `profiles.role`(user/organizer/admin) + 관리자 웹 접근 게이트 + 대회 insert RLS 강화
+- [ ] 대회 2단계: 모바일 참가 신청 화면 + 대진표(싱글 엘리) + 내 차례 알림
 - [ ] Supabase에 `0003_clubs.sql` 마이그레이션 실행 (클럽 테이블 생성) — 사용자
 - [ ] 카카오 로그인: 카카오 개발자 + Supabase Kakao Provider 설정 — 사용자
 - [ ] 안드로이드 개발 빌드(EAS) 실행: `eas build -p android --profile development` — 사용자
@@ -26,6 +29,16 @@
 ---
 
 ## 2026-07-01
+
+### 권한 체계 백로그 + 오늘 마무리
+- **결정**: 관리자 권한 분리는 현재 "만든 사람=운영자"(RLS: 남의 대회 못 건드림)까지만. **지정 관리자 게이트(모델 B: `profiles.role`)** 는 백로그로 넣고 다음에 착수. 오늘 세션은 여기서 마무리.
+- **진행 중**: `qa-pickle` 로 관리자 웹 "대회 개설 → 참가 승인" QA 백그라운드 실행. 결과는 `qa-report` 로 노션 QA 페이지에 누적 예정.
+- **메모**: 노션 로드맵에 대회(관리자 웹 1단계) 완료 + 권한 체계(모델 B) 반영. 미커밋 변경 있음(대회 DB·web-admin).
+
+### 대회 1단계 — DB + Next.js 관리자 웹
+- **결정**: 대회 운영 화면은 사용자 요청대로 **별도 Next.js 웹앱**(`web-admin/`)으로, 단 **Supabase 백엔드는 모바일과 공유**. 권한은 "대회 만든 사람 = 그 대회 운영자"(RLS)로 시작 — 플랫폼 관리자 체계는 나중.
+- **만든 것**: DB `tournaments`,`tournament_entries`,뷰 `tournaments_with_counts`(RLS: 조회 공개/주최자 관리, 참가신청 본인, 승인 주최자) + `migrations/0004_tournaments.sql` + 타입(양쪽). `web-admin` Next.js16(App Router, Tailwind, 클라이언트 Supabase 인증): 로그인/대회 목록/생성/상세(참가 승인·거절, 대회 상태 변경). 라이트 테마 고정.
+- **메모**: `.env.local`에 공유 Supabase 공개키. 검증: web-admin tsc·`next build`·로그인/목록 프리뷰 OK. 대회 실제 동작은 0004 실행 후.
 
 ### QA 리포트 노션 누적 스킬(qa-report)
 - **결정**: QA를 실행하는 것(`qa-pickle` 에이전트)과 결과를 노션에 기록·정리하는 것을 분리 — 기록/정리 전담 `qa-report` 스킬 신설. "피클 — QA 리포트 & 이슈" 페이지에 계속 누적하고, 요청 시 요약·중복제거·해결처리로 한 번에 정리.
