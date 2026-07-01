@@ -20,14 +20,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: '모임',
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
+          title: '홈',
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
           title: '매칭',
+          tabBarIcon: ({ color, size }) => <Ionicons name="flash" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="clubs"
+        options={{
+          title: '클럽',
           tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
         }}
       />

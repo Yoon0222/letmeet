@@ -69,10 +69,22 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, nickname)
+  -- 이메일 가입은 nickname 메타데이터, 카카오 등 소셜은 name/nickname/닉네임이 없으면 이메일/기본값
+  insert into public.profiles (id, nickname, avatar_url)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'nickname', split_part(new.email, '@', 1))
+    coalesce(
+      new.raw_user_meta_data->>'nickname',
+      new.raw_user_meta_data->>'name',
+      new.raw_user_meta_data->>'full_name',
+      new.raw_user_meta_data->>'user_name',
+      nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+      '피클러'
+    ),
+    coalesce(
+      new.raw_user_meta_data->>'avatar_url',
+      new.raw_user_meta_data->>'picture'
+    )
   )
   on conflict (id) do nothing;
   return new;
@@ -166,3 +178,85 @@ select
   (select count(*) from public.meetup_participants mp where mp.meetup_id = m.id) as participant_count
 from public.meetups m
 join public.profiles p on p.id = m.host_id;
+
+-- ============================================================
+-- 클럽(동호회)
+-- ============================================================
+create table if not exists public.clubs (
+  id          uuid primary key default uuid_generate_v4(),
+  owner_id    uuid not null references public.profiles(id) on delete cascade,
+  name        text not null,
+  description text not null default '',
+  region      text not null default '',
+  created_at  timestamptz not null default now()
+);
+create index if not exists clubs_region_idx on public.clubs (region);
+
+create table if not exists public.club_members (
+  club_id   uuid not null references public.clubs(id) on delete cascade,
+  user_id   uuid not null references public.profiles(id) on delete cascade,
+  role      text not null default 'member',   -- 'owner' | 'member'
+  joined_at timestamptz not null default now(),
+  primary key (club_id, user_id)
+);
+create index if not exists club_members_user_idx on public.club_members (user_id);
+
+-- 클럽 생성 시 개설자를 owner 멤버로 자동 등록
+create or replace function public.handle_new_club()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.club_members (club_id, user_id, role)
+  values (new.id, new.owner_id, 'owner')
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_club_created on public.clubs;
+create trigger on_club_created
+  after insert on public.clubs
+  for each row execute function public.handle_new_club();
+
+alter table public.clubs enable row level security;
+alter table public.club_members enable row level security;
+
+drop policy if exists "clubs_select" on public.clubs;
+create policy "clubs_select" on public.clubs for select using (true);
+
+drop policy if exists "clubs_insert_owner" on public.clubs;
+create policy "clubs_insert_owner" on public.clubs
+  for insert with check (auth.uid() = owner_id);
+
+drop policy if exists "clubs_update_owner" on public.clubs;
+create policy "clubs_update_owner" on public.clubs
+  for update using (auth.uid() = owner_id);
+
+drop policy if exists "clubs_delete_owner" on public.clubs;
+create policy "clubs_delete_owner" on public.clubs
+  for delete using (auth.uid() = owner_id);
+
+drop policy if exists "club_members_select" on public.club_members;
+create policy "club_members_select" on public.club_members for select using (true);
+
+drop policy if exists "club_members_insert_self" on public.club_members;
+create policy "club_members_insert_self" on public.club_members
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "club_members_delete_self" on public.club_members;
+create policy "club_members_delete_self" on public.club_members
+  for delete using (auth.uid() = user_id);
+
+-- 편의 뷰: 클럽 + 개설자 + 멤버 수
+create or replace view public.clubs_with_counts
+with (security_invoker = true)
+as
+select
+  c.*,
+  p.nickname   as owner_nickname,
+  p.avatar_url as owner_avatar_url,
+  (select count(*) from public.club_members cm where cm.club_id = c.id) as member_count
+from public.clubs c
+join public.profiles p on p.id = c.owner_id;

@@ -6,40 +6,36 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MeetupCard } from '@/components/meetup-card';
+import { ClubCard } from '@/components/club-card';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import type { MeetupWithCounts } from '@/lib/types';
+import type { ClubWithCounts } from '@/lib/types';
 
-// 매칭 = 번개 모임: 함께 칠 사람과 판을 찾는 화면
-export default function MatchesScreen() {
+export default function ClubsScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const [meetups, setMeetups] = useState<MeetupWithCounts[]>([]);
+  const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [region, setRegion] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
-      .from('meetups_with_counts')
+      .from('clubs_with_counts')
       .select('*')
-      .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-      .order('start_time', { ascending: true })
+      .order('member_count', { ascending: false })
       .limit(100);
     if (error) {
-      console.warn('[matches] load error', error.message);
-      setMeetups([]);
+      console.warn('[clubs] load error', error.message);
+      setClubs([]);
     } else {
-      setMeetups(data ?? []);
+      setClubs(data ?? []);
     }
     setLoading(false);
     setRefreshing(false);
@@ -51,30 +47,14 @@ export default function MatchesScreen() {
     }, [load]),
   );
 
-  const regions = Array.from(new Set(meetups.map((m) => m.region).filter(Boolean)));
-  const visible = region ? meetups.filter((m) => m.region === region) : meetups;
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>번개 모임</Text>
+        <Text style={[styles.title, { color: theme.text }]}>클럽</Text>
         <Text style={[styles.sub, { color: theme.textSecondary }]}>
-          가까운 코트에서 함께 칠 사람을 찾아보세요
+          함께 꾸준히 칠 동호회를 찾거나 만들어보세요
         </Text>
       </View>
-
-      {regions.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipsScroll}
-          contentContainerStyle={styles.chips}>
-          <Chip label="전체" active={region === null} onPress={() => setRegion(null)} theme={theme} />
-          {regions.map((r) => (
-            <Chip key={r} label={r} active={region === r} onPress={() => setRegion(r)} theme={theme} />
-          ))}
-        </ScrollView>
-      )}
 
       {loading ? (
         <View style={styles.center}>
@@ -82,11 +62,11 @@ export default function MatchesScreen() {
         </View>
       ) : (
         <FlatList
-          data={visible}
-          keyExtractor={(m) => m.id}
+          data={clubs}
+          keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <MeetupCard meetup={item} onPress={() => router.push(`/meetup/${item.id}`)} />
+            <ClubCard club={item} onPress={() => router.push(`/club/${item.id}`)} />
           )}
           refreshControl={
             <RefreshControl
@@ -100,10 +80,10 @@ export default function MatchesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="flash-outline" size={48} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>아직 모임이 없어요</Text>
+              <Ionicons name="people-outline" size={48} color={theme.tabIconDefault} />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>아직 클럽이 없어요</Text>
               <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                첫 번째 번개 모임을 만들어보세요!
+                첫 번째 클럽을 만들어보세요!
               </Text>
             </View>
           }
@@ -111,7 +91,7 @@ export default function MatchesScreen() {
       )}
 
       <Pressable
-        onPress={() => router.push('/meetup/create')}
+        onPress={() => router.push('/club/create')}
         style={({ pressed }) => [
           styles.fab,
           { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 },
@@ -122,37 +102,11 @@ export default function MatchesScreen() {
   );
 }
 
-function Chip({
-  label,
-  active,
-  onPress,
-  theme,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chip, { backgroundColor: active ? theme.primary : theme.backgroundElement }]}>
-      <Text style={[styles.chipText, { color: active ? '#fff' : theme.textSecondary }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
   title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   sub: { fontSize: 14, marginTop: 2 },
-  chipsScroll: { flexGrow: 0 },
-  chips: { paddingHorizontal: Spacing.four, gap: 8, paddingBottom: Spacing.three, alignItems: 'center' },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
-  chipText: { fontSize: 13, fontWeight: '600' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },

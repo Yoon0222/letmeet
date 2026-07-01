@@ -27,6 +27,8 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: Platform.OS === 'web',
+      // OAuth(카카오 등) code 교환을 위해 PKCE 플로우 사용
+      flowType: 'pkce',
     },
   },
 );

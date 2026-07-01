@@ -53,6 +53,11 @@ function RootNavigator() {
       />
       <Stack.Screen name="meetup/[id]" options={{ headerShown: true, title: '모임 상세' }} />
       <Stack.Screen
+        name="club/create"
+        options={{ presentation: 'modal', headerShown: true, title: '클럽 만들기' }}
+      />
+      <Stack.Screen name="club/[id]" options={{ headerShown: true, title: '클럽' }} />
+      <Stack.Screen
         name="profile/edit"
         options={{ presentation: 'modal', headerShown: true, title: '프로필 수정' }}
       />

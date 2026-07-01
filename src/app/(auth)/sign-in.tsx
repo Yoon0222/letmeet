@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
+import { KakaoButton } from '@/components/ui/kakao-button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
@@ -20,10 +21,23 @@ import { useTheme } from '@/hooks/use-theme';
 
 export default function SignIn() {
   const theme = useTheme();
-  const { signIn } = useAuth();
+  const { signIn, signInWithKakao } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [kakaoLoading, setKakaoLoading] = useState(false);
+
+  async function onKakao() {
+    setKakaoLoading(true);
+    try {
+      await signInWithKakao();
+      // 성공 시 루트 가드가 (tabs) 로 이동시킴 (웹은 리다이렉트)
+    } catch (e: any) {
+      Alert.alert('카카오 로그인 실패', translateError(e?.message));
+    } finally {
+      setKakaoLoading(false);
+    }
+  }
 
   async function onSubmit() {
     if (!email || !password) {
@@ -75,6 +89,14 @@ export default function SignIn() {
               onChangeText={setPassword}
             />
             <Button title="로그인" onPress={onSubmit} loading={loading} style={{ marginTop: 4 }} />
+
+            <View style={styles.divider}>
+              <View style={[styles.line, { backgroundColor: theme.border }]} />
+              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>또는</Text>
+              <View style={[styles.line, { backgroundColor: theme.border }]} />
+            </View>
+
+            <KakaoButton onPress={onKakao} loading={kakaoLoading} />
           </View>
 
           <View style={styles.footer}>
@@ -112,6 +134,9 @@ const styles = StyleSheet.create({
   brand: { fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
   tagline: { fontSize: 15 },
   form: { gap: Spacing.three },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginVertical: 2 },
+  line: { flex: 1, height: StyleSheet.hairlineWidth },
+  dividerText: { fontSize: 13 },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   link: { fontWeight: '700' },
 });

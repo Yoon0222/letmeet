@@ -1,48 +1,77 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ClubCard } from '@/components/club-card';
 import { MeetupCard } from '@/components/meetup-card';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { MeetupWithCounts } from '@/lib/types';
+import type { ClubWithCounts, MeetupWithCounts } from '@/lib/types';
 
-export default function FeedScreen() {
+export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const [meetups, setMeetups] = useState<MeetupWithCounts[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { session, profile } = useAuth();
+  const uid = session?.user.id;
+
+  const [nextMeetup, setNextMeetup] = useState<MeetupWithCounts | null>(null);
+  const [recommended, setRecommended] = useState<MeetupWithCounts[]>([]);
+  const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [region, setRegion] = useState<string | null>(null);
+
+  const mySkill = profile?.skill_level ?? 3.5;
+  const myRegion = profile?.region ?? '';
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
+    const nowIso = new Date().toISOString();
+
+    // 내가 참여 중인 다음 모임
+    let next: MeetupWithCounts | null = null;
+    if (uid) {
+      const { data: parts } = await supabase
+        .from('meetup_participants')
+        .select('meetup_id')
+        .eq('user_id', uid);
+      const ids = (parts ?? []).map((p) => p.meetup_id);
+      if (ids.length > 0) {
+        const { data } = await supabase
+          .from('meetups_with_counts')
+          .select('*')
+          .in('id', ids)
+          .eq('status', 'open')
+          .gte('start_time', nowIso)
+          .order('start_time', { ascending: true })
+          .limit(1);
+        next = data?.[0] ?? null;
+      }
+    }
+    setNextMeetup(next);
+
+    // 근처 추천 모임 (다가오는 오픈 모임)
+    const { data: recs } = await supabase
       .from('meetups_with_counts')
       .select('*')
-      .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+      .eq('status', 'open')
+      .gte('start_time', nowIso)
       .order('start_time', { ascending: true })
-      .limit(100);
-    if (error) {
-      console.warn('[feed] load error', error.message);
-      setMeetups([]);
-    } else {
-      setMeetups(data ?? []);
-    }
-    setLoading(false);
+      .limit(5);
+    setRecommended((recs ?? []).filter((m) => m.id !== next?.id).slice(0, 3));
+
+    // 추천 클럽 (멤버 많은 순)
+    const { data: cs } = await supabase
+      .from('clubs_with_counts')
+      .select('*')
+      .order('member_count', { ascending: false })
+      .limit(3);
+    setClubs(cs ?? []);
+
     setRefreshing(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,135 +79,166 @@ export default function FeedScreen() {
     }, [load]),
   );
 
-  const regions = Array.from(new Set(meetups.map((m) => m.region).filter(Boolean)));
-  const visible = region ? meetups.filter((m) => m.region === region) : meetups;
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: theme.text }]}>번개 모임</Text>
-          <Text style={[styles.sub, { color: theme.textSecondary }]}>
-            가까운 코트에서 함께 칠 사람을 찾아보세요
-          </Text>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={theme.primary}
+          />
+        }>
+        {/* 1. 헤더 */}
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.hello, { color: theme.text }]}>
+              안녕하세요, {profile?.nickname ?? '피클러'}님
+            </Text>
+            <Text style={[styles.sub, { color: theme.textSecondary }]}>
+              {myRegion || '지역 미설정'} · 실력 {mySkill.toFixed(1)} {skillLabel(mySkill)}
+            </Text>
+          </View>
+          <Pressable hitSlop={10} onPress={() => router.push('/(tabs)/profile')}>
+            <Ionicons name="notifications-outline" size={24} color={theme.text} />
+          </Pressable>
         </View>
-      </View>
 
-      {regions.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}>
-          <Chip label="전체" active={region === null} onPress={() => setRegion(null)} theme={theme} />
-          {regions.map((r) => (
-            <Chip key={r} label={r} active={region === r} onPress={() => setRegion(r)} theme={theme} />
-          ))}
-        </ScrollView>
-      )}
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={visible}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <MeetupCard meetup={item} onPress={() => router.push(`/meetup/${item.id}`)} />
-          )}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load();
-              }}
-              tintColor={theme.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="calendar-outline" size={48} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>아직 모임이 없어요</Text>
+        {/* 2. 다가오는 내 모임 */}
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>다가오는 내 모임</Text>
+        {nextMeetup ? (
+          <MeetupCard meetup={nextMeetup} onPress={() => router.push(`/meetup/${nextMeetup.id}`)} />
+        ) : (
+          <Pressable
+            onPress={() => router.push('/(tabs)/matches')}
+            style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="flash-outline" size={22} color={theme.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>참여 중인 모임이 없어요</Text>
               <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                첫 번째 번개 모임을 만들어보세요!
+                번개 모임을 찾아 참가해보세요
               </Text>
             </View>
-          }
-        />
-      )}
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </Pressable>
+        )}
 
-      <Pressable
-        onPress={() => router.push('/meetup/create')}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 },
-        ]}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+        {/* 3. 빠른 실행 */}
+        <View style={styles.quickRow}>
+          <Pressable
+            onPress={() => router.push('/meetup/create')}
+            style={({ pressed }) => [
+              styles.quickBtn,
+              { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 },
+            ]}>
+            <Ionicons name="add-circle-outline" size={22} color="#fff" />
+            <Text style={styles.quickTextPrimary}>모임 만들기</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/(tabs)/clubs')}
+            style={({ pressed }) => [
+              styles.quickBtn,
+              { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.9 : 1 },
+            ]}>
+            <Ionicons name="people-outline" size={22} color={theme.primary} />
+            <Text style={[styles.quickText, { color: theme.text }]}>클럽 찾기</Text>
+          </Pressable>
+        </View>
+
+        {/* 4. 근처 추천 모임 */}
+        <SectionHeader
+          title="근처 추천 모임"
+          onMore={() => router.push('/(tabs)/matches')}
+          theme={theme}
+        />
+        {recommended.length > 0 ? (
+          <View style={{ gap: Spacing.three }}>
+            {recommended.map((m) => (
+              <MeetupCard key={m.id} meetup={m} onPress={() => router.push(`/meetup/${m.id}`)} />
+            ))}
+          </View>
+        ) : (
+          <Text style={[styles.placeholder, { color: theme.textSecondary }]}>
+            아직 예정된 모임이 없어요. 첫 모임을 만들어보세요!
+          </Text>
+        )}
+
+        {/* 5. 추천 클럽 */}
+        <SectionHeader title="추천 클럽" onMore={() => router.push('/(tabs)/clubs')} theme={theme} />
+        {clubs.length > 0 ? (
+          <View style={{ gap: Spacing.three }}>
+            {clubs.map((c) => (
+              <ClubCard key={c.id} club={c} onPress={() => router.push(`/club/${c.id}`)} />
+            ))}
+          </View>
+        ) : (
+          <Text style={[styles.placeholder, { color: theme.textSecondary }]}>
+            아직 클럽이 없어요. 첫 클럽을 만들어보세요!
+          </Text>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Chip({
-  label,
-  active,
-  onPress,
+function SectionHeader({
+  title,
+  onMore,
   theme,
 }: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
+  title: string;
+  onMore: () => void;
   theme: ReturnType<typeof useTheme>;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: active ? theme.primary : theme.backgroundElement,
-        },
-      ]}>
-      <Text style={[styles.chipText, { color: active ? '#fff' : theme.textSecondary }]}>
-        {label}
-      </Text>
-    </Pressable>
+    <View style={styles.sectionRow}>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+      <Pressable onPress={onMore} hitSlop={8}>
+        <Text style={[styles.more, { color: theme.textSecondary }]}>전체보기</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.three,
-  },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  hello: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   sub: { fontSize: 14, marginTop: 2 },
-  chips: { paddingHorizontal: Spacing.four, gap: 8, paddingBottom: Spacing.three },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
-  chipText: { fontSize: 13, fontWeight: '600' },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyBody: { fontSize: 14 },
-  fab: {
-    position: 'absolute',
-    right: Spacing.four,
-    bottom: Spacing.four,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.two,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginTop: Spacing.two },
+  more: { fontSize: 13, fontWeight: '600', marginTop: Spacing.two },
+  emptyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: Spacing.three,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  emptyTitle: { fontSize: 15, fontWeight: '700' },
+  emptyBody: { fontSize: 13, marginTop: 2 },
+  quickRow: { flexDirection: 'row', gap: Spacing.three, marginTop: Spacing.one },
+  quickBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 14,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    gap: 8,
   },
+  quickTextPrimary: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  quickText: { fontSize: 15, fontWeight: '700' },
+  placeholder: { fontSize: 14, lineHeight: 20 },
 });

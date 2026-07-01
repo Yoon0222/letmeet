@@ -1,4 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import {
   createContext,
   useCallback,
@@ -8,9 +10,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
+
+// 네이티브에서 OAuth 브라우저 세션이 앱으로 돌아오면 마무리한다
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthContextValue {
   session: Session | null;
@@ -19,6 +25,7 @@ interface AuthContextValue {
   initializing: boolean;
   signUp: (email: string, password: string, nickname: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithKakao: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -87,6 +94,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }, []);
 
+  const signInWithKakao = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      // 웹: 전체 페이지 리다이렉트 후 detectSessionInUrl 이 세션을 복원
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      return;
+    }
+    // 네이티브: 인앱 브라우저로 열고, 돌아온 URL 의 code 를 세션으로 교환
+    const redirectTo = Linking.createURL('auth-callback');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+    if (!data?.url) throw new Error('카카오 인증 URL 을 받지 못했습니다.');
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success' || !result.url) return; // 사용자가 취소
+    const code = Linking.parse(result.url).queryParams?.code;
+    if (typeof code === 'string') {
+      const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
+      if (exErr) throw exErr;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -97,8 +132,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, loadProfile]);
 
   const value = useMemo(
-    () => ({ session, profile, initializing, signUp, signIn, signOut, refreshProfile }),
-    [session, profile, initializing, signUp, signIn, signOut, refreshProfile],
+    () => ({
+      session,
+      profile,
+      initializing,
+      signUp,
+      signIn,
+      signInWithKakao,
+      signOut,
+      refreshProfile,
+    }),
+    [session, profile, initializing, signUp, signIn, signInWithKakao, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

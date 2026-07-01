@@ -64,6 +64,37 @@ export type ParticipantWithProfile = Participant & {
   profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
 };
 
+// ---- 클럽(동호회) ----
+export type ClubRole = 'owner' | 'member';
+
+export type Club = {
+  id: string;
+  owner_id: string;
+  name: string;
+  description: string;
+  region: string;
+  created_at: string;
+};
+
+/** clubs_with_counts 뷰 결과 */
+export type ClubWithCounts = Club & {
+  owner_nickname: string;
+  owner_avatar_url: string | null;
+  member_count: number;
+};
+
+export type ClubMember = {
+  club_id: string;
+  user_id: string;
+  role: ClubRole;
+  joined_at: string;
+};
+
+/** 멤버 + 프로필 (조인 결과) */
+export type ClubMemberWithProfile = ClubMember & {
+  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+};
+
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
 type WriteDefaults<T> = Partial<T>;
 
@@ -93,10 +124,26 @@ export interface Database {
         Update: WriteDefaults<Participant>;
         Relationships: [];
       };
+      clubs: {
+        Row: Club;
+        Insert: WriteDefaults<Club> & { owner_id: string; name: string };
+        Update: WriteDefaults<Club>;
+        Relationships: [];
+      };
+      club_members: {
+        Row: ClubMember;
+        Insert: { club_id: string; user_id: string; role?: ClubRole };
+        Update: WriteDefaults<ClubMember>;
+        Relationships: [];
+      };
     };
     Views: {
       meetups_with_counts: {
         Row: MeetupWithCounts;
+        Relationships: [];
+      };
+      clubs_with_counts: {
+        Row: ClubWithCounts;
         Relationships: [];
       };
     };
