@@ -154,6 +154,19 @@ function DetailInner() {
     load();
   }
 
+  // 해당 경기 선수들에게 "차례 알림" 푸시 발송 (notify-turn 엣지 함수)
+  async function notifyTurn(m: TournamentMatch) {
+    const { data, error } = await supabase.functions.invoke('notify-turn', {
+      body: { match_id: m.id },
+    });
+    if (error) {
+      alert(`알림 전송 실패: ${error.message}`);
+      return;
+    }
+    const sent = (data as { sent?: number })?.sent ?? 0;
+    alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
+  }
+
   async function generateKnockout() {
     const gc = t?.group_count ?? 0;
     const byGroup: Standing[][] = [];
@@ -355,7 +368,7 @@ function DetailInner() {
                 </table>
                 <div className="mt-3 space-y-1.5">
                   {gm.map((m) => (
-                    <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} />
+                    <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} onNotify={notifyTurn} />
                   ))}
                 </div>
               </div>
@@ -390,7 +403,7 @@ function DetailInner() {
                 <h3 className="font-medium">{rm[0]?.round_name ?? `라운드 ${r}`}</h3>
                 <div className="mt-2 space-y-1.5">
                   {rm.map((m) => (
-                    <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} />
+                    <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} onNotify={notifyTurn} />
                   ))}
                 </div>
               </div>
@@ -412,11 +425,13 @@ function MatchRow({
   name,
   isOrganizer,
   onSave,
+  onNotify,
 }: {
   m: TournamentMatch;
   name: (uid: string | null) => string;
   isOrganizer: boolean;
   onSave: (m: TournamentMatch, s1: number, s2: number) => void;
+  onNotify: (m: TournamentMatch) => void;
 }) {
   const [s1, setS1] = useState<string>(m.score1?.toString() ?? '');
   const [s2, setS2] = useState<string>(m.score2?.toString() ?? '');
@@ -451,6 +466,15 @@ function MatchRow({
       <span className={`flex-1 text-right ${done && m.winner_id === m.entry2_id ? 'font-semibold text-emerald-700' : ''}`}>
         {name(m.entry2_id)}
       </span>
+      {isOrganizer && !done && !bye && (
+        <button
+          onClick={() => onNotify(m)}
+          title="이 경기 선수들에게 차례 알림 보내기"
+          className="ml-1 whitespace-nowrap rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+        >
+          🔔 차례 알림
+        </button>
+      )}
     </div>
   );
 }

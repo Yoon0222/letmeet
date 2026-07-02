@@ -10,6 +10,8 @@
 - [ ] Supabase에 `0007_discipline.sql` 실행 (단식/복식) — 사용자
 - [ ] **Supabase에 `0008_partner.sql` 실행** (복식 파트너 회원 연결 `partner_id`) — 사용자 · 실행 전 대회 상세 참가자 조회 실패함
 - [ ] **Supabase에 `0009_audit.sql` 실행** (감사 로그 테이블+트리거) — 사용자 · 실행 후부터 행위 기록, `/audit`(슈퍼관리자)에서 조회
+- [ ] **Supabase에 `0010_push_token.sql` 실행** (profiles.push_token) — 사용자
+- [ ] **Edge Function 배포** `supabase functions deploy notify-turn` (내 경기 차례 푸시) — 사용자 · 실기기 빌드 + Android FCM 자격 필요
 - [x] 대회 2단계 — 모바일 참가 신청 화면(대회 탭/목록/상세/신청) 완료
 - [ ] 대회 2단계 나머지: 앱 대진표/내 경기 열람, **선수 앱 푸시(내 차례)**, **진행자 "카톡 울리기"(노쇼 호출)**, 3·4위전, 정원 자동 마감
 - [ ] 대회 **선착순 참가 + 결제/대기열 흐름**(설계만): 신청 순서대로 처리, `입금 대기`도 정원에 포함(자리 예약) → 결제 완료 시 `참가 확정`, 신청 후 **24h 미입금 자동 취소**. 정원 차면 이후 신청은 `대기 신청`, 취소/자동취소로 자리 나면 **대기열 맨 앞 자동 승격 + 카카오톡 입금 요청(알림톡)+24h**. 무료 대회(fee=0)는 신청 즉시 확정(대기열 없음). 실제 결제는 PG(포트원/토스) 가맹점 계약·통신판매업 필요 → 나중에 연동
@@ -36,6 +38,11 @@
 ---
 
 ## 2026-07-03
+
+### 선수 앱 대진표 열람 + 내 경기 차례 푸시 알림
+- **대진표(열람)**: 모바일 대회 상세에 **대진표 섹션** 추가 — 내 경기 하이라이트, **조 순위표**(승/득실차), 조별 경기 결과, 토너먼트 라운드(준결승/결승) + 승자 강조. `src/lib/bracket.ts`(standings/groupMembers 읽기전용), `TournamentMatch` 타입/뷰 등록. **라이브 QA(QA 토너먼트)**: 조 순위(선수1 +9…)·11:8 결과·준결승·결승 정상 렌더 ✅.
+- **푸시 알림(내 경기 차례)**: `expo-notifications`+`expo-device` 설치, `src/lib/notifications.ts`(권한요청+Expo 토큰), 로그인 시 `profiles.push_token` 저장(auth 컨텍스트), `0010_push_token.sql`. **발송**: `supabase/functions/notify-turn`(Edge Function, 주최자/슈퍼관리자만, 경기 선수+파트너 토큰으로 Expo 푸시), 관리자 대진에 **🔔 차례 알림** 버튼(예정 경기).
+- **주의(사용자 필요)**: ① `0010_push_token.sql` 실행 ② `supabase functions deploy notify-turn` 배포 ③ **실기기 빌드**에서만 푸시 동작(Expo Go/웹 불가), Android는 FCM 자격 필요. tsconfig에 `supabase/functions` 제외(Deno). 모바일/web-admin tsc·lint ✅.
 
 ### 감사 로그(audit log) — DB 트리거 자동 기록
 - **결정**: 승인/거절/개설/수정/권한변경 등 주요 행위를 **앱이 아니라 DB 트리거**로 자동 기록(우회·누락·위조 불가). 누가(actor_id/role)·무엇(action/entity)·언제(created_at)·어떻게(old→new jsonb).

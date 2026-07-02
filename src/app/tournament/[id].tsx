@@ -12,12 +12,14 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
 import { useTheme } from '@/hooks/use-theme';
+import { groupMembers, standings } from '@/lib/bracket';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type {
   EntryStatus,
   PartnerProfile,
   TournamentEntryWithProfile,
+  TournamentMatch,
   TournamentWithCounts,
 } from '@/lib/types';
 
@@ -38,6 +40,7 @@ export default function TournamentDetail() {
 
   const [t, setT] = useState<TournamentWithCounts | null>(null);
   const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
+  const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
 
@@ -49,7 +52,7 @@ export default function TournamentDetail() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [{ data: tour }, { data: ents }] = await Promise.all([
+    const [{ data: tour }, { data: ents }, { data: ms }] = await Promise.all([
       supabase.from('tournaments_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('tournament_entries')
@@ -58,9 +61,15 @@ export default function TournamentDetail() {
         )
         .eq('tournament_id', id)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('tournament_matches')
+        .select('*')
+        .eq('tournament_id', id)
+        .order('slot', { ascending: true }),
     ]);
     setT(tour ?? null);
     setEntries((ents as unknown as TournamentEntryWithProfile[]) ?? []);
+    setMatches((ms as TournamentMatch[]) ?? []);
     setLoading(false);
   }, [id]);
 
@@ -77,6 +86,28 @@ export default function TournamentDetail() {
   const approved = entries.filter((e) => e.status === 'approved');
   const canRegister = t?.status === 'registration';
   const isDoubles = t?.discipline === 'doubles';
+
+  // 참가자 id → 표시 이름(복식은 파트너 포함)
+  const nameOf = useCallback(
+    (entryId: string | null): string => {
+      if (!entryId) return '부전승';
+      const e = entries.find((x) => x.user_id === entryId);
+      if (!e) return '미정';
+      const nick = e.profiles?.nickname ?? '?';
+      const partner = e.partner?.nickname ?? e.partner_name;
+      return isDoubles && partner ? `${nick} / ${partner}` : nick;
+    },
+    [entries, isDoubles],
+  );
+
+  // 대진 데이터 분해
+  const groupMatchesAll = matches.filter((m) => m.phase === 'group');
+  const koMatches = matches
+    .filter((m) => m.phase === 'knockout')
+    .sort((a, b) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot);
+  const groupNos = [...new Set(groupMatchesAll.map((m) => m.group_no ?? 1))].sort((a, b) => a - b);
+  const koRounds = [...new Set(koMatches.map((m) => m.round_order ?? 0))].sort((a, b) => a - b);
+  const myMatches = matches.filter((m) => m.entry1_id === uid || m.entry2_id === uid);
 
   // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
   useEffect(() => {
@@ -226,6 +257,71 @@ export default function TournamentDetail() {
           </View>
         </View>
 
+        {/* 대진표 (경기가 편성된 경우) */}
+        {matches.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>대진표</Text>
+
+            {myMatches.length > 0 && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
+                <View style={{ gap: 6, marginTop: 6 }}>
+                  {myMatches.map((m) => (
+                    <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {groupNos.map((gno) => {
+              const gms = groupMatchesAll.filter((m) => (m.group_no ?? 1) === gno);
+              const table = standings(groupMembers(gms), gms);
+              return (
+                <View key={`g${gno}`} style={{ marginTop: 14 }}>
+                  <Text style={[styles.subLabel, { color: theme.textSecondary }]}>{gno}조 순위</Text>
+                  <View style={[styles.tableCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    {table.map((s, i) => (
+                      <View
+                        key={s.id}
+                        style={[styles.standRow, i > 0 && { borderTopColor: theme.border, borderTopWidth: 1 }]}>
+                        <Text style={[styles.standRank, { color: theme.textSecondary }]}>{i + 1}</Text>
+                        <Text style={[styles.standName, { color: theme.text }]} numberOfLines={1}>
+                          {nameOf(s.id)}
+                        </Text>
+                        <Text style={[styles.standStat, { color: theme.text }]}>{s.wins}승</Text>
+                        <Text style={[styles.standStat, { color: theme.textSecondary }]}>
+                          {s.diff > 0 ? `+${s.diff}` : s.diff}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={{ gap: 6, marginTop: 6 }}>
+                    {gms.map((m) => (
+                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} />
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+
+            {koRounds.map((ro) => {
+              const rms = koMatches.filter((m) => (m.round_order ?? 0) === ro);
+              return (
+                <View key={`r${ro}`} style={{ marginTop: 14 }}>
+                  <Text style={[styles.subLabel, { color: theme.textSecondary }]}>
+                    {rms[0]?.round_name || '토너먼트'}
+                  </Text>
+                  <View style={{ gap: 6, marginTop: 6 }}>
+                    {rms.map((m) => (
+                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} />
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* 복식 파트너 검색·선택 (미신청 + 접수중일 때) */}
         {canRegister && !myEntry && isDoubles && (
           <View style={styles.section}>
@@ -332,6 +428,53 @@ function Info({
   );
 }
 
+// 경기 한 건: 양쪽 이름 + 점수(완료 시), 승자 강조, 내 경기 하이라이트
+function MatchRow({
+  m,
+  nameOf,
+  uid,
+  theme,
+  highlight = false,
+}: {
+  m: TournamentMatch;
+  nameOf: (id: string | null) => string;
+  uid: string | undefined;
+  theme: ReturnType<typeof useTheme>;
+  highlight?: boolean;
+}) {
+  const done = m.status === 'done';
+  const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
+  const w2 = done && !!m.winner_id && m.winner_id === m.entry2_id;
+  const mine = highlight || m.entry1_id === uid || m.entry2_id === uid;
+  return (
+    <View
+      style={[
+        styles.matchRow,
+        { backgroundColor: theme.card, borderColor: mine ? theme.primary : theme.border },
+      ]}>
+      <View style={{ flex: 1, gap: 4 }}>
+        {[
+          { id: m.entry1_id, score: m.score1, win: w1 },
+          { id: m.entry2_id, score: m.score2, win: w2 },
+        ].map((side, i) => (
+          <View key={i} style={styles.matchSide}>
+            <Text
+              style={[styles.matchName, { color: theme.text, fontWeight: side.win ? '800' : '500' }]}
+              numberOfLines={1}>
+              {nameOf(side.id)}
+            </Text>
+            <Text
+              style={[styles.matchScore, { color: side.win ? theme.primary : theme.textSecondary }]}>
+              {done ? side.score ?? 0 : '·'}
+            </Text>
+          </View>
+        ))}
+      </View>
+      {!done && <Text style={[styles.matchTag, { color: theme.textSecondary }]}>예정</Text>}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -370,6 +513,25 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 6,
   },
+  subLabel: { fontSize: 14, fontWeight: '700', marginTop: 2 },
+  tableCard: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: 'hidden' },
+  standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },
+  standRank: { width: 18, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  standName: { flex: 1, fontSize: 14, fontWeight: '600' },
+  standStat: { width: 44, fontSize: 13, fontWeight: '600', textAlign: 'right' },
+  matchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  matchSide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  matchName: { flex: 1, fontSize: 14 },
+  matchScore: { fontSize: 15, fontWeight: '800', minWidth: 18, textAlign: 'right' },
+  matchTag: { fontSize: 12, fontWeight: '600' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',

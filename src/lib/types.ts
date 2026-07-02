@@ -24,6 +24,7 @@ export type Profile = {
   play_style: PlayStyle;
   bio: string;
   avatar_url: string | null;
+  push_token: string | null;
   // DUPR 연동 대비 (추후 파트너 API 로 검증)
   dupr_id: string | null;
   dupr_rating: number | null;
@@ -151,6 +152,27 @@ export type TournamentEntryWithProfile = TournamentEntry & {
   partner: PartnerProfile | null;
 };
 
+// ---- 대진(tournament_matches) ----
+export type MatchPhase = 'group' | 'knockout';
+export type MatchStatus = 'scheduled' | 'done';
+
+export type TournamentMatch = {
+  id: string;
+  tournament_id: string;
+  phase: MatchPhase;
+  group_no: number | null;
+  round_order: number | null;
+  round_name: string | null;
+  slot: number;
+  entry1_id: string | null;
+  entry2_id: string | null;
+  score1: number | null;
+  score2: number | null;
+  winner_id: string | null;
+  status: MatchStatus;
+  created_at: string;
+};
+
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
 type WriteDefaults<T> = Partial<T>;
 
@@ -206,6 +228,12 @@ export interface Database {
         Row: TournamentEntry;
         Insert: { tournament_id: string; user_id: string } & WriteDefaults<TournamentEntry>;
         Update: WriteDefaults<TournamentEntry>;
+        Relationships: [];
+      };
+      tournament_matches: {
+        Row: TournamentMatch;
+        Insert: WriteDefaults<TournamentMatch> & { tournament_id: string; phase: MatchPhase };
+        Update: WriteDefaults<TournamentMatch>;
         Relationships: [];
       };
     };

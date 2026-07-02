@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 
+import { registerForPushTokenAsync } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 
@@ -76,6 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, [loadProfile]);
+
+  // 로그인한 기기의 Expo 푸시 토큰을 등록·저장 (내 경기 알림용). 실기기에서만 동작.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    (async () => {
+      const token = await registerForPushTokenAsync();
+      if (cancelled || !token) return;
+      await supabase.from('profiles').update({ push_token: token }).eq('id', uid);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
 
   const signUp = useCallback(
     async (email: string, password: string, nickname: string) => {

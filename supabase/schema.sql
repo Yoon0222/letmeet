@@ -18,6 +18,7 @@ create table if not exists public.profiles (
   play_style  text not null default 'all',        -- 'aggressive' | 'control' | 'all'
   bio         text not null default '',
   avatar_url  text,
+  push_token  text,                                -- Expo 푸시 토큰(내 경기 알림용)
   -- DUPR 연동 대비 (현재는 자가입력, 추후 파트너 API 로 검증)
   dupr_id       text,                              -- 사용자의 DUPR 계정 ID
   dupr_rating   numeric(3,1),                      -- DUPR 레이팅 (검증 시 채워짐)
