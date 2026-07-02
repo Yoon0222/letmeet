@@ -39,7 +39,10 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  if new.role is distinct from old.role and public.my_role() <> 'super_admin' then
+  -- auth.uid() 가 null 이면 백엔드/SQL Editor(신뢰) 컨텍스트 → 허용(부트스트랩용)
+  if new.role is distinct from old.role
+     and auth.uid() is not null
+     and public.my_role() <> 'super_admin' then
     new.role := old.role;
   end if;
   return new;
