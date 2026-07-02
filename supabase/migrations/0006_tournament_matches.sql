@@ -25,6 +25,20 @@ create table if not exists public.tournament_matches (
 );
 create index if not exists tournament_matches_tid_idx on public.tournament_matches (tournament_id);
 
+-- tournaments 에 컬럼이 추가됐으니 뷰를 새 컬럼 포함해 재생성 (t.* 는 생성 시점 컬럼만 잡음)
+drop view if exists public.tournaments_with_counts;
+create view public.tournaments_with_counts
+with (security_invoker = true)
+as
+select
+  t.*,
+  p.nickname   as organizer_nickname,
+  p.avatar_url as organizer_avatar_url,
+  (select count(*) from public.tournament_entries e where e.tournament_id = t.id and e.status = 'approved') as approved_count,
+  (select count(*) from public.tournament_entries e where e.tournament_id = t.id and e.status = 'pending') as pending_count
+from public.tournaments t
+join public.profiles p on p.id = t.organizer_id;
+
 alter table public.tournament_matches enable row level security;
 
 drop policy if exists "matches_select" on public.tournament_matches;
