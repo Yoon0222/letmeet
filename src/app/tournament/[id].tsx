@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BracketTree } from '@/components/bracket-tree';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -106,7 +107,6 @@ export default function TournamentDetail() {
     .filter((m) => m.phase === 'knockout')
     .sort((a, b) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot);
   const groupNos = [...new Set(groupMatchesAll.map((m) => m.group_no ?? 1))].sort((a, b) => a - b);
-  const koRounds = [...new Set(koMatches.map((m) => m.round_order ?? 0))].sort((a, b) => a - b);
   const myMatches = matches.filter((m) => m.entry1_id === uid || m.entry2_id === uid);
 
   // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
@@ -304,21 +304,12 @@ export default function TournamentDetail() {
               );
             })}
 
-            {koRounds.map((ro) => {
-              const rms = koMatches.filter((m) => (m.round_order ?? 0) === ro);
-              return (
-                <View key={`r${ro}`} style={{ marginTop: 14 }}>
-                  <Text style={[styles.subLabel, { color: theme.textSecondary }]}>
-                    {rms[0]?.round_name || '토너먼트'}
-                  </Text>
-                  <View style={{ gap: 6, marginTop: 6 }}>
-                    {rms.map((m) => (
-                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} />
-                    ))}
-                  </View>
-                </View>
-              );
-            })}
+            {koMatches.length > 0 && (
+              <View style={{ marginTop: 14 }}>
+                <Text style={[styles.subLabel, { color: theme.textSecondary }]}>토너먼트</Text>
+                <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} />
+              </View>
+            )}
           </View>
         )}
 

@@ -40,7 +40,7 @@
 ## 2026-07-03
 
 ### 선수 앱 대진표 열람 + 내 경기 차례 푸시 알림
-- **대진표(열람)**: 모바일 대회 상세에 **대진표 섹션** 추가 — 내 경기 하이라이트, **조 순위표**(승/득실차), 조별 경기 결과, 토너먼트 라운드(준결승/결승) + 승자 강조. `src/lib/bracket.ts`(standings/groupMembers 읽기전용), `TournamentMatch` 타입/뷰 등록. **라이브 QA(QA 토너먼트)**: 조 순위(선수1 +9…)·11:8 결과·준결승·결승 정상 렌더 ✅.
+- **대진표(열람)**: 모바일 대회 상세에 **대진표 섹션** 추가 — 내 경기 하이라이트, **조 순위표**(승/득실차), 조별 경기 결과, **토너먼트는 좌→우 브래킷 트리**(`src/components/bracket-tree.tsx`, 연결선 엘보+우승 박스, 가로 스크롤, 계산기반 좌표). `src/lib/bracket.ts`(standings/groupMembers 읽기전용), `TournamentMatch` 타입/뷰 등록. **라이브 QA(QA 토너먼트)**: 조 순위(선수1 +9…)·11:8 결과·준결승→결승→🏆선수1 트리 정상 렌더 ✅.
 - **푸시 알림(내 경기 차례)**: `expo-notifications`+`expo-device` 설치, `src/lib/notifications.ts`(권한요청+Expo 토큰), 로그인 시 `profiles.push_token` 저장(auth 컨텍스트), `0010_push_token.sql`. **발송**: `supabase/functions/notify-turn`(Edge Function, 주최자/슈퍼관리자만, 경기 선수+파트너 토큰으로 Expo 푸시), 관리자 대진에 **🔔 차례 알림** 버튼(예정 경기).
 - **주의(사용자 필요)**: ① `0010_push_token.sql` 실행 ② `supabase functions deploy notify-turn` 배포 ③ **실기기 빌드**에서만 푸시 동작(Expo Go/웹 불가), Android는 FCM 자격 필요. tsconfig에 `supabase/functions` 제외(Deno). 모바일/web-admin tsc·lint ✅.
 
