@@ -64,6 +64,7 @@ function RootNavigator() {
         options={{ presentation: 'modal', headerShown: true, title: '클럽 만들기' }}
       />
       <Stack.Screen name="club/[id]" options={{ headerShown: true, title: '클럽' }} />
+      <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
       <Stack.Screen
         name="profile/edit"
         options={{ presentation: 'modal', headerShown: true, title: '프로필 수정' }}
