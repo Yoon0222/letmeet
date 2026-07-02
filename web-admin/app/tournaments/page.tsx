@@ -34,6 +34,8 @@ function TournamentsInner() {
   }, [session?.user.id]);
 
   useEffect(() => {
+    // load 는 비동기로 await 이후 setState 를 호출한다 (동기 cascading 렌더 아님)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
