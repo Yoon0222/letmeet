@@ -49,6 +49,21 @@ export function seedQualifiers(standingsByGroup: Standing[][], advancePerGroup: 
   return seeds;
 }
 
+// 총 진출 인원 기준으로 랭크-우선(각 조 1위 → 각 조 2위 …) 시드 목록을 만들고 앞에서 N명.
+export function seedQualifiersTotal(standingsByGroup: Standing[][], totalAdvance: number): string[] {
+  const maxRank = Math.max(0, ...standingsByGroup.map((g) => g.length));
+  const seeds: string[] = [];
+  for (let rank = 0; rank < maxRank; rank++) {
+    for (const g of standingsByGroup) if (g[rank]) seeds.push(g[rank].id);
+  }
+  return seeds.slice(0, Math.max(2, totalAdvance));
+}
+
+// 조당 목표 인원으로 조 개수 계산
+export function groupCountForSize(n: number, perGroup: number): number {
+  return Math.max(1, Math.ceil(n / Math.max(1, perGroup)));
+}
+
 // 표준 토너먼트 시드 순서(0-index). n 은 2의 거듭제곱.
 function seedOrder(n: number): number[] {
   let seeds = [1, 2];

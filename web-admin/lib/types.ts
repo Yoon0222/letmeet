@@ -15,6 +15,7 @@ export type Profile = {
 
 export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancelled';
 export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+export type Discipline = 'singles' | 'doubles';
 
 export type Tournament = {
   id: string;
@@ -29,6 +30,7 @@ export type Tournament = {
   skill_min: number;
   skill_max: number;
   fee: number;
+  discipline: Discipline;
   format: string;
   status: TournamentStatus;
   group_count: number | null;

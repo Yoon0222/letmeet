@@ -7,9 +7,10 @@ import { Protected } from '@/components/protected';
 import {
   buildGroups,
   firstRoundPairs,
+  groupCountForSize,
   nextRoundPairs,
   roundName,
-  seedQualifiers,
+  seedQualifiersTotal,
   standings,
   type Standing,
 } from '@/lib/bracket';
@@ -43,8 +44,8 @@ function DetailInner() {
   const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [groupInput, setGroupInput] = useState(2);
-  const [advanceInput, setAdvanceInput] = useState(2);
+  const [perGroupInput, setPerGroupInput] = useState(4);
+  const [advanceInput, setAdvanceInput] = useState(4);
 
   const load = useCallback(async () => {
     const [{ data: tour }, { data: ents }, { data: ms }] = await Promise.all([
@@ -68,8 +69,12 @@ function DetailInner() {
   }, [load]);
 
   const isOrganizer = !!t && (t.organizer_id === session?.user.id);
-  const name = (uid: string | null) =>
-    !uid ? '부전승' : entries.find((e) => e.user_id === uid)?.profiles?.nickname ?? '알 수 없음';
+  const name = (uid: string | null) => {
+    if (!uid) return '부전승';
+    const e = entries.find((x) => x.user_id === uid);
+    const nick = e?.profiles?.nickname ?? '알 수 없음';
+    return t?.discipline === 'doubles' && e?.partner_name ? `${nick} / ${e.partner_name}` : nick;
+  };
 
   const approved = entries.filter((e) => e.status === 'approved');
   const groupMatches = matches.filter((m) => m.phase === 'group');
@@ -86,10 +91,11 @@ function DetailInner() {
   }
 
   async function generateGroups() {
-    const gc = Math.max(1, Math.min(groupInput, approved.length));
+    const per = Math.max(2, perGroupInput);
+    const gc = groupCountForSize(approved.length, per);
     const { rows } = buildGroups(approved.map((e) => e.user_id), gc);
     if (rows.length === 0) {
-      alert('경기를 만들 수 없어요. 조당 2명 이상이 되도록 조 개수를 줄이세요.');
+      alert('경기를 만들 수 없어요. 승인 인원과 조당 인원을 확인하세요.');
       return;
     }
     await supabase.from('tournament_matches').insert(
@@ -103,6 +109,30 @@ function DetailInner() {
       })),
     );
     await supabase.from('tournaments').update({ group_count: gc, status: 'ongoing' }).eq('id', id);
+    load();
+  }
+
+  // 조별리그 없이 바로 본선 토너먼트 (참가 순서 시드)
+  async function generateStraightKnockout() {
+    const seeds = approved.map((e) => e.user_id);
+    if (seeds.length < 2) return;
+    let size = 1;
+    while (size < seeds.length) size *= 2;
+    const pairs = firstRoundPairs(seeds);
+    await supabase.from('tournament_matches').insert(
+      pairs.map((p, i) => ({
+        tournament_id: id,
+        phase: 'knockout' as const,
+        round_order: 1,
+        round_name: roundName(size),
+        slot: i,
+        entry1_id: p[0],
+        entry2_id: p[1],
+        winner_id: p[1] ? null : p[0],
+        status: p[1] ? 'scheduled' : 'done',
+      })),
+    );
+    await supabase.from('tournaments').update({ status: 'ongoing' }).eq('id', id);
     load();
   }
 
@@ -121,14 +151,13 @@ function DetailInner() {
 
   async function generateKnockout() {
     const gc = t?.group_count ?? 0;
-    const adv = Math.max(1, advanceInput);
     const byGroup: Standing[][] = [];
     for (let g = 1; g <= gc; g++) {
       const gm = groupMatches.filter((m) => m.group_no === g);
       const members = Array.from(new Set(gm.flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[]));
       byGroup.push(standings(members, gm));
     }
-    const seeds = seedQualifiers(byGroup, adv);
+    const seeds = seedQualifiersTotal(byGroup, advanceInput);
     if (seeds.length < 2) {
       alert('진출자가 2명 이상이어야 토너먼트를 만들 수 있어요.');
       return;
@@ -149,7 +178,7 @@ function DetailInner() {
         status: p[1] ? 'scheduled' : 'done',
       })),
     );
-    await supabase.from('tournaments').update({ advance_per_group: adv }).eq('id', id);
+    await supabase.from('tournaments').update({ advance_per_group: advanceInput }).eq('id', id);
     load();
   }
 
@@ -192,7 +221,7 @@ function DetailInner() {
           <span className="text-sm text-slate-500">{TOURNAMENT_STATUS_LABEL[t.status]}</span>
           <h1 className="text-2xl font-semibold">{t.title}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {formatDateTime(t.start_at)} · {t.venue || '장소 미정'}
+            {t.discipline === 'doubles' ? '복식' : '단식'} · {formatDateTime(t.start_at)} · {t.venue || '장소 미정'}
             {t.region ? ` · ${t.region}` : ''} · 정원 {t.approved_count}/{t.max_participants}
             {' · '}실력 {skillRange(t.skill_min, t.skill_max)}
           </p>
@@ -266,13 +295,18 @@ function DetailInner() {
           ) : !isOrganizer ? (
             <p className="text-sm text-slate-500">아직 대진이 생성되지 않았습니다.</p>
           ) : (
-            <div className="flex items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <label className="text-sm">
-                <span className="mb-1 block text-slate-600">조 개수 (승인 {approved.length}명)</span>
-                <input type="number" min={1} max={approved.length} value={groupInput} onChange={(e) => setGroupInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                <span className="mb-1 block text-slate-600">
+                  조당 인원 (승인 {approved.length}{t.discipline === 'doubles' ? '팀' : '명'})
+                </span>
+                <input type="number" min={2} value={perGroupInput} onChange={(e) => setPerGroupInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
               </label>
               <button onClick={generateGroups} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-                조별리그 대진 생성
+                조별리그 생성 ({groupCountForSize(approved.length, Math.max(2, perGroupInput))}개 조)
+              </button>
+              <button onClick={generateStraightKnockout} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
+                조별리그 없이 바로 본선
               </button>
             </div>
           )}
@@ -322,15 +356,17 @@ function DetailInner() {
 
       {/* 토너먼트 생성 */}
       {groupsDone && koMatches.length === 0 && isOrganizer && (
-        <div className="mt-4 flex items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <label className="text-sm">
-            <span className="mb-1 block text-slate-600">조별 진출 인원</span>
-            <input type="number" min={1} value={advanceInput} onChange={(e) => setAdvanceInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-slate-600">본선 진출 인원 (총)</span>
+            <input type="number" min={2} value={advanceInput} onChange={(e) => setAdvanceInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           </label>
           <button onClick={generateKnockout} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
             본선 토너먼트 생성
           </button>
-          <span className="pb-2 text-xs text-slate-400">각 조 상위 {advanceInput}명이 진출 → 총 {(t.group_count ?? 0) * advanceInput}명</span>
+          <span className="pb-2 text-xs text-slate-400">
+            상위 {advanceInput}명 진출 → {roundName((() => { let s = 1; while (s < Math.max(2, advanceInput)) s *= 2; return s; })())} (부족분은 상위 시드 부전승)
+          </span>
         </div>
       )}
 

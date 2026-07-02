@@ -310,6 +310,8 @@ create table if not exists public.tournaments (
   skill_min             numeric(3,1) not null default 2.0,
   skill_max             numeric(3,1) not null default 8.0,
   fee                   int not null default 0,          -- 참가비(원)
+  discipline            text not null default 'singles'  -- 'singles' | 'doubles'
+                        check (discipline in ('singles', 'doubles')),
   format                text not null default 'single_elim',  -- 대진 방식(추후)
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
   group_count           int,                                  -- 조 개수 (대진 생성 시)
