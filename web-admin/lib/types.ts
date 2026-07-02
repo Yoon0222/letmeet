@@ -31,6 +31,27 @@ export type Tournament = {
   fee: number;
   format: string;
   status: TournamentStatus;
+  group_count: number | null;
+  advance_per_group: number | null;
+  created_at: string;
+};
+
+export type MatchPhase = 'group' | 'knockout';
+
+export type TournamentMatch = {
+  id: string;
+  tournament_id: string;
+  phase: MatchPhase;
+  group_no: number | null;
+  round_order: number | null;
+  round_name: string | null;
+  slot: number;
+  entry1_id: string | null;
+  entry2_id: string | null;
+  score1: number | null;
+  score2: number | null;
+  winner_id: string | null;
+  status: 'scheduled' | 'done';
   created_at: string;
 };
 
@@ -83,6 +104,12 @@ export interface Database {
         Row: TournamentEntry;
         Insert: { tournament_id: string; user_id: string } & Write<TournamentEntry>;
         Update: Write<TournamentEntry>;
+        Relationships: [];
+      };
+      tournament_matches: {
+        Row: TournamentMatch;
+        Insert: Write<TournamentMatch> & { tournament_id: string; phase: MatchPhase };
+        Update: Write<TournamentMatch>;
         Relationships: [];
       };
     };

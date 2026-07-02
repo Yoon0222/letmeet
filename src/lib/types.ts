@@ -117,6 +117,8 @@ export type Tournament = {
   fee: number;
   format: string;
   status: TournamentStatus;
+  group_count: number | null;
+  advance_per_group: number | null;
   created_at: string;
 };
 

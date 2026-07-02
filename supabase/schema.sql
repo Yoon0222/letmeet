@@ -312,6 +312,8 @@ create table if not exists public.tournaments (
   fee                   int not null default 0,          -- 참가비(원)
   format                text not null default 'single_elim',  -- 대진 방식(추후)
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
+  group_count           int,                                  -- 조 개수 (대진 생성 시)
+  advance_per_group     int,                                  -- 조별 진출 인원
   created_at            timestamptz not null default now()
 );
 create index if not exists tournaments_start_idx on public.tournaments (start_at);
@@ -376,3 +378,36 @@ select
      where e.tournament_id = t.id and e.status = 'pending') as pending_count
 from public.tournaments t
 join public.profiles p on p.id = t.organizer_id;
+
+-- 대회 진행: 경기(조별리그 + 토너먼트)
+create table if not exists public.tournament_matches (
+  id            uuid primary key default uuid_generate_v4(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  phase         text not null,                 -- 'group' | 'knockout'
+  group_no      int,
+  round_order   int,
+  round_name    text,
+  slot          int not null default 0,
+  entry1_id     uuid references public.profiles(id) on delete set null,
+  entry2_id     uuid references public.profiles(id) on delete set null,
+  score1        int,
+  score2        int,
+  winner_id     uuid references public.profiles(id) on delete set null,
+  status        text not null default 'scheduled',
+  created_at    timestamptz not null default now()
+);
+create index if not exists tournament_matches_tid_idx on public.tournament_matches (tournament_id);
+
+alter table public.tournament_matches enable row level security;
+drop policy if exists "matches_select" on public.tournament_matches;
+create policy "matches_select" on public.tournament_matches for select using (true);
+drop policy if exists "matches_write_organizer" on public.tournament_matches;
+create policy "matches_write_organizer" on public.tournament_matches
+  for all using (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  )
+  with check (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  );
