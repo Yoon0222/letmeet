@@ -137,13 +137,18 @@ export type TournamentEntry = {
   user_id: string;
   status: EntryStatus;
   partner_name: string | null;
+  partner_id: string | null;
   seed: number | null;
   created_at: string;
 };
 
+/** 파트너/참가자 프로필 요약 */
+export type PartnerProfile = Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+
 /** 참가신청 + 프로필 (조인 결과) */
 export type TournamentEntryWithProfile = TournamentEntry & {
-  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+  profiles: PartnerProfile;
+  partner: PartnerProfile | null;
 };
 
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----

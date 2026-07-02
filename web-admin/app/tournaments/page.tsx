@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Protected } from '@/components/protected';
 import { formatDateTime, TOURNAMENT_STATUS_LABEL } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { useRole } from '@/lib/use-role';
 import { useSession } from '@/lib/use-session';
 import type { TournamentWithCounts } from '@/lib/types';
 
@@ -18,20 +19,21 @@ const STATUS_STYLE: Record<string, string> = {
 
 function TournamentsInner() {
   const { session } = useSession();
+  const { role } = useRole();
+  const isSuperAdmin = role === 'super_admin';
   const [rows, setRows] = useState<TournamentWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const uid = session?.user.id;
-    if (!uid) return;
-    const { data } = await supabase
-      .from('tournaments_with_counts')
-      .select('*')
-      .eq('organizer_id', uid)
-      .order('start_at', { ascending: false });
+    if (!uid || !role) return;
+    // 슈퍼관리자는 전체 대회, 그 외는 본인이 개설한 대회만
+    let query = supabase.from('tournaments_with_counts').select('*');
+    if (role !== 'super_admin') query = query.eq('organizer_id', uid);
+    const { data } = await query.order('start_at', { ascending: false });
     setRows(data ?? []);
     setLoading(false);
-  }, [session?.user.id]);
+  }, [session?.user.id, role]);
 
   useEffect(() => {
     // load 는 비동기로 await 이후 setState 를 호출한다 (동기 cascading 렌더 아님)
@@ -43,8 +45,12 @@ function TournamentsInner() {
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">내 대회</h1>
-          <p className="mt-1 text-sm text-slate-500">개설한 대회를 운영하고 참가 신청을 관리하세요.</p>
+          <h1 className="text-2xl font-semibold">{isSuperAdmin ? '전체 대회' : '내 대회'}</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isSuperAdmin
+              ? '모든 운영자의 대회를 조회·관리할 수 있어요.'
+              : '개설한 대회를 운영하고 참가 신청을 관리하세요.'}
+          </p>
         </div>
         <Link
           href="/tournaments/new"
@@ -58,7 +64,7 @@ function TournamentsInner() {
         <p className="mt-8 text-slate-500">불러오는 중…</p>
       ) : rows.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-          아직 개설한 대회가 없습니다. 첫 대회를 만들어보세요.
+          {isSuperAdmin ? '아직 개설된 대회가 없습니다.' : '아직 개설한 대회가 없습니다. 첫 대회를 만들어보세요.'}
         </div>
       ) : (
         <div className="mt-6 grid gap-3">

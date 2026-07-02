@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui/avatar';
@@ -14,7 +14,12 @@ import { useLoading } from '@/contexts/loading';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { EntryStatus, TournamentEntryWithProfile, TournamentWithCounts } from '@/lib/types';
+import type {
+  EntryStatus,
+  PartnerProfile,
+  TournamentEntryWithProfile,
+  TournamentWithCounts,
+} from '@/lib/types';
 
 const ENTRY_LABEL: Record<EntryStatus, string> = {
   pending: '승인 대기중',
@@ -34,8 +39,13 @@ export default function TournamentDetail() {
   const [t, setT] = useState<TournamentWithCounts | null>(null);
   const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [partner, setPartner] = useState('');
   const [acting, setActing] = useState(false);
+
+  // 복식 파트너 검색/선택
+  const [partnerQuery, setPartnerQuery] = useState('');
+  const [partnerResults, setPartnerResults] = useState<PartnerProfile[]>([]);
+  const [partnerSel, setPartnerSel] = useState<PartnerProfile | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -43,7 +53,9 @@ export default function TournamentDetail() {
       supabase.from('tournaments_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('tournament_entries')
-        .select('*, profiles(id, nickname, skill_level, avatar_url, region)')
+        .select(
+          '*, profiles:profiles!tournament_entries_user_id_fkey(id, nickname, skill_level, avatar_url, region), partner:profiles!tournament_entries_partner_id_fkey(id, nickname, skill_level, avatar_url, region)',
+        )
         .eq('tournament_id', id)
         .order('created_at', { ascending: true }),
     ]);
@@ -64,14 +76,42 @@ export default function TournamentDetail() {
   const myEntry = entries.find((e) => e.user_id === uid);
   const approved = entries.filter((e) => e.status === 'approved');
   const canRegister = t?.status === 'registration';
+  const isDoubles = t?.discipline === 'doubles';
+
+  // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
+  useEffect(() => {
+    const q = partnerQuery.trim();
+    if (partnerSel || q.length < 1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPartnerResults([]);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, nickname, skill_level, avatar_url, region')
+        .ilike('nickname', `%${q}%`)
+        .neq('id', uid ?? '')
+        .limit(8);
+      setPartnerResults((data as PartnerProfile[]) ?? []);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [partnerQuery, partnerSel, uid]);
 
   async function apply() {
     if (!uid || !id) return;
+    if (isDoubles && !partnerSel) {
+      Alert.alert('파트너 필요', '복식은 함께 출전할 파트너를 선택해야 해요.');
+      return;
+    }
     setActing(true);
     const { error } = await supabase.from('tournament_entries').insert({
       tournament_id: id,
       user_id: uid,
-      partner_name: t?.discipline === 'doubles' ? partner.trim() || null : null,
+      partner_id: isDoubles ? partnerSel?.id ?? null : null,
+      partner_name: isDoubles ? partnerSel?.nickname ?? null : null,
     });
     setActing(false);
     if (error) {
@@ -117,7 +157,7 @@ export default function TournamentDetail() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
           <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#7A4E00" bg="rgba(245,166,35,0.16)" />
           {t.status === 'registration' ? (
@@ -167,7 +207,9 @@ export default function TournamentDetail() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.pName, { color: theme.text }]}>
                       {e.profiles?.nickname ?? '알 수 없음'}
-                      {t.discipline === 'doubles' && e.partner_name ? ` / ${e.partner_name}` : ''}
+                      {isDoubles && (e.partner?.nickname ?? e.partner_name)
+                        ? ` / ${e.partner?.nickname ?? e.partner_name}`
+                        : ''}
                     </Text>
                     <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
                       {e.profiles?.region || '지역 미설정'}
@@ -184,15 +226,66 @@ export default function TournamentDetail() {
           </View>
         </View>
 
-        {/* 복식 파트너 입력 (미신청 + 접수중일 때) */}
-        {canRegister && !myEntry && t.discipline === 'doubles' && (
+        {/* 복식 파트너 검색·선택 (미신청 + 접수중일 때) */}
+        {canRegister && !myEntry && isDoubles && (
           <View style={styles.section}>
-            <TextField
-              label="파트너 이름 (복식)"
-              value={partner}
-              onChangeText={setPartner}
-              placeholder="함께 출전할 파트너"
-            />
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>파트너 선택 (복식)</Text>
+            {partnerSel ? (
+              <View style={[styles.partnerChip, { backgroundColor: theme.card, borderColor: theme.primary }]}>
+                <Avatar nickname={partnerSel.nickname} uri={partnerSel.avatar_url} size={36} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pName, { color: theme.text }]}>{partnerSel.nickname}</Text>
+                  <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
+                    {partnerSel.region || '지역 미설정'} · {partnerSel.skill_level.toFixed(1)} {skillLabel(partnerSel.skill_level)}
+                  </Text>
+                </View>
+                <Text
+                  onPress={() => {
+                    setPartnerSel(null);
+                    setPartnerQuery('');
+                  }}
+                  style={[styles.partnerClear, { color: theme.primary }]}>
+                  변경
+                </Text>
+              </View>
+            ) : (
+              <>
+                <TextField
+                  label="파트너 이름으로 검색"
+                  value={partnerQuery}
+                  onChangeText={setPartnerQuery}
+                  placeholder="닉네임 입력 후 목록에서 선택"
+                  autoCapitalize="none"
+                />
+                {searching ? (
+                  <Text style={[styles.pMeta, { color: theme.textSecondary, marginTop: 6 }]}>검색 중…</Text>
+                ) : partnerQuery.trim().length > 0 && partnerResults.length === 0 ? (
+                  <View style={[styles.partnerNotice, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <Ionicons name="alert-circle-outline" size={16} color={theme.textSecondary} />
+                    <Text style={[styles.pMeta, { color: theme.textSecondary, flex: 1 }]}>
+                      가입되지 않은 회원이에요. 앱에 가입된 회원만 파트너로 지정할 수 있어요.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ marginTop: 6, gap: 6 }}>
+                    {partnerResults.map((p) => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => setPartnerSel(p)}
+                        style={[styles.partnerRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <Avatar nickname={p.nickname} uri={p.avatar_url} size={34} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.pName, { color: theme.text }]}>{p.nickname}</Text>
+                          <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
+                            {p.region || '지역 미설정'} · {p.skill_level.toFixed(1)} {skillLabel(p.skill_level)}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -258,4 +351,31 @@ const styles = StyleSheet.create({
   actionBar: { padding: Spacing.three, borderTopWidth: 1 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   statusText: { fontSize: 15, fontWeight: '700' },
+  partnerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 8,
+  },
+  partnerClear: { fontSize: 14, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 4 },
+  partnerNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+  },
+  partnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 8,
+  },
 });

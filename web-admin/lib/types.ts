@@ -69,6 +69,7 @@ export type TournamentEntry = {
   user_id: string;
   status: EntryStatus;
   partner_name: string | null;
+  partner_id: string | null;
   seed: number | null;
   created_at: string;
 };
@@ -83,6 +84,23 @@ export type EntryProfile = {
 
 export type TournamentEntryWithProfile = TournamentEntry & {
   profiles: EntryProfile;
+  partner: EntryProfile | null;
+};
+
+export type AuditLog = {
+  id: number;
+  actor_id: string | null;
+  actor_role: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type AuditLogWithActor = AuditLog & {
+  actor: Pick<EntryProfile, 'id' | 'nickname'> | null;
 };
 
 type Write<T> = Partial<T>;
@@ -112,6 +130,12 @@ export interface Database {
         Row: TournamentMatch;
         Insert: Write<TournamentMatch> & { tournament_id: string; phase: MatchPhase };
         Update: Write<TournamentMatch>;
+        Relationships: [];
+      };
+      audit_logs: {
+        Row: AuditLog;
+        Insert: Write<AuditLog>;
+        Update: Write<AuditLog>;
         Relationships: [];
       };
     };

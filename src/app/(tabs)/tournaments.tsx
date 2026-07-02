@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -15,7 +16,15 @@ import { TournamentCard } from '@/components/tournament-card';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import type { TournamentWithCounts } from '@/lib/types';
+import type { Discipline, TournamentWithCounts } from '@/lib/types';
+
+type DisciplineFilter = 'all' | Discipline;
+
+const FILTERS: { key: DisciplineFilter; label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'singles', label: '단식' },
+  { key: 'doubles', label: '복식' },
+];
 
 export default function TournamentsScreen() {
   const theme = useTheme();
@@ -23,6 +32,7 @@ export default function TournamentsScreen() {
   const [rows, setRows] = useState<TournamentWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<DisciplineFilter>('all');
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -56,13 +66,34 @@ export default function TournamentsScreen() {
         </Text>
       </View>
 
+      {/* 단식/복식 구분 필터 */}
+      <View style={styles.segment}>
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <Pressable
+              key={f.key}
+              onPress={() => setFilter(f.key)}
+              style={[
+                styles.segItem,
+                { borderColor: theme.border, backgroundColor: active ? theme.primary : 'transparent' },
+              ]}>
+              <Text
+                style={[styles.segText, { color: active ? '#fff' : theme.textSecondary }]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : (
         <FlatList
-          data={rows}
+          data={filter === 'all' ? rows : rows.filter((t) => t.discipline === filter)}
           keyExtractor={(t) => t.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -81,7 +112,9 @@ export default function TournamentsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="trophy-outline" size={48} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>아직 대회가 없어요</Text>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                {filter === 'all' ? '아직 대회가 없어요' : `${filter === 'singles' ? '단식' : '복식'} 대회가 없어요`}
+              </Text>
               <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
                 열리는 대회가 생기면 여기에 표시됩니다.
               </Text>
@@ -95,9 +128,22 @@ export default function TournamentsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
+  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two },
   title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   sub: { fontSize: 14, marginTop: 2 },
+  segment: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.three,
+  },
+  segItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  segText: { fontSize: 14, fontWeight: '700' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },

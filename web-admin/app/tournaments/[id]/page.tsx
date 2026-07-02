@@ -52,7 +52,9 @@ function DetailInner() {
       supabase.from('tournaments_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('tournament_entries')
-        .select('*, profiles(id, nickname, skill_level, avatar_url, region)')
+        .select(
+          '*, profiles:profiles!tournament_entries_user_id_fkey(id, nickname, skill_level, avatar_url, region), partner:profiles!tournament_entries_partner_id_fkey(id, nickname, skill_level, avatar_url, region)',
+        )
         .eq('tournament_id', id)
         .order('created_at', { ascending: true }),
       supabase.from('tournament_matches').select('*').eq('tournament_id', id).order('slot', { ascending: true }),
@@ -73,10 +75,13 @@ function DetailInner() {
     if (!uid) return '부전승';
     const e = entries.find((x) => x.user_id === uid);
     const nick = e?.profiles?.nickname ?? '알 수 없음';
-    return t?.discipline === 'doubles' && e?.partner_name ? `${nick} / ${e.partner_name}` : nick;
+    const partnerNick = e?.partner?.nickname ?? e?.partner_name;
+    return t?.discipline === 'doubles' && partnerNick ? `${nick} / ${partnerNick}` : nick;
   };
 
   const approved = entries.filter((e) => e.status === 'approved');
+  // 거절된 신청은 목록에서 숨긴다
+  const visibleEntries = entries.filter((e) => e.status !== 'rejected');
   const groupMatches = matches.filter((m) => m.phase === 'group');
   const koMatches = matches.filter((m) => m.phase === 'knockout');
   const groupsDone = groupMatches.length > 0 && groupMatches.every((m) => m.status === 'done');
@@ -234,8 +239,8 @@ function DetailInner() {
       </div>
 
       {/* 참가 신청 */}
-      <h2 className="mt-8 text-lg font-medium">참가 신청 {entries.length}건</h2>
-      {entries.length === 0 ? (
+      <h2 className="mt-8 text-lg font-medium">참가 신청 {visibleEntries.length}건</h2>
+      {visibleEntries.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">아직 신청이 없습니다.</p>
       ) : (
         <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -249,9 +254,14 @@ function DetailInner() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e) => (
+              {visibleEntries.map((e) => (
                 <tr key={e.user_id} className="border-t border-slate-100">
-                  <td className="px-4 py-2 font-medium">{e.profiles?.nickname ?? '알 수 없음'}</td>
+                  <td className="px-4 py-2 font-medium">
+                    {e.profiles?.nickname ?? '알 수 없음'}
+                    {t?.discipline === 'doubles' && (e.partner?.nickname ?? e.partner_name) && (
+                      <span className="text-slate-500"> / {e.partner?.nickname ?? e.partner_name}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2">{e.profiles ? e.profiles.skill_level.toFixed(1) : '-'}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ENTRY_STYLE[e.status]}`}>

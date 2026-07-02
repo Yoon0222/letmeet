@@ -325,7 +325,8 @@ create table if not exists public.tournament_entries (
   tournament_id uuid not null references public.tournaments(id) on delete cascade,
   user_id       uuid not null references public.profiles(id) on delete cascade,
   status        text not null default 'pending',   -- pending | approved | rejected | withdrawn
-  partner_name  text,                              -- 복식 파트너(선택)
+  partner_name  text,                              -- 복식 파트너 이름(표시용 스냅샷)
+  partner_id    uuid references public.profiles(id) on delete set null, -- 복식 파트너(회원 연결)
   seed          int,                               -- 대진 시드(추후)
   created_at    timestamptz not null default now(),
   primary key (tournament_id, user_id)
@@ -413,3 +414,78 @@ create policy "matches_write_organizer" on public.tournament_matches
     public.my_role() = 'super_admin'
     or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
   );
+
+-- ============================================================
+-- 감사 로그(audit log) — 0009
+-- 주요 행위(승인/거절/생성/수정/권한변경)를 트리거로 자동 기록.
+-- ============================================================
+create table if not exists public.audit_logs (
+  id          bigint generated always as identity primary key,
+  actor_id    uuid references public.profiles(id) on delete set null, -- 누가
+  actor_role  text,                                                   -- 당시 역할
+  action      text not null,          -- 무엇을 (예: tournament_entries.UPDATE)
+  entity_type text not null,          -- 대상 테이블
+  entity_id   text,                   -- 대상 식별자(복합키는 'tid:uid')
+  old_data    jsonb,                  -- 변경 전
+  new_data    jsonb,                  -- 변경 후
+  created_at  timestamptz not null default now()  -- 언제
+);
+create index if not exists audit_logs_created_idx on public.audit_logs (created_at desc);
+create index if not exists audit_logs_actor_idx on public.audit_logs (actor_id);
+create index if not exists audit_logs_entity_idx on public.audit_logs (entity_type, entity_id);
+
+create or replace function public.audit_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_row   jsonb := case when TG_OP = 'DELETE' then to_jsonb(OLD) else to_jsonb(NEW) end;
+  v_entity text;
+begin
+  v_entity := coalesce(
+    v_row->>'id',
+    (v_row->>'tournament_id') || coalesce(':' || (v_row->>'user_id'), '')
+  );
+  insert into public.audit_logs(
+    actor_id, actor_role, action, entity_type, entity_id, old_data, new_data
+  ) values (
+    v_actor,
+    case when v_actor is null then null else public.my_role() end,
+    TG_TABLE_NAME || '.' || TG_OP,
+    TG_TABLE_NAME,
+    v_entity,
+    case when TG_OP in ('UPDATE', 'DELETE') then to_jsonb(OLD) else null end,
+    case when TG_OP in ('INSERT', 'UPDATE') then to_jsonb(NEW) else null end
+  );
+  return null;
+end;
+$$;
+
+drop trigger if exists audit_tournaments on public.tournaments;
+create trigger audit_tournaments
+  after insert or update or delete on public.tournaments
+  for each row execute function public.audit_trigger();
+
+drop trigger if exists audit_entries on public.tournament_entries;
+create trigger audit_entries
+  after insert or update or delete on public.tournament_entries
+  for each row execute function public.audit_trigger();
+
+drop trigger if exists audit_matches on public.tournament_matches;
+create trigger audit_matches
+  after insert or update or delete on public.tournament_matches
+  for each row execute function public.audit_trigger();
+
+drop trigger if exists audit_profile_role on public.profiles;
+create trigger audit_profile_role
+  after update on public.profiles
+  for each row when (old.role is distinct from new.role)
+  execute function public.audit_trigger();
+
+alter table public.audit_logs enable row level security;
+drop policy if exists "audit_select_super" on public.audit_logs;
+create policy "audit_select_super" on public.audit_logs
+  for select using (public.my_role() = 'super_admin');

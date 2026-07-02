@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "피클 대회 관리자",
+  title: "피클",
   description: "피클볼 대회 개설·운영 관리자",
 };
 
