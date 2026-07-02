@@ -2,6 +2,8 @@
 // 도메인 타입 + Supabase Database 타입 (수동 정의)
 // ============================================================
 
+export type UserRole = 'player' | 'organizer' | 'court_manager' | 'super_admin';
+
 export type PlayStyle = 'aggressive' | 'control' | 'all';
 
 export const PLAY_STYLE_LABELS: Record<PlayStyle, string> = {
@@ -26,6 +28,7 @@ export type Profile = {
   dupr_id: string | null;
   dupr_rating: number | null;
   dupr_verified: boolean;
+  role: UserRole;
   created_at: string;
   updated_at: string;
 };

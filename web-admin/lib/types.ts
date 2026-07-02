@@ -1,6 +1,18 @@
 // 모바일 앱(src/lib/types.ts)과 공유하는 대회 관련 도메인 타입.
 // 별도 앱이라 필요한 부분만 복제한다. 스키마 변경 시 양쪽을 함께 갱신할 것.
 
+export type UserRole = 'player' | 'organizer' | 'court_manager' | 'super_admin';
+
+export type Profile = {
+  id: string;
+  nickname: string;
+  role: UserRole;
+  region: string;
+  skill_level: number;
+  avatar_url: string | null;
+  created_at: string;
+};
+
 export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancelled';
 export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 
@@ -55,6 +67,12 @@ type Write<T> = Partial<T>;
 export interface Database {
   public: {
     Tables: {
+      profiles: {
+        Row: Profile;
+        Insert: Write<Profile> & { id: string; nickname: string };
+        Update: Write<Profile>;
+        Relationships: [];
+      };
       tournaments: {
         Row: Tournament;
         Insert: Write<Tournament> & { organizer_id: string; title: string; start_at: string };

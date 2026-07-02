@@ -22,6 +22,9 @@ create table if not exists public.profiles (
   dupr_id       text,                              -- 사용자의 DUPR 계정 ID
   dupr_rating   numeric(3,1),                      -- DUPR 레이팅 (검증 시 채워짐)
   dupr_verified boolean not null default false,    -- API 로 검증되었는지 여부
+  -- 권한(역할): player < organizer < court_manager < super_admin. 부여는 super_admin 만.
+  role        text not null default 'player'
+              check (role in ('player', 'organizer', 'court_manager', 'super_admin')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -134,6 +137,33 @@ create policy "profiles_update_own" on public.profiles
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
+
+-- 권한(역할) 헬퍼 + super_admin 역할 부여 + 자기 role 변경 차단
+create or replace function public.my_role()
+returns text language sql stable security definer set search_path = public
+as $$
+  select coalesce((select role from public.profiles where id = auth.uid()), 'player');
+$$;
+
+drop policy if exists "profiles_update_superadmin" on public.profiles;
+create policy "profiles_update_superadmin" on public.profiles
+  for update using (public.my_role() = 'super_admin');
+
+create or replace function public.enforce_role_change()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.role is distinct from old.role and public.my_role() <> 'super_admin' then
+    new.role := old.role;  -- super_admin 이 아니면 role 변경 무시
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_profile_role_change on public.profiles;
+create trigger on_profile_role_change
+  before update on public.profiles
+  for each row execute function public.enforce_role_change();
 
 -- meetups: 로그인 사용자 조회 가능, 호스트만 생성/수정/삭제
 drop policy if exists "meetups_select" on public.meetups;
@@ -302,7 +332,10 @@ drop policy if exists "tournaments_select" on public.tournaments;
 create policy "tournaments_select" on public.tournaments for select using (true);
 drop policy if exists "tournaments_insert_organizer" on public.tournaments;
 create policy "tournaments_insert_organizer" on public.tournaments
-  for insert with check (auth.uid() = organizer_id);
+  for insert with check (
+    auth.uid() = organizer_id
+    and public.my_role() in ('organizer', 'court_manager', 'super_admin')
+  );
 drop policy if exists "tournaments_update_organizer" on public.tournaments;
 create policy "tournaments_update_organizer" on public.tournaments
   for update using (auth.uid() = organizer_id);

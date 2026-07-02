@@ -4,7 +4,8 @@
 
 ## 열린 항목
 - [x] Supabase에 `0004_tournaments.sql` 실행 (대회 테이블) — 적용됨(테이블 200 확인)
-- [ ] 권한(역할) 체계 (모델 B): `profiles.role`(user/organizer/admin) + 관리자 웹 접근 게이트 + 대회 insert RLS 강화
+- [x] 권한(역할) 체계 코드 완료 (role + RLS + 트리거 + 관리자 웹 게이트 + 사용자관리)
+- [ ] Supabase에 `0005_roles.sql` 실행 + 최초 super_admin 부트스트랩 SQL — 사용자
 - [ ] 대회 2단계: 모바일 참가 신청 화면 + 대진표(싱글 엘리) + 내 차례 알림
 - [ ] Supabase에 `0003_clubs.sql` 마이그레이션 실행 (클럽 테이블 생성) — 사용자
 - [ ] 카카오 로그인: 카카오 개발자 + Supabase Kakao Provider 설정 — 사용자
@@ -29,6 +30,11 @@
 ---
 
 ## 2026-07-01
+
+### 권한(역할) 체계 1단계
+- **결정**: 단일 role 계층(`player<organizer<court_manager<super_admin`), 부여는 super_admin만(신청·승인 없음). 코트관리자의 코트 권한은 코트 기능 때 연결.
+- **만든 것**: DB `profiles.role` + `my_role()`(security definer) + super_admin 업데이트 정책 + **자기 role 변경 차단 트리거**(권한상승 방지) + 대회 insert를 organizer↑로 제한 (`migrations/0005`). web-admin: `useRole`·`Protected` 역할 게이트(player 차단)·`/users` 사용자관리(역할 변경)·헤더 링크. 모바일/웹 타입에 role.
+- **메모**: 0005 실행 후 **최초 super_admin은 DB로 부트스트랩** 필요(닭-달걀). 검증: 모바일 tsc·web-admin tsc/lint/build ✅. 실동작 QA는 부트스트랩 후.
 
 ### 권한 체계 백로그 + 오늘 마무리
 - **결정**: 관리자 권한 분리는 현재 "만든 사람=운영자"(RLS: 남의 대회 못 건드림)까지만. **지정 관리자 게이트(모델 B: `profiles.role`)** 는 백로그로 넣고 다음에 착수. 오늘 세션은 여기서 마무리.
