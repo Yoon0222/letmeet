@@ -7,18 +7,19 @@
 - [x] 권한(역할) 체계 코드 완료 (role + RLS + 트리거 + 관리자 웹 게이트 + 사용자관리)
 - [x] `0005_roles.sql` 실행 + super_admin 부트스트랩(`관리자`=ysshin93) — 완료
 - [x] `0006_tournament_matches.sql` (+ 뷰 재생성) 실행 — 완료, 조별→4강→결승 QA 통과
-- [ ] Supabase에 `0007_discipline.sql` 실행 (단식/복식) — 사용자
-- [ ] **Supabase에 `0008_partner.sql` 실행** (복식 파트너 회원 연결 `partner_id`) — 사용자 · 실행 전 대회 상세 참가자 조회 실패함
-- [ ] **Supabase에 `0009_audit.sql` 실행** (감사 로그 테이블+트리거) — 사용자 · 실행 후부터 행위 기록, `/audit`(슈퍼관리자)에서 조회
-- [ ] **Supabase에 `0010_push_token.sql` 실행** (profiles.push_token) — 사용자
+- [x] Supabase에 `0007_discipline.sql` 실행 (단식/복식) — 완료
+- [x] Supabase에 `0008_partner.sql` 실행 (복식 파트너 `partner_id`) — 완료(라이브 QA 통과)
+- [x] Supabase에 `0009_audit.sql` 실행 (감사 로그) — 완료(신청/거절 기록 QA 통과)
+- [x] Supabase에 `0010_push_token.sql` 실행 (profiles.push_token) — 완료(컬럼 확인)
 - [ ] **Edge Function 배포** `supabase functions deploy notify-turn` (내 경기 차례 푸시) — 사용자 · 실기기 빌드 + Android FCM 자격 필요
 - [x] 대회 2단계 — 모바일 참가 신청 화면(대회 탭/목록/상세/신청) 완료
-- [ ] 대회 2단계 나머지: 앱 대진표/내 경기 열람, **선수 앱 푸시(내 차례)**, **진행자 "카톡 울리기"(노쇼 호출)**, 3·4위전, 정원 자동 마감
+- [x] 앱 대진표/내 경기 열람(브래킷 트리) + 선수 앱 푸시(내 차례) 코드 — 완료
+- [ ] 대회 2단계 잔여: **진행자 "카톡 울리기"(노쇼 호출)**, 3·4위전, 정원 자동 마감
 - [ ] 대회 **선착순 참가 + 결제/대기열 흐름**(설계만): 신청 순서대로 처리, `입금 대기`도 정원에 포함(자리 예약) → 결제 완료 시 `참가 확정`, 신청 후 **24h 미입금 자동 취소**. 정원 차면 이후 신청은 `대기 신청`, 취소/자동취소로 자리 나면 **대기열 맨 앞 자동 승격 + 카카오톡 입금 요청(알림톡)+24h**. 무료 대회(fee=0)는 신청 즉시 확정(대기열 없음). 실제 결제는 PG(포트원/토스) 가맹점 계약·통신판매업 필요 → 나중에 연동
 - [ ] Supabase에 `0003_clubs.sql` 마이그레이션 실행 (클럽 테이블 생성) — 사용자
 - [ ] 카카오 로그인: 카카오 개발자 + Supabase Kakao Provider 설정 — 사용자
 - [ ] 안드로이드 개발 빌드(EAS) 실행: `eas build -p android --profile development` — 사용자
-- [ ] 노션 MCP 커넥터를 **현재 Claude Code 환경에 재연결** (이 세션엔 노션 도구 없음 → qa-report/워크로그 노션 미러링 대기) — 사용자
+- [x] 노션 MCP 커넥터 연결됨 (이 세션에서 로드맵 페이지 갱신에 사용)
 - [x] 노션 커넥터 연결 + "피클 — 기능 현황 & 로드맵" 페이지 생성
 - [x] 변경분 커밋 (카카오·빌드설정·홈·탭재편·클럽·QA/워크로그) — `7879045`
 - [x] Supabase 프로젝트 연결 + 스키마 실행 (ref `pjfhxkvdjipvdmfsacie`)

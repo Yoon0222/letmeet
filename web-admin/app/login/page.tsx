@@ -34,7 +34,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto mt-10 max-w-sm">
       <h1 className="text-xl font-semibold">관리자 로그인</h1>
-      <p className="mt-1 text-sm text-slate-500">피클 앱과 동일한 계정으로 로그인하세요.</p>
+      <p className="mt-1 text-sm text-slate-500">피넛 앱과 동일한 계정으로 로그인하세요.</p>
       <form onSubmit={onSubmit} className="mt-6 space-y-3">
         <input
           type="email"

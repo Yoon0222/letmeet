@@ -4,9 +4,15 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-# 피클 — 피클볼 커뮤니티 매칭 앱
+# 피넛 — 피클볼 커뮤니티 매칭 앱
 
 피클볼 슈퍼앱의 1단계 MVP. 가까운 코트에서 함께 칠 사람을 찾는 **커뮤니티 매칭**(번개 모임 + 플레이어 매칭) 모바일 앱이다.
+
+## 브랜드
+- **이름: 피넛 (PEANUT)** — 앱 표시 이름은 "피넛". (내부 slug/scheme/bundleID 는 `pickleball` / `com.pickle.app` 유지 — 빌드·스토어·딥링크 안정성 때문에 건드리지 말 것)
+- **브랜드 가치: Play · Engage · Achieve**
+- **슬로건: for sports nuts** (peanut ↔ nuts 워드플레이)
+- "피클볼"은 종목명이라 그대로 쓰고, **앱 브랜드 표기는 "피넛"** 으로 통일한다. (기존 "피클" 표기가 남아 있으면 피넛으로 교체)
 
 ## 스택
 - **Expo SDK 56** (React Native 0.85) + **expo-router**(파일 기반 라우팅, typed routes)

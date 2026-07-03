@@ -22,7 +22,7 @@ export function AppHeader() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
         <Link href="/" className="flex items-center gap-2 font-semibold text-slate-900">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500 text-white">🎾</span>
-          피클
+          피넛
         </Link>
         {session && (
           <div className="flex items-center gap-4 text-sm">
