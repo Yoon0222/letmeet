@@ -2,6 +2,8 @@
 // 도메인 타입 + Supabase Database 타입 (수동 정의)
 // ============================================================
 
+export type UserRole = 'player' | 'organizer' | 'court_manager' | 'super_admin';
+
 export type PlayStyle = 'aggressive' | 'control' | 'all';
 
 export const PLAY_STYLE_LABELS: Record<PlayStyle, string> = {
@@ -22,10 +24,12 @@ export type Profile = {
   play_style: PlayStyle;
   bio: string;
   avatar_url: string | null;
+  push_token: string | null;
   // DUPR 연동 대비 (추후 파트너 API 로 검증)
   dupr_id: string | null;
   dupr_rating: number | null;
   dupr_verified: boolean;
+  role: UserRole;
   created_at: string;
   updated_at: string;
 };
@@ -98,6 +102,7 @@ export type ClubMemberWithProfile = ClubMember & {
 // ---- 대회(tournaments) ----
 export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancelled';
 export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+export type Discipline = 'singles' | 'doubles';
 
 export type Tournament = {
   id: string;
@@ -112,8 +117,11 @@ export type Tournament = {
   skill_min: number;
   skill_max: number;
   fee: number;
+  discipline: Discipline;
   format: string;
   status: TournamentStatus;
+  group_count: number | null;
+  advance_per_group: number | null;
   created_at: string;
 };
 
@@ -130,13 +138,39 @@ export type TournamentEntry = {
   user_id: string;
   status: EntryStatus;
   partner_name: string | null;
+  partner_id: string | null;
   seed: number | null;
   created_at: string;
 };
 
+/** 파트너/참가자 프로필 요약 */
+export type PartnerProfile = Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+
 /** 참가신청 + 프로필 (조인 결과) */
 export type TournamentEntryWithProfile = TournamentEntry & {
-  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+  profiles: PartnerProfile;
+  partner: PartnerProfile | null;
+};
+
+// ---- 대진(tournament_matches) ----
+export type MatchPhase = 'group' | 'knockout';
+export type MatchStatus = 'scheduled' | 'done';
+
+export type TournamentMatch = {
+  id: string;
+  tournament_id: string;
+  phase: MatchPhase;
+  group_no: number | null;
+  round_order: number | null;
+  round_name: string | null;
+  slot: number;
+  entry1_id: string | null;
+  entry2_id: string | null;
+  score1: number | null;
+  score2: number | null;
+  winner_id: string | null;
+  status: MatchStatus;
+  created_at: string;
 };
 
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
@@ -194,6 +228,12 @@ export interface Database {
         Row: TournamentEntry;
         Insert: { tournament_id: string; user_id: string } & WriteDefaults<TournamentEntry>;
         Update: WriteDefaults<TournamentEntry>;
+        Relationships: [];
+      };
+      tournament_matches: {
+        Row: TournamentMatch;
+        Insert: WriteDefaults<TournamentMatch> & { tournament_id: string; phase: MatchPhase };
+        Update: WriteDefaults<TournamentMatch>;
         Relationships: [];
       };
     };

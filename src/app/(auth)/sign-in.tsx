@@ -67,7 +67,7 @@ export default function SignIn() {
             <View style={[styles.logoBadge, { backgroundColor: theme.primary }]}>
               <Ionicons name="tennisball" size={34} color="#fff" />
             </View>
-            <Text style={[styles.brand, { color: theme.text }]}>피클</Text>
+            <Text style={[styles.brand, { color: theme.text }]}>피넛</Text>
             <Text style={[styles.tagline, { color: theme.textSecondary }]}>
               가까운 피클볼 메이트를 찾아보세요
             </Text>

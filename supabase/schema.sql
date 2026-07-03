@@ -18,10 +18,14 @@ create table if not exists public.profiles (
   play_style  text not null default 'all',        -- 'aggressive' | 'control' | 'all'
   bio         text not null default '',
   avatar_url  text,
+  push_token  text,                                -- Expo 푸시 토큰(내 경기 알림용)
   -- DUPR 연동 대비 (현재는 자가입력, 추후 파트너 API 로 검증)
   dupr_id       text,                              -- 사용자의 DUPR 계정 ID
   dupr_rating   numeric(3,1),                      -- DUPR 레이팅 (검증 시 채워짐)
   dupr_verified boolean not null default false,    -- API 로 검증되었는지 여부
+  -- 권한(역할): player < organizer < court_manager < super_admin. 부여는 super_admin 만.
+  role        text not null default 'player'
+              check (role in ('player', 'organizer', 'court_manager', 'super_admin')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -134,6 +138,36 @@ create policy "profiles_update_own" on public.profiles
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
+
+-- 권한(역할) 헬퍼 + super_admin 역할 부여 + 자기 role 변경 차단
+create or replace function public.my_role()
+returns text language sql stable security definer set search_path = public
+as $$
+  select coalesce((select role from public.profiles where id = auth.uid()), 'player');
+$$;
+
+drop policy if exists "profiles_update_superadmin" on public.profiles;
+create policy "profiles_update_superadmin" on public.profiles
+  for update using (public.my_role() = 'super_admin');
+
+create or replace function public.enforce_role_change()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  -- auth.uid() 가 null 이면 백엔드/SQL Editor(신뢰) 컨텍스트 → 허용(부트스트랩용)
+  if new.role is distinct from old.role
+     and auth.uid() is not null
+     and public.my_role() <> 'super_admin' then
+    new.role := old.role;  -- 인증된 비-super_admin 의 role 변경만 무시
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_profile_role_change on public.profiles;
+create trigger on_profile_role_change
+  before update on public.profiles
+  for each row execute function public.enforce_role_change();
 
 -- meetups: 로그인 사용자 조회 가능, 호스트만 생성/수정/삭제
 drop policy if exists "meetups_select" on public.meetups;
@@ -277,8 +311,12 @@ create table if not exists public.tournaments (
   skill_min             numeric(3,1) not null default 2.0,
   skill_max             numeric(3,1) not null default 8.0,
   fee                   int not null default 0,          -- 참가비(원)
+  discipline            text not null default 'singles'  -- 'singles' | 'doubles'
+                        check (discipline in ('singles', 'doubles')),
   format                text not null default 'single_elim',  -- 대진 방식(추후)
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
+  group_count           int,                                  -- 조 개수 (대진 생성 시)
+  advance_per_group     int,                                  -- 조별 진출 인원
   created_at            timestamptz not null default now()
 );
 create index if not exists tournaments_start_idx on public.tournaments (start_at);
@@ -288,7 +326,8 @@ create table if not exists public.tournament_entries (
   tournament_id uuid not null references public.tournaments(id) on delete cascade,
   user_id       uuid not null references public.profiles(id) on delete cascade,
   status        text not null default 'pending',   -- pending | approved | rejected | withdrawn
-  partner_name  text,                              -- 복식 파트너(선택)
+  partner_name  text,                              -- 복식 파트너 이름(표시용 스냅샷)
+  partner_id    uuid references public.profiles(id) on delete set null, -- 복식 파트너(회원 연결)
   seed          int,                               -- 대진 시드(추후)
   created_at    timestamptz not null default now(),
   primary key (tournament_id, user_id)
@@ -302,7 +341,10 @@ drop policy if exists "tournaments_select" on public.tournaments;
 create policy "tournaments_select" on public.tournaments for select using (true);
 drop policy if exists "tournaments_insert_organizer" on public.tournaments;
 create policy "tournaments_insert_organizer" on public.tournaments
-  for insert with check (auth.uid() = organizer_id);
+  for insert with check (
+    auth.uid() = organizer_id
+    and public.my_role() in ('organizer', 'court_manager', 'super_admin')
+  );
 drop policy if exists "tournaments_update_organizer" on public.tournaments;
 create policy "tournaments_update_organizer" on public.tournaments
   for update using (auth.uid() = organizer_id);
@@ -340,3 +382,111 @@ select
      where e.tournament_id = t.id and e.status = 'pending') as pending_count
 from public.tournaments t
 join public.profiles p on p.id = t.organizer_id;
+
+-- 대회 진행: 경기(조별리그 + 토너먼트)
+create table if not exists public.tournament_matches (
+  id            uuid primary key default uuid_generate_v4(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  phase         text not null,                 -- 'group' | 'knockout'
+  group_no      int,
+  round_order   int,
+  round_name    text,
+  slot          int not null default 0,
+  entry1_id     uuid references public.profiles(id) on delete set null,
+  entry2_id     uuid references public.profiles(id) on delete set null,
+  score1        int,
+  score2        int,
+  winner_id     uuid references public.profiles(id) on delete set null,
+  status        text not null default 'scheduled',
+  created_at    timestamptz not null default now()
+);
+create index if not exists tournament_matches_tid_idx on public.tournament_matches (tournament_id);
+
+alter table public.tournament_matches enable row level security;
+drop policy if exists "matches_select" on public.tournament_matches;
+create policy "matches_select" on public.tournament_matches for select using (true);
+drop policy if exists "matches_write_organizer" on public.tournament_matches;
+create policy "matches_write_organizer" on public.tournament_matches
+  for all using (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  )
+  with check (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  );
+
+-- ============================================================
+-- 감사 로그(audit log) — 0009
+-- 주요 행위(승인/거절/생성/수정/권한변경)를 트리거로 자동 기록.
+-- ============================================================
+create table if not exists public.audit_logs (
+  id          bigint generated always as identity primary key,
+  actor_id    uuid references public.profiles(id) on delete set null, -- 누가
+  actor_role  text,                                                   -- 당시 역할
+  action      text not null,          -- 무엇을 (예: tournament_entries.UPDATE)
+  entity_type text not null,          -- 대상 테이블
+  entity_id   text,                   -- 대상 식별자(복합키는 'tid:uid')
+  old_data    jsonb,                  -- 변경 전
+  new_data    jsonb,                  -- 변경 후
+  created_at  timestamptz not null default now()  -- 언제
+);
+create index if not exists audit_logs_created_idx on public.audit_logs (created_at desc);
+create index if not exists audit_logs_actor_idx on public.audit_logs (actor_id);
+create index if not exists audit_logs_entity_idx on public.audit_logs (entity_type, entity_id);
+
+create or replace function public.audit_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_row   jsonb := case when TG_OP = 'DELETE' then to_jsonb(OLD) else to_jsonb(NEW) end;
+  v_entity text;
+begin
+  v_entity := coalesce(
+    v_row->>'id',
+    (v_row->>'tournament_id') || coalesce(':' || (v_row->>'user_id'), '')
+  );
+  insert into public.audit_logs(
+    actor_id, actor_role, action, entity_type, entity_id, old_data, new_data
+  ) values (
+    v_actor,
+    case when v_actor is null then null else public.my_role() end,
+    TG_TABLE_NAME || '.' || TG_OP,
+    TG_TABLE_NAME,
+    v_entity,
+    case when TG_OP in ('UPDATE', 'DELETE') then to_jsonb(OLD) else null end,
+    case when TG_OP in ('INSERT', 'UPDATE') then to_jsonb(NEW) else null end
+  );
+  return null;
+end;
+$$;
+
+drop trigger if exists audit_tournaments on public.tournaments;
+create trigger audit_tournaments
+  after insert or update or delete on public.tournaments
+  for each row execute function public.audit_trigger();
+
+drop trigger if exists audit_entries on public.tournament_entries;
+create trigger audit_entries
+  after insert or update or delete on public.tournament_entries
+  for each row execute function public.audit_trigger();
+
+drop trigger if exists audit_matches on public.tournament_matches;
+create trigger audit_matches
+  after insert or update or delete on public.tournament_matches
+  for each row execute function public.audit_trigger();
+
+drop trigger if exists audit_profile_role on public.profiles;
+create trigger audit_profile_role
+  after update on public.profiles
+  for each row when (old.role is distinct from new.role)
+  execute function public.audit_trigger();
+
+alter table public.audit_logs enable row level security;
+drop policy if exists "audit_select_super" on public.audit_logs;
+create policy "audit_select_super" on public.audit_logs
+  for select using (public.my_role() = 'super_admin');

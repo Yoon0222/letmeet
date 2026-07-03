@@ -30,6 +30,7 @@ function NewTournamentInner() {
   const { session } = useSession();
 
   const [title, setTitle] = useState('');
+  const [discipline, setDiscipline] = useState<'singles' | 'doubles'>('singles');
   const [venue, setVenue] = useState('');
   const [region, setRegion] = useState('');
   const [startAt, setStartAt] = useState('');
@@ -62,6 +63,7 @@ function NewTournamentInner() {
       .insert({
         organizer_id: uid,
         title: title.trim(),
+        discipline,
         venue: venue.trim(),
         region: region.trim(),
         start_at: iso,
@@ -88,6 +90,12 @@ function NewTournamentInner() {
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <Field label="대회 제목">
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 2026 송파 오픈 복식" maxLength={50} />
+        </Field>
+        <Field label="종목">
+          <select className={inputCls} value={discipline} onChange={(e) => setDiscipline(e.target.value as 'singles' | 'doubles')}>
+            <option value="singles">단식</option>
+            <option value="doubles">복식</option>
+          </select>
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="장소">

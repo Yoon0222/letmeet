@@ -4,12 +4,22 @@
 
 ## 열린 항목
 - [x] Supabase에 `0004_tournaments.sql` 실행 (대회 테이블) — 적용됨(테이블 200 확인)
-- [ ] 권한(역할) 체계 (모델 B): `profiles.role`(user/organizer/admin) + 관리자 웹 접근 게이트 + 대회 insert RLS 강화
-- [ ] 대회 2단계: 모바일 참가 신청 화면 + 대진표(싱글 엘리) + 내 차례 알림
+- [x] 권한(역할) 체계 코드 완료 (role + RLS + 트리거 + 관리자 웹 게이트 + 사용자관리)
+- [x] `0005_roles.sql` 실행 + super_admin 부트스트랩(`관리자`=ysshin93) — 완료
+- [x] `0006_tournament_matches.sql` (+ 뷰 재생성) 실행 — 완료, 조별→4강→결승 QA 통과
+- [x] Supabase에 `0007_discipline.sql` 실행 (단식/복식) — 완료
+- [x] Supabase에 `0008_partner.sql` 실행 (복식 파트너 `partner_id`) — 완료(라이브 QA 통과)
+- [x] Supabase에 `0009_audit.sql` 실행 (감사 로그) — 완료(신청/거절 기록 QA 통과)
+- [x] Supabase에 `0010_push_token.sql` 실행 (profiles.push_token) — 완료(컬럼 확인)
+- [ ] **Edge Function 배포** `supabase functions deploy notify-turn` (내 경기 차례 푸시) — 사용자 · 실기기 빌드 + Android FCM 자격 필요
+- [x] 대회 2단계 — 모바일 참가 신청 화면(대회 탭/목록/상세/신청) 완료
+- [x] 앱 대진표/내 경기 열람(브래킷 트리) + 선수 앱 푸시(내 차례) 코드 — 완료
+- [ ] 대회 2단계 잔여: **진행자 "카톡 울리기"(노쇼 호출)**, 3·4위전, 정원 자동 마감
+- [ ] 대회 **선착순 참가 + 결제/대기열 흐름**(설계만): 신청 순서대로 처리, `입금 대기`도 정원에 포함(자리 예약) → 결제 완료 시 `참가 확정`, 신청 후 **24h 미입금 자동 취소**. 정원 차면 이후 신청은 `대기 신청`, 취소/자동취소로 자리 나면 **대기열 맨 앞 자동 승격 + 카카오톡 입금 요청(알림톡)+24h**. 무료 대회(fee=0)는 신청 즉시 확정(대기열 없음). 실제 결제는 PG(포트원/토스) 가맹점 계약·통신판매업 필요 → 나중에 연동
 - [ ] Supabase에 `0003_clubs.sql` 마이그레이션 실행 (클럽 테이블 생성) — 사용자
 - [ ] 카카오 로그인: 카카오 개발자 + Supabase Kakao Provider 설정 — 사용자
 - [ ] 안드로이드 개발 빌드(EAS) 실행: `eas build -p android --profile development` — 사용자
-- [ ] 노션 MCP 커넥터를 **현재 Claude Code 환경에 재연결** (이 세션엔 노션 도구 없음 → qa-report/워크로그 노션 미러링 대기) — 사용자
+- [x] 노션 MCP 커넥터 연결됨 (이 세션에서 로드맵 페이지 갱신에 사용)
 - [x] 노션 커넥터 연결 + "피클 — 기능 현황 & 로드맵" 페이지 생성
 - [x] 변경분 커밋 (카카오·빌드설정·홈·탭재편·클럽·QA/워크로그) — `7879045`
 - [x] Supabase 프로젝트 연결 + 스키마 실행 (ref `pjfhxkvdjipvdmfsacie`)
@@ -28,7 +38,59 @@
 
 ---
 
+## 2026-07-03
+
+### 선수 앱 대진표 열람 + 내 경기 차례 푸시 알림
+- **대진표(열람)**: 모바일 대회 상세에 **대진표 섹션** 추가 — 내 경기 하이라이트, **조 순위표**(승/득실차), 조별 경기 결과, **토너먼트는 좌→우 브래킷 트리**(`src/components/bracket-tree.tsx`, 연결선 엘보+우승 박스, 가로 스크롤, 계산기반 좌표). `src/lib/bracket.ts`(standings/groupMembers 읽기전용), `TournamentMatch` 타입/뷰 등록. **라이브 QA(QA 토너먼트)**: 조 순위(선수1 +9…)·11:8 결과·준결승→결승→🏆선수1 트리 정상 렌더 ✅.
+- **푸시 알림(내 경기 차례)**: `expo-notifications`+`expo-device` 설치, `src/lib/notifications.ts`(권한요청+Expo 토큰), 로그인 시 `profiles.push_token` 저장(auth 컨텍스트), `0010_push_token.sql`. **발송**: `supabase/functions/notify-turn`(Edge Function, 주최자/슈퍼관리자만, 경기 선수+파트너 토큰으로 Expo 푸시), 관리자 대진에 **🔔 차례 알림** 버튼(예정 경기).
+- **주의(사용자 필요)**: ① `0010_push_token.sql` 실행 ② `supabase functions deploy notify-turn` 배포 ③ **실기기 빌드**에서만 푸시 동작(Expo Go/웹 불가), Android는 FCM 자격 필요. tsconfig에 `supabase/functions` 제외(Deno). 모바일/web-admin tsc·lint ✅.
+
+### 감사 로그(audit log) — DB 트리거 자동 기록
+- **결정**: 승인/거절/개설/수정/권한변경 등 주요 행위를 **앱이 아니라 DB 트리거**로 자동 기록(우회·누락·위조 불가). 누가(actor_id/role)·무엇(action/entity)·언제(created_at)·어떻게(old→new jsonb).
+- **만든 것**: `migrations/0009_audit.sql` — `audit_logs` 테이블 + `audit_trigger()`(SECURITY DEFINER) + `tournaments`/`tournament_entries`/`tournament_matches` 전(全) 이벤트 트리거 + `profiles` **역할 변경만** 트리거. RLS: 조회는 **슈퍼관리자만**, 쓰기 정책 없음(트리거만 기록 → 불변). schema.sql 반영. web-admin: `AuditLog` 타입, **`/audit` 뷰어**(행위 한글 라벨+상세 old→new), 헤더 "감사로그" 링크(super_admin). tsc/lint ✅.
+- **주의**: **0009 실행 전엔 `/audit` 조회 실패**. 트리거는 실행 이후 발생 행위부터 기록(과거분 소급 없음).
+- **라이브 QA(0009 실행 후)**: 선수 신청→`참가 신청`(행위자=선수/플레이어), 관리자 거절→`참가 거절 · 대기→거절`(행위자=데모유저/슈퍼관리자) 정확히 기록 확인 ✅.
+- **참고**: 참가 거절 시 관리자 목록에서 숨김 처리도 이날 반영(`status !== 'rejected'` 필터).
+
+### 복식 파트너 = 실제 회원 연결 (검색·선택 신청)
+- **결정**: 복식 신청 시 파트너를 **이름으로 검색 → 조회된 회원 목록(동명이인 대비)에서 선택 → 신청**. 파트너는 실제 앱 회원과 연결(별도 수락 절차 없음).
+- **만든 것**: `migrations/0008_partner.sql`(`tournament_entries.partner_id` FK→profiles, 인덱스), schema/types(모바일·web-admin) 갱신. 모바일 `tournament/[id].tsx`: 자유입력 파트너 필드 → **닉네임 검색 드롭다운(Pressable 선택)+선택 칩**, `apply()`에 `partner_id`+`partner_name`(스냅샷) 저장, 복식은 파트너 미선택 시 신청 차단. 참가자/관리자 표시는 `partner.nickname` 우선(없으면 `partner_name`).
+- **주의**: profiles FK가 2개(user_id·partner_id)라 엔트리 조회 embed를 **FK명으로 명시**(`profiles!..._user_id_fkey`, `partner:profiles!..._partner_id_fkey`) — **0008 실행 전에는 대회 상세(앱·관리자) 참가자 조회가 실패**함. 검증: 모바일 tsc/lint ✅, web-admin tsc/lint ✅.
+- **라이브 QA(0008 적용 후, 모바일 웹)**: 이름 입력 시 회원 **리스트업**(송파선수→1~5) ✅, **없는 회원**은 "가입되지 않은 회원" 안내+목록없음 ✅, 파트너 미선택 신청 시 **DB 미삽입(차단)** ✅. 관리자 승인 목록에도 `신청자/파트너` 표기 추가. **수정**: `keyboardShouldPersistTaps="handled"`(실기기에서 드롭다운 탭이 키보드만 닫던 버그), 없는 회원 문구 개선.
+- **참고**: 사용자가 "리스트업 안 됨/없는 사람인데 신청됨" 보고 → 현재 코드엔 없는 동작(구 빌드/캐시로 추정). 폰은 재빌드, 웹은 강력 새로고침 필요.
+- **열림**: 관리자 웹에서도 운영자가 참가자 추가 시 파트너 선택 UI(현재 미적용), 정원 카운트를 팀 단위로 볼지.
+
+### 모바일 대회 목록 — 단식/복식 필터 탭
+- **결정**: 대회가 단식인지 복식인지 한눈에 구분되도록 목록 상단에 **전체/단식/복식 세그먼트 탭** 추가. 필터는 제목이 아니라 **실제 `discipline` 값**으로 거름.
+- **만든 것**: `(tabs)/tournaments.tsx` 세그먼트 필터(클라이언트 필터링, 빈 상태 문구도 필터 반영). 라이브 QA: 복식 탭 → 실제 복식 대회만 노출(제목만 복식인 "송파"는 단식이라 제외됨) ✅. 모바일 tsc/lint ✅.
+- **메모**: 파트너는 "무조건 앱 회원" 요구 확정 — 검색 목록에서 선택만 허용(임의 입력 불가, 미선택 시 신청 차단)로 이미 충족.
+
+### 관리자 웹 — 슈퍼관리자 전체 대회 열람 / 헤더 "피클"
+- 슈퍼관리자는 `organizer_id` 필터 없이 **전체 대회** 조회(그 외는 본인 개설분). 헤더·타이틀 "피클 대회 관리자" → **"피클"**.
+
+## 2026-07-02
+
+### 모바일 대회 참가 화면 (선수 신청)
+- **결정**: 선수가 앱에서 대회를 보고 신청하도록 **대회 탭 신설**(홈·매칭·클럽·**대회**·내정보 5탭). 조/대진 열람은 추후, 이번엔 신청 흐름 우선.
+- **만든 것**: `(tabs)/tournaments.tsx`(목록), `tournament/[id].tsx`(정보+참가자+**참가 신청/취소**, 복식 파트너 입력), `components/tournament-card.tsx`, 탭/라우트 등록. 라이브 QA: player 계정으로 신청 → "승인 대기중" 확인.
+- **메모**: 신청 RLS(entries_insert_self) 통과, 승인은 관리자 웹에서. 검증 모바일 tsc/lint ✅.
+
+### 대회 설정 강화 (단식/복식 · 조/본선/바이) + 진행 엔진 라이브 QA
+- **결정**: 운영자가 참가자 수 보고 **조당 인원**(→조 개수 자동)·**본선 진출 인원(총, →몇 강)**·**조별리그 생략(바로 본선)** 을 정하고, 바이는 상위 시드 자동. **단식/복식**(discipline) 지원(복식은 파트너 표시).
+- **만든 것**: `migrations/0007`(discipline + 뷰 재생성), bracket `seedQualifiersTotal`/`groupCountForSize`, 대회 상세 컨트롤·복식 표시, 생성폼 종목 선택. 앞선 **조별→4강→결승 시나리오 QA는 8명으로 PASS**(우승 선수1).
+- **메모**: 조/본선 컨트롤은 0007 없이도 동작. 단식/복식만 0007 필요. 검증 모바일/web-admin tsc·lint·build ✅. 진행 중 뷰-미갱신 버그(High) 발견·수정(0006/0007에 뷰 재생성 포함).
+
 ## 2026-07-01
+
+### 대회 진행 엔진 (조별리그 → 토너먼트)
+- **결정**: "풀 엔진(설정 가능)" — 주최자가 조 개수·조별 진출 인원을 정하고, 조별 라운드로빈 → 순위 → 시드 진출 → 단판 토너먼트(준결승/결승) → 우승.
+- **만든 것**: DB `tournament_matches`(조별/토너먼트·점수·승자) + tournaments 설정 컬럼(`migrations/0006`). `web-admin/lib/bracket.ts`(조편성·순위·시드·페어링), 대회 상세에 조별리그(순위표+점수입력)·토너먼트 라운드·"다음 라운드 생성"·🏆 우승 UI. 부전승 자동 처리.
+- **메모**: 검증 모바일 tsc·web-admin tsc/lint/build ✅. 실동작 QA는 0006 실행 후(조별→4강→결승 시나리오).
+
+### 권한(역할) 체계 1단계
+- **결정**: 단일 role 계층(`player<organizer<court_manager<super_admin`), 부여는 super_admin만(신청·승인 없음). 코트관리자의 코트 권한은 코트 기능 때 연결.
+- **만든 것**: DB `profiles.role` + `my_role()`(security definer) + super_admin 업데이트 정책 + **자기 role 변경 차단 트리거**(권한상승 방지) + 대회 insert를 organizer↑로 제한 (`migrations/0005`). web-admin: `useRole`·`Protected` 역할 게이트(player 차단)·`/users` 사용자관리(역할 변경)·헤더 링크. 모바일/웹 타입에 role.
+- **메모**: 0005 실행 후 **최초 super_admin은 DB로 부트스트랩** 필요(닭-달걀). 검증: 모바일 tsc·web-admin tsc/lint/build ✅. 실동작 QA는 부트스트랩 후.
 
 ### 권한 체계 백로그 + 오늘 마무리
 - **결정**: 관리자 권한 분리는 현재 "만든 사람=운영자"(RLS: 남의 대회 못 건드림)까지만. **지정 관리자 게이트(모델 B: `profiles.role`)** 는 백로그로 넣고 다음에 착수. 오늘 세션은 여기서 마무리.
