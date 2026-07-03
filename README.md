@@ -22,15 +22,20 @@
 ### 📱 모바일 앱
 | 영역 | 내용 |
 | --- | --- |
-| 🔐 인증 | 이메일 + **카카오** 로그인 (Supabase Auth) |
+| 🔐 인증 | 이메일 로그인 (Supabase Auth) · **카카오** 로그인(코드·연결 완료, 이메일 동의는 비즈앱 승인 대기) |
 | 🏠 홈 | 요약 허브 — 다가오는 내 모임 · 빠른 실행 · 추천 모임 · 추천 클럽 |
 | ⚡ 매칭 | 번개 모임 피드(지역 필터), 모임 생성(시간·장소·실력대·정원), 참가/취소 |
 | 👥 클럽 | 동호회 개설, 목록/상세, 가입/탈퇴 |
+| 🏆 대회 | 대회 목록(단식/복식 필터), 참가 신청/취소, **복식 파트너 검색·선택**, **대진표 열람**(조 순위표 + 브래킷 트리 + 내 경기 하이라이트), 내 경기 차례 푸시 알림 |
 | 👤 내 정보 | 프로필(닉네임·실력 DUPR 2.0~8.0·지역·플레이 스타일), 참여 모임 관리, 로그아웃 |
 
 ### 🖥️ 관리자 웹 (web-admin)
-- **대회(tournaments)** 개설 · 목록 · 상세 · 참가신청(승인/대기) 관리
-- **역할 기반 접근** — `player < organizer < court_manager < super_admin`. 대회 개설은 `organizer` 이상만.
+- **대회 개설·운영** — 목록/상세, 참가신청 승인·거절(거절 시 목록에서 숨김)
+- **대진 진행 엔진** — 조별리그 → 토너먼트 → 우승, 점수 입력·다음 라운드 자동. **단식/복식 · 조당 인원 · 몇 강부터 · 바이 · 정원** 설정
+- **역할 기반 접근** — `player < organizer < court_manager < super_admin`. 대회 개설은 `organizer` 이상만
+- **사용자 관리**(super_admin) · **전체 대회 열람**(super_admin)
+- **감사 로그** (`/audit`) — 승인/거절/개설/수정/권한변경을 DB 트리거로 자동 기록 (누가·무엇·언제·어떻게)
+- **내 경기 차례 알림** — 대진에서 선수에게 푸시 발송(🔔, `notify-turn` Edge Function)
 
 ---
 
@@ -40,10 +45,10 @@
 1. [supabase.com](https://supabase.com) 에서 무료 프로젝트 생성
 2. **SQL Editor** 에 [`supabase/schema.sql`](supabase/schema.sql) 전체를 붙여넣고 실행
    - 테이블(profiles / meetups / clubs / tournaments 등), RLS 정책, 트리거, 뷰가 한 번에 생성됩니다.
-   - 이미 예전 스키마를 실행했다면, [`supabase/migrations/`](supabase/migrations/) 의 `0001`~`0005` 를 순서대로 실행하세요.
+   - 이미 예전 스키마를 실행했다면, [`supabase/migrations/`](supabase/migrations/) 의 `0001`~`0010` 을 순서대로 실행하세요.
 3. **Authentication → Providers**
    - **Email** 활성화 (빠른 테스트를 위해 "Confirm email" 을 끄면 가입 즉시 로그인. 운영 시엔 켜두세요.)
-   - **Kakao** Provider 설정 — 카카오 개발자 콘솔의 Redirect URI 를 `https://<ref>.supabase.co/auth/v1/callback` 로 등록.
+   - **Kakao** Provider(선택) — 카카오 **플랫폼 키 → REST API 키 → 리다이렉트 URI**에 `https://<ref>.supabase.co/auth/v1/callback` 등록 후, Supabase에 REST API 키(Client ID)·Client Secret 입력. ⚠️ 이메일 동의(`account_email`)까지 받으려면 카카오 **비즈앱 전환**(개인정보처리방침 URL·심사)이 필요합니다.
 4. 관리자 웹을 쓰려면 최초 **super_admin** 을 지정합니다 (SQL Editor):
    ```sql
    update public.profiles set role = 'super_admin'
@@ -92,23 +97,27 @@ src/                              # 📱 모바일 앱 (Expo)
 │   │   ├── index.tsx             # 홈 (요약 허브)
 │   │   ├── matches.tsx           # 매칭 = 번개 모임 피드
 │   │   ├── clubs.tsx             # 클럽 목록
+│   │   ├── tournaments.tsx       # 대회 목록 (단식/복식 필터)
 │   │   └── profile.tsx           # 내 정보
 │   ├── meetup/                   # create(모달) · [id](상세)
 │   ├── club/                     # create(모달) · [id](상세)
+│   ├── tournament/[id].tsx       # 대회 상세 (참가 신청·복식 파트너·대진표)
 │   └── profile/edit.tsx          # 프로필 수정 (모달)
-├── components/                   # meetup-card, club-card, ui/(button·avatar·kakao-button·loading-overlay 등)
-├── contexts/                     # auth(세션·프로필), loading(전역 로딩)
-├── lib/                          # supabase · types(도메인+Database) · format
+├── components/                   # meetup-card, club-card, tournament-card, bracket-tree, ui/(button·avatar·kakao-button·loading-overlay 등)
+├── contexts/                     # auth(세션·프로필·푸시토큰), loading(전역 로딩)
+├── lib/                          # supabase · types(도메인+Database) · format · bracket · notifications
 └── constants/theme.ts            # 브랜드 색상/간격
 
 web-admin/                        # 🖥️ 관리자 웹 (Next.js)
-├── app/                          # login · tournaments(목록/[id]/new)
+├── app/                          # login · tournaments(목록/[id]/new) · users · audit
 ├── components/                   # protected(역할 가드) · app-header
-└── lib/                          # supabase · use-session · types · format
+└── lib/                          # supabase · use-session · use-role · types · format · bracket
 
 supabase/
 ├── schema.sql                    # 전체 스키마 (최초 1회 실행)
+├── functions/notify-turn/        # Edge Function — 내 경기 차례 푸시 발송
 └── migrations/                   # 0001 dupr · 0002 kakao · 0003 clubs · 0004 tournaments · 0005 roles
+                                  #  · 0006 matches · 0007 discipline · 0008 partner · 0009 audit · 0010 push_token
 ```
 
 ---
@@ -135,10 +144,11 @@ npm run lint         # 린트
 ---
 
 ## 데이터 모델 요약
-- **profiles** — `auth.users` 와 1:1, 회원가입 트리거로 자동 생성. 실력(DUPR)·지역·`role` 포함.
+- **profiles** — `auth.users` 와 1:1, 회원가입 트리거로 자동 생성. 실력(DUPR)·지역·`role`·`push_token` 포함.
 - **meetups / meetup_participants** — 번개 모임과 참가자(M:N). 생성 시 호스트 자동 참가.
 - **clubs / club_members** — 동호회와 회원(M:N).
-- **tournaments / tournament_entries** — 대회와 참가신청(승인/대기).
+- **tournaments / tournament_entries / tournament_matches** — 대회 · 참가신청(승인/대기, 복식 `partner_id`) · 대진 경기(조별/토너먼트).
+- **audit_logs** — 주요 행위 감사 로그. DB 트리거로 자동 기록, 조회는 `super_admin` 만(불변 로그).
 - **뷰** — `meetups_with_counts` · `clubs_with_counts` · `tournaments_with_counts` (본체 + 개설자 정보 + 인원 집계).
 - **역할** — `my_role()` 헬퍼 + `enforce_role_change` 트리거로 권한 상승 차단. 부여는 `super_admin` 만.
 - 모든 테이블에 **RLS** 적용: 조회는 공개, 쓰기는 본인/호스트/주최자만.
@@ -148,10 +158,11 @@ npm run lint         # 린트
 ## 로드맵
 - [x] **커뮤니티 매칭** — 번개 모임(매칭 탭) + 홈 허브
 - [x] **클럽(동호회)** — 개설 · 회원 관리
-- [x] **카카오 로그인**
-- [x] **대회 1단계** — 공유 DB + 관리자 웹(개설·참가신청 관리) + 역할 체계
-- [ ] 대회 2단계 — 브래킷 대진/운영, "내 차례" 카카오 알림톡
-- [ ] 코트 예약 + 결제 (지도·PG 연동)
-- [ ] 모임 채팅 / 푸시 알림
+- [x] **카카오 로그인** — 코드·연결 완료 (이메일 동의는 비즈앱 전환 승인 대기)
+- [x] **대회 1단계** — 공유 DB + 관리자 웹(개설·참가신청) + 역할 체계
+- [x] **대회 2단계(대부분)** — 대진 엔진(조별→토너먼트→우승), 단식/복식·조/본선/바이, 모바일 참가·복식 파트너, **대진표 브래킷 트리 열람**, 감사 로그, 내 경기 푸시(코드)
+- [ ] 대회 잔여 — 참가비 결제·정원/대기열, 진행자 "카톡 울리기"(노쇼 호출), 3·4위전
+- [ ] 코트 예약 + 결제 (네이버 지도·PG 연동)
+- [ ] 모임/클럽 채팅
 - [ ] 경기 기록 / 엘로 랭킹
-- [ ] 용품 마켓
+- [ ] 커뮤니티 게시판 · 용품 마켓
