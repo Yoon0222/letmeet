@@ -1,46 +1,31 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { PEANUT_AVATARS, peanutFromUrl, peanutIndexFor } from '@/constants/avatars';
 
 interface AvatarProps {
-  nickname: string;
+  /** 사진이 없을 때 기본 피넛을 정하는 시드(닉네임 등). */
+  nickname?: string;
+  /** 업로드된 사진 URL 또는 'peanut:NN'. 없으면 시드 기반 기본 피넛. */
   uri?: string | null;
   size?: number;
 }
 
-// 닉네임 → 안정적인 파스텔 배경색
-const PALETTE = ['#3DBA6F', '#2D7FF9', '#F5A623', '#E5484D', '#8E5BE5', '#12A4A4'];
-function colorFor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return PALETTE[Math.abs(hash) % PALETTE.length];
-}
-
 export function Avatar({ nickname, uri, size = 44 }: AvatarProps) {
   const radius = size / 2;
-  if (uri) {
-    return (
-      <Image
-        source={{ uri }}
-        style={{ width: size, height: size, borderRadius: radius }}
-        contentFit="cover"
-      />
-    );
-  }
-  const initial = (nickname?.trim()?.[0] ?? '?').toUpperCase();
+
+  const chosen = peanutFromUrl(uri); // 'peanut:NN' 선택값
+  const source =
+    chosen != null
+      ? PEANUT_AVATARS[chosen]
+      : uri
+        ? { uri } // 업로드된 원격 사진
+        : PEANUT_AVATARS[peanutIndexFor(nickname || '?')]; // 기본: 시드 기반 피넛
+
   return (
-    <View
-      style={[
-        styles.fallback,
-        { width: size, height: size, borderRadius: radius, backgroundColor: colorFor(nickname || 'x') || Brand.primary },
-      ]}>
-      <Text style={[styles.initial, { fontSize: size * 0.42 }]}>{initial}</Text>
-    </View>
+    <Image
+      source={source}
+      style={{ width: size, height: size, borderRadius: radius, backgroundColor: '#E5E7EB' }}
+      contentFit="cover"
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  fallback: { alignItems: 'center', justifyContent: 'center' },
-  initial: { color: '#fff', fontWeight: '700' },
-});

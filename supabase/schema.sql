@@ -490,3 +490,24 @@ alter table public.audit_logs enable row level security;
 drop policy if exists "audit_select_super" on public.audit_logs;
 create policy "audit_select_super" on public.audit_logs
   for select using (public.my_role() = 'super_admin');
+
+-- ============================================================
+-- 프로필 사진(아바타) Storage — 0011
+-- 경로: avatars/{user_id}/파일명. 조회 공개, 쓰기는 본인 폴더만.
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "avatars_read" on storage.objects;
+create policy "avatars_read" on storage.objects
+  for select using (bucket_id = 'avatars');
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own" on storage.objects
+  for insert with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own" on storage.objects
+  for update using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own" on storage.objects
+  for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
