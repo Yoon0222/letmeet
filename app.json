@@ -14,7 +14,7 @@
     "android": {
       "package": "com.pickle.app",
       "adaptiveIcon": {
-        "backgroundColor": "#12B981",
+        "backgroundColor": "#163C33",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
