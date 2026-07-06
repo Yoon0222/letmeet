@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { confirmDestructive } from '@/lib/confirm';
 import { playStyleLabel, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
@@ -49,33 +50,26 @@ export default function ProfileScreen() {
   );
 
   function confirmSignOut() {
-    Alert.alert('로그아웃', '정말 로그아웃 하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
-    ]);
+    confirmDestructive('로그아웃', '정말 로그아웃 하시겠어요?', '로그아웃', () => signOut());
+  }
+
+  async function doDelete() {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+    } catch (e) {
+      Alert.alert('탈퇴 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function confirmDelete() {
-    Alert.alert(
+    confirmDestructive(
       '회원 탈퇴',
       '정말 탈퇴하시겠어요?\n계정과 모든 데이터(프로필·모임·대회 참가 기록)가 영구 삭제되며 되돌릴 수 없어요.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '탈퇴하기',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              await deleteAccount();
-            } catch (e) {
-              Alert.alert('탈퇴 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ],
+      '탈퇴하기',
+      doDelete,
     );
   }
 
