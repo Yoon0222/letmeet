@@ -28,6 +28,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithKakao: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -143,6 +144,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // 회원 탈퇴: 본인 계정(auth.users) 삭제 → 데이터 연쇄 정리 → 로그아웃
+  const deleteAccount = useCallback(async () => {
+    const { error } = await supabase.rpc('delete_account');
+    if (error) throw error;
+    await supabase.auth.signOut();
+    setProfile(null);
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (session?.user) await loadProfile(session.user.id);
   }, [session, loadProfile]);
@@ -156,9 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInWithKakao,
       signOut,
+      deleteAccount,
       refreshProfile,
     }),
-    [session, profile, initializing, signUp, signIn, signInWithKakao, signOut, refreshProfile],
+    [session, profile, initializing, signUp, signIn, signInWithKakao, signOut, deleteAccount, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

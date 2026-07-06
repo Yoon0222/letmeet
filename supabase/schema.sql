@@ -511,3 +511,23 @@ create policy "avatars_update_own" on storage.objects
 drop policy if exists "avatars_delete_own" on storage.objects;
 create policy "avatars_delete_own" on storage.objects
   for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================
+-- 회원 탈퇴 (계정 삭제) — 0012
+-- SECURITY DEFINER RPC 로 본인 auth.users 삭제 → profiles 등 연쇄 정리.
+-- ============================================================
+create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+revoke all on function public.delete_account() from public;
+grant execute on function public.delete_account() to authenticated;
