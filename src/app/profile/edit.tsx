@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -44,6 +43,15 @@ export default function EditProfile() {
   async function pickAvatar() {
     const uid = session?.user.id;
     if (!uid || uploading) return;
+    // 네이티브 모듈이라 지연 로드 — 없는 빌드에서도 화면이 크래시나지 않게
+    let ImagePicker: typeof import('expo-image-picker');
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      ImagePicker = require('expo-image-picker');
+    } catch {
+      Alert.alert('사진 업로드', '이 기능은 최신 앱 빌드에서 사용할 수 있어요.');
+      return;
+    }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('권한 필요', '사진을 올리려면 갤러리 접근 권한이 필요해요.');
