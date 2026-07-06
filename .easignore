@@ -1,0 +1,22 @@
+# EAS Build 업로드 제외 목록 — 모바일 빌드에 불필요한 것 제거해 업로드/빌드 슬림화.
+# (.gitignore 항목도 함께 포함해 두어, 동작 방식과 무관하게 안전하게 제외한다.)
+
+# 의존성 / 캐시
+node_modules/
+.expo/
+dist/
+web-build/
+.metro-health-check*
+*.tsbuildinfo
+
+# 모바일 빌드와 무관한 워크스페이스
+web-admin/
+supabase/
+docs/
+
+# 문서/기타
+*.md
+.DS_Store
+*.log
+.vscode/
+.idea/
