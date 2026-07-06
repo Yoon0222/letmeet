@@ -7,39 +7,39 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
-// 피넛 브랜드: 마스코트 그린 + 따뜻한 크림 배경 + 피넛 골드 포인트
+// 피넛 브랜드: 밝은 화이트 + 비비드 그린 + 따뜻한 골드 포인트
 export const Brand = {
-  primary: '#2FA063', // 피넛 그린 (마스코트 헤드밴드/후디)
-  primaryDark: '#24824E',
-  accent: '#E0A33E', // 피넛 골드 포인트
-  warning: '#F5A623',
-  danger: '#E5484D',
+  primary: '#12B981', // 비비드 피넛 그린
+  primaryDark: '#0E9E6E',
+  accent: '#F5A623', // 골드 포인트
+  warning: '#F59E0B',
+  danger: '#F0453F',
 } as const;
 
 export const Colors = {
   light: {
-    text: '#1C1917', // 따뜻한 먹색
-    background: '#FBF7F0', // 크림
-    backgroundElement: '#F1EADD',
-    backgroundSelected: '#E7DCCB',
-    textSecondary: '#7A7266',
+    text: '#17191C',
+    background: '#FBFCFB', // 거의 화이트 (밝게)
+    backgroundElement: '#F0F2F1',
+    backgroundSelected: '#E4E7E5',
+    textSecondary: '#757C78',
     primary: Brand.primary,
     accent: Brand.accent,
-    border: '#EAE1D2',
+    border: '#EBEEEC',
     card: '#FFFFFF',
-    tabIconDefault: '#A79E90',
+    tabIconDefault: '#A7ADA9',
   },
   dark: {
-    text: '#F2EFEA',
-    background: '#14110E', // 따뜻한 다크 브라운블랙
-    backgroundElement: '#221C16',
-    backgroundSelected: '#33291F',
-    textSecondary: '#A79E92',
-    primary: '#43C079', // 다크에서 약간 밝은 그린
-    accent: '#EBB25A',
-    border: '#332A20',
-    card: '#1C1712',
-    tabIconDefault: '#7A7166',
+    text: '#F1F3F2',
+    background: '#0F1211',
+    backgroundElement: '#1B1F1D',
+    backgroundSelected: '#2A2F2C',
+    textSecondary: '#9BA29E',
+    primary: '#2FD08B', // 다크에서 더 밝은 그린
+    accent: '#F5B84B',
+    border: '#262B28',
+    card: '#161A18',
+    tabIconDefault: '#6E756F',
   },
 } as const;
 
