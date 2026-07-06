@@ -1,54 +1,54 @@
 import { Image } from 'expo-image';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
-import { PEANUT_AVATARS } from '@/constants/avatars';
 import { useTheme } from '@/hooks/use-theme';
 
-// 대표 피넛(헤드밴드 손인사)을 로고 마크로 사용
-const LOGO = PEANUT_AVATARS[0];
+const ILLUST = require('../../../assets/images/peanut-loading.png');
+const TRACK = 220;
+const SEG = 80;
 
-/** 앱 부팅(세션 확인) 중 보여주는 피넛 브랜드 스플래시 */
+/** 앱 부팅(세션 확인) 중 보여주는 피넛 브랜드 스플래시 + 로딩바 */
 export function BootScreen() {
   const theme = useTheme();
-  const scale = useSharedValue(1);
+  const x = useSharedValue(-SEG);
 
   useEffect(() => {
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.08, { duration: 650, easing: Easing.inOut(Easing.quad) }),
-        withTiming(1, { duration: 650, easing: Easing.inOut(Easing.quad) }),
-      ),
-      -1,
-    );
-  }, [scale]);
+    x.value = withRepeat(withTiming(TRACK, { duration: 1100, easing: Easing.linear }), -1);
+  }, [x]);
 
-  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const bar = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.background }]}>
-      <Animated.View style={anim}>
-        <Image source={LOGO} style={styles.logo} contentFit="cover" />
-      </Animated.View>
+      <Image source={ILLUST} style={styles.illust} contentFit="contain" />
       <Text style={[styles.brand, { color: theme.text }]}>피넛</Text>
       <Text style={[styles.tag, { color: theme.primary }]}>for sports nuts</Text>
-      <ActivityIndicator style={styles.loader} color={theme.primary} />
+      <View style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
+        <Animated.View style={[styles.seg, { backgroundColor: theme.primary }, bar]} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  logo: { width: 104, height: 104, borderRadius: 52 },
-  brand: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5, marginTop: 20 },
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  illust: { width: '92%', maxWidth: 420, aspectRatio: 1536 / 798 },
+  brand: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5, marginTop: 16 },
   tag: { fontSize: 14, fontWeight: '700', marginTop: 4, letterSpacing: 0.3 },
-  loader: { marginTop: 28 },
+  track: {
+    width: TRACK,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 28,
+  },
+  seg: { width: SEG, height: 6, borderRadius: 3 },
 });
