@@ -12,7 +12,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { LoadingOverlay } from '@/components/ui/loading-overlay';
+import { BootScreen } from '@/components/ui/boot-screen';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { LoadingProvider } from '@/contexts/loading';
@@ -44,9 +44,9 @@ function RootNavigator() {
     }
   }, [session, initializing, segments, router]);
 
-  // 앱 부팅(세션 확인) 중에는 로딩 팝업을 띄운다
+  // 앱 부팅(세션 확인) 중에는 피넛 브랜드 스플래시를 띄운다
   if (initializing) {
-    return <LoadingOverlay visible message="loading..." />;
+    return <BootScreen />;
   }
 
   return (
