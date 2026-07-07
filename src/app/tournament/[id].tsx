@@ -47,6 +47,7 @@ export default function TournamentDetail() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [tab, setTab] = useState<'info' | 'prelim' | 'final'>('info');
+  const [groupTab, setGroupTab] = useState<number | 'all'>('all');
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -345,7 +346,30 @@ export default function TournamentDetail() {
         {/* 예선 (조별리그) */}
         {hasBracket && tab === 'prelim' && (
           <View style={styles.section}>
-            {groupNos.map((gno) => {
+            {groupNos.length > 1 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.groupTabRow}>
+                {(['all', ...groupNos] as (number | 'all')[]).map((g) => {
+                  const active = groupTab === g;
+                  return (
+                    <Pressable
+                      key={String(g)}
+                      onPress={() => setGroupTab(g)}
+                      style={[
+                        styles.groupPill,
+                        { backgroundColor: active ? theme.primary : theme.backgroundElement },
+                      ]}>
+                      <Text style={[styles.groupPillText, { color: active ? '#fff' : theme.textSecondary }]}>
+                        {g === 'all' ? '전체' : `${g}조`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+            {(groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab)).map((gno) => {
               const gms = groupMatchesAll.filter((m) => (m.group_no ?? 1) === gno);
               const table = standings(groupMembers(gms), gms);
               return (
@@ -602,6 +626,9 @@ const styles = StyleSheet.create({
   courtName: { fontSize: 14, fontWeight: '700' },
   courtTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   courtTagText: { fontSize: 12, fontWeight: '700' },
+  groupTabRow: { gap: 8, paddingBottom: 4 },
+  groupPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  groupPillText: { fontSize: 14, fontWeight: '700' },
   subLabel: { fontSize: 14, fontWeight: '700', marginTop: 2 },
   tableCard: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },
