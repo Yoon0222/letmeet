@@ -170,6 +170,16 @@ export type TournamentMatch = {
   score2: number | null;
   winner_id: string | null;
   status: MatchStatus;
+  court_id: string | null;
+  created_at: string;
+};
+
+export type TournamentCourt = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  indoor: boolean;
+  sort: number;
   created_at: string;
 };
 
@@ -234,6 +244,12 @@ export interface Database {
         Row: TournamentMatch;
         Insert: WriteDefaults<TournamentMatch> & { tournament_id: string; phase: MatchPhase };
         Update: WriteDefaults<TournamentMatch>;
+        Relationships: [];
+      };
+      tournament_courts: {
+        Row: TournamentCourt;
+        Insert: WriteDefaults<TournamentCourt> & { tournament_id: string; name: string };
+        Update: WriteDefaults<TournamentCourt>;
         Relationships: [];
       };
     };

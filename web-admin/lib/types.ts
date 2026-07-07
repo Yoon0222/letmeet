@@ -54,6 +54,16 @@ export type TournamentMatch = {
   score2: number | null;
   winner_id: string | null;
   status: 'scheduled' | 'done';
+  court_id: string | null;
+  created_at: string;
+};
+
+export type TournamentCourt = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  indoor: boolean;
+  sort: number;
   created_at: string;
 };
 
@@ -130,6 +140,12 @@ export interface Database {
         Row: TournamentMatch;
         Insert: Write<TournamentMatch> & { tournament_id: string; phase: MatchPhase };
         Update: Write<TournamentMatch>;
+        Relationships: [];
+      };
+      tournament_courts: {
+        Row: TournamentCourt;
+        Insert: Write<TournamentCourt> & { tournament_id: string; name: string };
+        Update: Write<TournamentCourt>;
         Relationships: [];
       };
       audit_logs: {

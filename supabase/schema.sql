@@ -383,6 +383,31 @@ select
 from public.tournaments t
 join public.profiles p on p.id = t.organizer_id;
 
+-- 대회 코트 구성 (코트명 + 실내/실외) — 대회마다 자유롭게 정의
+create table if not exists public.tournament_courts (
+  id            uuid primary key default uuid_generate_v4(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  name          text not null,                 -- 예: '1', 'A', '센터코트'
+  indoor        boolean not null default true, -- true=실내, false=실외
+  sort          int not null default 0,
+  created_at    timestamptz not null default now()
+);
+create index if not exists tournament_courts_tid_idx on public.tournament_courts (tournament_id);
+
+alter table public.tournament_courts enable row level security;
+drop policy if exists "courts_select" on public.tournament_courts;
+create policy "courts_select" on public.tournament_courts for select using (true);
+drop policy if exists "courts_write_organizer" on public.tournament_courts;
+create policy "courts_write_organizer" on public.tournament_courts
+  for all using (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  )
+  with check (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  );
+
 -- 대회 진행: 경기(조별리그 + 토너먼트)
 create table if not exists public.tournament_matches (
   id            uuid primary key default uuid_generate_v4(),
@@ -398,6 +423,7 @@ create table if not exists public.tournament_matches (
   score2        int,
   winner_id     uuid references public.profiles(id) on delete set null,
   status        text not null default 'scheduled',
+  court_id      uuid references public.tournament_courts(id) on delete set null,
   created_at    timestamptz not null default now()
 );
 create index if not exists tournament_matches_tid_idx on public.tournament_matches (tournament_id);

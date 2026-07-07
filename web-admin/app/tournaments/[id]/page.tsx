@@ -19,7 +19,7 @@ const ENTRY_STYLE: Record<string, string> = {
 export default function EntriesTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, entries, loading, reload } = useTournament();
+  const { t, entries, courts, loading, reload } = useTournament();
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -35,6 +35,22 @@ export default function EntriesTab() {
 
   return (
     <div>
+      {courts.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-medium">코트 {courts.length}면</h2>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {courts.map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-2 text-sm">
+                <span className="font-medium text-slate-800">{c.name}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${c.indoor ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {c.indoor ? '실내' : '실외'}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <h2 className="text-lg font-medium">참가 신청 {visibleEntries.length}건</h2>
       {visibleEntries.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">아직 신청이 없습니다.</p>

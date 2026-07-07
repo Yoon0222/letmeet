@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import type {
   EntryStatus,
   PartnerProfile,
+  TournamentCourt,
   TournamentEntryWithProfile,
   TournamentMatch,
   TournamentWithCounts,
@@ -42,6 +43,7 @@ export default function TournamentDetail() {
   const [t, setT] = useState<TournamentWithCounts | null>(null);
   const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
+  const [courts, setCourts] = useState<TournamentCourt[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [tab, setTab] = useState<'info' | 'prelim' | 'final'>('info');
@@ -54,7 +56,7 @@ export default function TournamentDetail() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [{ data: tour }, { data: ents }, { data: ms }] = await Promise.all([
+    const [{ data: tour }, { data: ents }, { data: ms }, { data: cs }] = await Promise.all([
       supabase.from('tournaments_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('tournament_entries')
@@ -68,10 +70,12 @@ export default function TournamentDetail() {
         .select('*')
         .eq('tournament_id', id)
         .order('slot', { ascending: true }),
+      supabase.from('tournament_courts').select('*').eq('tournament_id', id).order('sort', { ascending: true }),
     ]);
     setT(tour ?? null);
     setEntries((ents as unknown as TournamentEntryWithProfile[]) ?? []);
     setMatches((ms as TournamentMatch[]) ?? []);
+    setCourts((cs as TournamentCourt[]) ?? []);
     setLoading(false);
   }, [id]);
 
@@ -260,6 +264,28 @@ export default function TournamentDetail() {
             <Text style={[styles.desc, { color: theme.textSecondary }]}>{t.description}</Text>
           </View>
         ) : null}
+
+        {courts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>코트 {courts.length}면</Text>
+            <View style={styles.courtWrap}>
+              {courts.map((c) => (
+                <View key={c.id} style={[styles.courtChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Text style={[styles.courtName, { color: theme.text }]}>{c.name}</Text>
+                  <View
+                    style={[
+                      styles.courtTag,
+                      { backgroundColor: c.indoor ? 'rgba(56,132,255,0.14)' : 'rgba(245,166,35,0.16)' },
+                    ]}>
+                    <Text style={[styles.courtTagText, { color: c.indoor ? '#2D6BD6' : '#7A4E00' }]}>
+                      {c.indoor ? '실내' : '실외'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>참가자 {approved.length}{isDoubles ? '팀' : '명'}</Text>
@@ -552,6 +578,11 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 6,
   },
+  courtWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  courtChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
+  courtName: { fontSize: 14, fontWeight: '700' },
+  courtTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  courtTagText: { fontSize: 12, fontWeight: '700' },
   subLabel: { fontSize: 14, fontWeight: '700', marginTop: 2 },
   tableCard: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },

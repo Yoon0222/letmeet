@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 import { supabase } from '@/lib/supabase';
 import type {
+  TournamentCourt,
   TournamentEntryWithProfile,
   TournamentMatch,
   TournamentWithCounts,
@@ -13,6 +14,7 @@ type Ctx = {
   t: TournamentWithCounts | null;
   entries: TournamentEntryWithProfile[];
   matches: TournamentMatch[];
+  courts: TournamentCourt[];
   loading: boolean;
   reload: () => Promise<void>;
   // 선수/팀 이름 (복식이면 "닉 / 파트너")
@@ -31,10 +33,11 @@ export function TournamentProvider({ id, children }: { id: string; children: Rea
   const [t, setT] = useState<TournamentWithCounts | null>(null);
   const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
+  const [courts, setCourts] = useState<TournamentCourt[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    const [{ data: tour }, { data: ents }, { data: ms }] = await Promise.all([
+    const [{ data: tour }, { data: ents }, { data: ms }, { data: cs }] = await Promise.all([
       supabase.from('tournaments_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('tournament_entries')
@@ -44,10 +47,12 @@ export function TournamentProvider({ id, children }: { id: string; children: Rea
         .eq('tournament_id', id)
         .order('created_at', { ascending: true }),
       supabase.from('tournament_matches').select('*').eq('tournament_id', id).order('slot', { ascending: true }),
+      supabase.from('tournament_courts').select('*').eq('tournament_id', id).order('sort', { ascending: true }),
     ]);
     setT(tour ?? null);
     setEntries((ents as unknown as TournamentEntryWithProfile[]) ?? []);
     setMatches((ms as TournamentMatch[]) ?? []);
+    setCourts((cs as TournamentCourt[]) ?? []);
     setLoading(false);
   }, [id]);
 
@@ -65,7 +70,7 @@ export function TournamentProvider({ id, children }: { id: string; children: Rea
   };
 
   return (
-    <TournamentContext.Provider value={{ t, entries, matches, loading, reload, name }}>
+    <TournamentContext.Provider value={{ t, entries, matches, courts, loading, reload, name }}>
       {children}
     </TournamentContext.Provider>
   );
