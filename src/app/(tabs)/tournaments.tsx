@@ -3,9 +3,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   View,
@@ -39,19 +39,31 @@ export default function TournamentsScreen() {
       .from('tournaments_with_counts')
       .select('*')
       .neq('status', 'cancelled')
-      .order('start_at', { ascending: true })
+      .order('start_at', { ascending: false })
       .limit(100);
     if (error) {
       console.warn('[tournaments] load error', error.message);
       setRows([]);
     } else {
-      // 종료된 대회는 맨 아래로 (진행/신청 대회를 위로)
-      const sorted = (data ?? []).slice().sort((a, b) => (a.status === 'finished' ? 1 : 0) - (b.status === 'finished' ? 1 : 0));
-      setRows(sorted);
+      setRows(data ?? []);
     }
     setLoading(false);
     setRefreshing(false);
   }, []);
+
+  // 날짜순 목록을 월별 섹션으로
+  const filtered = filter === 'all' ? rows : rows.filter((t) => t.discipline === filter);
+  const sections: { key: string; title: string; data: TournamentWithCounts[] }[] = [];
+  for (const t of filtered) {
+    const d = new Date(t.start_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    let g = sections.find((s) => s.key === key);
+    if (!g) {
+      g = { key, title: `${d.getFullYear()}년 ${d.getMonth() + 1}월`, data: [] };
+      sections.push(g);
+    }
+    g.data.push(t);
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -94,10 +106,16 @@ export default function TournamentsScreen() {
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : (
-        <FlatList
-          data={filter === 'all' ? rows : rows.filter((t) => t.discipline === filter)}
+        <SectionList
+          sections={sections}
           keyExtractor={(t) => t.id}
           contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <Text style={[styles.monthHeader, { color: theme.textSecondary, backgroundColor: theme.background }]}>
+              {section.title}
+            </Text>
+          )}
           renderItem={({ item }) => (
             <TournamentCard tournament={item} onPress={() => router.push(`/tournament/${item.id}`)} />
           )}
@@ -147,6 +165,7 @@ const styles = StyleSheet.create({
   },
   segText: { fontSize: 14, fontWeight: '700' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 40 },
+  monthHeader: { fontSize: 15, fontWeight: '800', paddingTop: 8, paddingBottom: 2 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
   emptyTitle: { fontSize: 18, fontWeight: '700' },
