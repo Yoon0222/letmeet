@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 
 import { Protected } from '@/components/protected';
 import { formatDateTime, TOURNAMENT_STATUS_LABEL } from '@/lib/format';
@@ -31,7 +31,10 @@ function TournamentsInner() {
     let query = supabase.from('tournaments_with_counts').select('*');
     if (role !== 'super_admin') query = query.eq('organizer_id', uid);
     const { data } = await query.order('start_at', { ascending: false });
-    setRows(data ?? []);
+    // 종료·취소 대회는 맨 아래로 (그 안에서는 start_at 최신순 유지 — 안정 정렬)
+    const ended = (s: string) => (s === 'finished' || s === 'cancelled' ? 1 : 0);
+    const sorted = (data ?? []).slice().sort((a, b) => ended(a.status) - ended(b.status));
+    setRows(sorted);
     setLoading(false);
   }, [session?.user.id, role]);
 
@@ -68,33 +71,48 @@ function TournamentsInner() {
         </div>
       ) : (
         <div className="mt-6 grid gap-3">
-          {rows.map((t) => (
-            <Link
-              key={t.id}
-              href={`/tournaments/${t.id}`}
-              className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">{formatDateTime(t.start_at)}</span>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[t.status]}`}>
-                  {TOURNAMENT_STATUS_LABEL[t.status]}
-                </span>
-              </div>
-              <h2 className="mt-1 text-lg font-medium">{t.title}</h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {t.venue || '장소 미정'}
-                {t.region ? ` · ${t.region}` : ''}
-              </p>
-              <div className="mt-3 flex gap-4 text-sm text-slate-600">
-                <span>
-                  승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
-                </span>
-                {t.pending_count > 0 && (
-                  <span className="text-amber-600">대기 {t.pending_count}건</span>
+          {rows.map((t, i) => {
+            const isEnded = t.status === 'finished' || t.status === 'cancelled';
+            const prevEnded = i > 0 && (rows[i - 1].status === 'finished' || rows[i - 1].status === 'cancelled');
+            const showDivider = isEnded && !prevEnded && i > 0; // 진행/신청 대회 뒤 첫 종료 대회 앞
+            return (
+              <Fragment key={t.id}>
+                {showDivider && (
+                  <div className="flex items-center gap-3 pt-2 text-xs font-medium text-slate-400">
+                    <span className="h-px flex-1 bg-slate-200" />
+                    종료된 대회
+                    <span className="h-px flex-1 bg-slate-200" />
+                  </div>
                 )}
-              </div>
-            </Link>
-          ))}
+                <Link
+                  href={`/tournaments/${t.id}`}
+                  className={`rounded-xl border p-4 ${
+                    isEnded
+                      ? 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
+                      : 'border-slate-200 bg-white hover:border-emerald-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">{formatDateTime(t.start_at)}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[t.status]}`}>
+                      {TOURNAMENT_STATUS_LABEL[t.status]}
+                    </span>
+                  </div>
+                  <h2 className="mt-1 text-lg font-medium">{t.title}</h2>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    {t.venue || '장소 미정'}
+                    {t.region ? ` · ${t.region}` : ''}
+                  </p>
+                  <div className="mt-3 flex gap-4 text-sm text-slate-600">
+                    <span>
+                      승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
+                    </span>
+                    {t.pending_count > 0 && <span className="text-amber-600">대기 {t.pending_count}건</span>}
+                  </div>
+                </Link>
+              </Fragment>
+            );
+          })}
         </div>
       )}
     </div>

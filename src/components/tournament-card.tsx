@@ -18,13 +18,14 @@ export function TournamentCard({
   const theme = useTheme();
   const t = tournament;
   const registering = t.status === 'registration';
+  const ended = t.status === 'finished' || t.status === 'cancelled';
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 },
+        { backgroundColor: theme.card, borderColor: theme.border, opacity: ended ? 0.55 : pressed ? 0.9 : 1 },
       ]}>
       <View style={styles.topRow}>
         <Text style={[styles.time, { color: theme.primary }]}>{formatMeetupTime(t.start_at)}</Text>

@@ -45,7 +45,9 @@ export default function TournamentsScreen() {
       console.warn('[tournaments] load error', error.message);
       setRows([]);
     } else {
-      setRows(data ?? []);
+      // 종료된 대회는 맨 아래로 (진행/신청 대회를 위로)
+      const sorted = (data ?? []).slice().sort((a, b) => (a.status === 'finished' ? 1 : 0) - (b.status === 'finished' ? 1 : 0));
+      setRows(sorted);
     }
     setLoading(false);
     setRefreshing(false);
