@@ -48,15 +48,22 @@ function Side({
   );
 }
 
-function MatchBox({ m, nameOf, uid, theme }: { m: TournamentMatch; nameOf: (id: string | null) => string; uid: string | undefined; theme: Theme }) {
+function MatchBox({ m, nameOf, uid, theme, hl }: { m: TournamentMatch; nameOf: (id: string | null) => string; uid: string | undefined; theme: Theme; hl: string }) {
   const done = m.status === 'done';
   const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
   const w2 = done && !!m.winner_id && m.winner_id === m.entry2_id;
   const mine = m.entry1_id === uid || m.entry2_id === uid;
   // 빈 슬롯: 확정 부전승은 '부전승', 아직 안 정해진 다음 라운드는 '미정'
   const label = (id: string | null) => (id ? nameOf(id) : done ? '부전승' : '미정');
+  // 검색어와 일치하는 경기 강조
+  const matchHit = !!hl && (label(m.entry1_id).toLowerCase().includes(hl) || label(m.entry2_id).toLowerCase().includes(hl));
   return (
-    <View style={[styles.box, { borderColor: mine ? theme.primary : theme.border, backgroundColor: theme.card }]}>
+    <View
+      style={[
+        styles.box,
+        { borderColor: matchHit ? theme.accent : mine ? theme.primary : theme.border, backgroundColor: theme.card },
+        matchHit && { borderWidth: 2 },
+      ]}>
       <Side name={label(m.entry1_id)} score={done ? m.score1 : null} win={w1} theme={theme} border />
       <Side name={label(m.entry2_id)} score={done ? m.score2 : null} win={w2} theme={theme} />
     </View>
@@ -67,12 +74,15 @@ export function BracketTree({
   matches,
   nameOf,
   uid,
+  highlightQuery = '',
 }: {
   matches: TournamentMatch[];
   nameOf: (id: string | null) => string;
   uid: string | undefined;
+  highlightQuery?: string;
 }) {
   const theme = useTheme();
+  const hl = highlightQuery.trim().toLowerCase();
 
   const roundOrders = [...new Set(matches.map((m) => m.round_order ?? 0))].sort((a, b) => a - b);
   const rounds = roundOrders.map((ro) =>
@@ -147,7 +157,7 @@ export function BracketTree({
         {rounds.map((rms, r) =>
           rms.map((m, j) => (
             <View key={m.id} style={{ position: 'absolute', left: colX(r), top: centers[r][j] - BOX_H / 2, width: BOX_W }}>
-              <MatchBox m={m} nameOf={nameOf} uid={uid} theme={theme} />
+              <MatchBox m={m} nameOf={nameOf} uid={uid} theme={theme} hl={hl} />
             </View>
           )),
         )}

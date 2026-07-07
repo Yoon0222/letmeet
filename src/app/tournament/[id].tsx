@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BracketTree } from '@/components/bracket-tree';
@@ -48,6 +48,7 @@ export default function TournamentDetail() {
   const [acting, setActing] = useState(false);
   const [tab, setTab] = useState<'info' | 'prelim' | 'final'>('info');
   const [groupTab, setGroupTab] = useState<number | 'all'>('all');
+  const [search, setSearch] = useState('');
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -125,6 +126,17 @@ export default function TournamentDetail() {
       return c ? `${c.name} · ${c.indoor ? '실내' : '실외'}` : undefined;
     },
     [courts],
+  );
+
+  // 이름 검색
+  const q = search.trim().toLowerCase();
+  const matchHit = (m: TournamentMatch) =>
+    !q || nameOf(m.entry1_id).toLowerCase().includes(q) || nameOf(m.entry2_id).toLowerCase().includes(q);
+  const approvedShown = approved.filter(
+    (e) =>
+      !q ||
+      (e.profiles?.nickname ?? '').toLowerCase().includes(q) ||
+      (e.partner?.nickname ?? e.partner_name ?? '').toLowerCase().includes(q),
   );
 
   // 대진이 있으면 정보/예선/본선 탭으로 분리
@@ -252,6 +264,22 @@ export default function TournamentDetail() {
       )}
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {(approved.length > 0 || hasBracket) && (
+          <View style={[styles.searchBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="search" size={16} color={theme.textSecondary} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="이름으로 검색"
+              placeholderTextColor={theme.textSecondary}
+              autoCapitalize="none"
+              style={[styles.searchInput, { color: theme.text }]}
+            />
+            {search.length > 0 && (
+              <Ionicons name="close-circle" size={18} color={theme.textSecondary} onPress={() => setSearch('')} />
+            )}
+          </View>
+        )}
         {(!hasBracket || tab === 'info') && (
           <>
         <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -299,12 +327,16 @@ export default function TournamentDetail() {
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>참가자 {approved.length}{isDoubles ? '팀' : '명'}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            참가자 {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
+          </Text>
           <View style={{ gap: 10, marginTop: 8 }}>
             {approved.length === 0 ? (
               <Text style={{ color: theme.textSecondary, fontSize: 14 }}>아직 확정된 참가자가 없어요.</Text>
+            ) : approvedShown.length === 0 ? (
+              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>검색 결과가 없어요.</Text>
             ) : (
-              approved.map((e) => (
+              approvedShown.map((e) => (
                 <View key={e.user_id} style={styles.pRow}>
                   <Avatar nickname={e.profiles?.nickname ?? '?'} uri={e.profiles?.avatar_url} size={40} />
                   <View style={{ flex: 1 }}>
@@ -369,9 +401,11 @@ export default function TournamentDetail() {
                 })}
               </ScrollView>
             )}
-            {(groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab)).map((gno) => {
+            {(q ? groupNos : groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab)).map((gno) => {
               const gms = groupMatchesAll.filter((m) => (m.group_no ?? 1) === gno);
               const table = standings(groupMembers(gms), gms);
+              const shownGms = q ? gms.filter(matchHit) : gms;
+              if (q && shownGms.length === 0) return null;
               return (
                 <View key={`g${gno}`} style={{ marginTop: 14 }}>
                   <Text style={[styles.subLabel, { color: theme.textSecondary }]}>{gno}조 순위</Text>
@@ -392,7 +426,7 @@ export default function TournamentDetail() {
                     ))}
                   </View>
                   <View style={{ gap: 6, marginTop: 6 }}>
-                    {gms.map((m) => (
+                    {shownGms.map((m) => (
                       <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} courtLabel={courtLabelOf(m.court_id)} />
                     ))}
                   </View>
@@ -405,7 +439,12 @@ export default function TournamentDetail() {
         {/* 본선 (토너먼트) */}
         {hasBracket && tab === 'final' && (
           <View style={styles.section}>
-            <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} />
+            {q ? (
+              <Text style={[styles.pMeta, { color: theme.textSecondary, marginBottom: 6 }]}>
+                검색어와 일치하는 선수를 강조 표시해요.
+              </Text>
+            ) : null}
+            <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} highlightQuery={q} />
           </View>
         )}
 
@@ -626,6 +665,8 @@ const styles = StyleSheet.create({
   courtName: { fontSize: 14, fontWeight: '700' },
   courtTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   courtTagText: { fontSize: 12, fontWeight: '700' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 44 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
   groupTabRow: { gap: 8, paddingBottom: 4 },
   groupPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   groupPillText: { fontSize: 14, fontWeight: '700' },
