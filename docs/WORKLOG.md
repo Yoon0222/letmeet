@@ -51,7 +51,8 @@
 - **DB**: `0020_court_geo.sql` — `courts.latitude/longitude` + 부분 인덱스. **실행 완료**. (커밋 `5527a84`)
 - **관리자 지오코딩**: `web-admin/app/api/geocode/route.ts` — 네이버 클라우드 Geocoding 프록시(서버 키). 코트 폼에 **"주소로 좌표 찾기"** + 위/경도 수동 보정, 목록에 위치(📍설정됨/미설정).
 - **네이버 클라우드 키**: Maps Application 등록(Dynamic Map + Geocoding, 번들ID `com.pickle.app`). Geocoding 키를 `web-admin/.env.local`(NAVER_MAP_GEOCODE_ID/KEY, git 제외)에 설정 → **실동작 검증 완료**(예: 송파 올림픽로 424 → 37.52093,127.12296). 데모 코트 4개 실주소 지오코딩으로 좌표 갱신.
-- **미착수(다음, ③)**: 선수앱 **네이버 지도 화면**(코트 마커→탭→예약, 목록/지도 토글). `@mj-studio/react-native-naver-map` + Expo 플러그인 + **동일 Application의 Client ID**. ⚠️ 네이티브 지도는 웹 프리뷰 렌더 불가 → **EAS 개발 빌드**(열린 항목 #9) 필요. 웹 번들 안 깨지게 네이티브 전용 가드.
+- **선수앱 네이버 지도(③) — 코드 완료**: `@mj-studio/react-native-naver-map` 2.9.0(새 아키텍처) + `expo-build-properties`(네이버 maven). 목록/지도 토글 → 지도에 코트 마커(캡션) → 탭하면 예약 화면. 플랫폼 분리(`court-map.native.tsx`=네이버 지도 / `court-map.tsx`=웹 폴백)로 **웹 번들 안 깨짐**(웹·iOS export 통과). `app.config.js`가 `client_id`를 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`(=지오코딩 Client ID, `.env` gitignore)로 주입 → git 미커밋. (커밋 `5d02615`)
+  - **남은 것**: 네이티브 지도는 Expo Go·웹에서 안 뜸 → **EAS 개발 빌드**(#9)로만 실제 지도 확인. 빌드 시 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`를 EAS env(또는 eas.json)에 넣어야 함(현재 로컬 `.env`만). 네이버 Application 서비스환경에 Android 패키지/iOS 번들 `com.pickle.app` 등록 필요.
 
 ## 2026-07-07
 
