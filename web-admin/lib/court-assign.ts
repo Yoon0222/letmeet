@@ -86,6 +86,56 @@ export function computeAutoAssign(
   return updates;
 }
 
+// 배정 대기열: 아직 코트 없이 지금 배정 가능한(양팀 확정 + 선수 안 겹침) 경기를
+// 우선순위 순(덜 진행한 조 → 조/라운드/슬롯)으로 나열한다. 대기번호 매길 때 사용.
+export function computeQueueOrder(matches: TournamentMatch[]): TournamentMatch[] {
+  const remaining = remainingMatches(matches);
+
+  const busyTeams = new Set<string>();
+  remaining.forEach((m) => {
+    if (m.court_id) {
+      if (m.entry1_id) busyTeams.add(m.entry1_id);
+      if (m.entry2_id) busyTeams.add(m.entry2_id);
+    }
+  });
+
+  const groupPlayed = new Map<number, number>();
+  matches.forEach((m) => {
+    if (m.phase !== 'group' || m.group_no == null) return;
+    if (m.status === 'done' || m.court_id) groupPlayed.set(m.group_no, (groupPlayed.get(m.group_no) ?? 0) + 1);
+  });
+
+  const priorityKey = (m: TournamentMatch, played: Map<number, number>): number[] =>
+    m.phase === 'group'
+      ? [0, played.get(m.group_no ?? 0) ?? 0, m.group_no ?? 0, m.slot]
+      : [1, 0, m.round_order ?? 0, m.slot];
+
+  // 지금 배정 가능한 경기(양팀 확정 + 선수 안 겹침)만 대상
+  const pool = remaining.filter(
+    (m) => !m.court_id && !!m.entry1_id && !!m.entry2_id && !busyTeams.has(m.entry1_id) && !busyTeams.has(m.entry2_id),
+  );
+
+  // 픽할 때마다 조별 진행수를 늘려 조 간 rotation (1조→2조→…→다시 1조) 순으로 나열
+  const played = new Map(groupPlayed);
+  const order: TournamentMatch[] = [];
+  const rest = [...pool];
+  while (rest.length > 0) {
+    let bestIdx = 0;
+    let bestKey = priorityKey(rest[0], played);
+    for (let i = 1; i < rest.length; i++) {
+      const key = priorityKey(rest[i], played);
+      if (cmpKey(key, bestKey) < 0) {
+        bestKey = key;
+        bestIdx = i;
+      }
+    }
+    const m = rest.splice(bestIdx, 1)[0];
+    order.push(m);
+    if (m.phase === 'group' && m.group_no != null) played.set(m.group_no, (played.get(m.group_no) ?? 0) + 1);
+  }
+  return order;
+}
+
 // 경기 종료 등으로 코트가 비었을 때, 대기 경기를 자동으로 빈 코트에 투입(미확정 상태).
 // 새로 배정한 경기 수를 반환.
 export async function autoAdvanceCourts(tournamentId: string): Promise<number> {

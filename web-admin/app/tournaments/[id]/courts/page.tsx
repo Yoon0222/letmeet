@@ -1,6 +1,8 @@
 'use client';
 
-import { computeAutoAssign } from '@/lib/court-assign';
+import { useState } from 'react';
+
+import { computeAutoAssign, computeQueueOrder } from '@/lib/court-assign';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
 import type { TournamentMatch } from '@/lib/types';
@@ -16,6 +18,7 @@ function matchLabel(m: TournamentMatch): string {
 export default function CourtsTab() {
   const { session } = useSession();
   const { t, matches, courts, loading, reload, name } = useTournament();
+  const [phaseTab, setPhaseTab] = useState<'group' | 'knockout'>('group');
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -50,6 +53,32 @@ export default function CourtsTab() {
   const assigned = remaining.filter((m) => m.court_id);
   const unconfirmed = assigned.filter((m) => !m.court_confirmed); // 배정됐지만 아직 확정 전
   const courtName = (cid: string | null) => courts.find((c) => c.id === cid)?.name ?? null;
+
+  // 배정 대기열(우선순위 순) → 경기별 대기번호
+  const queueOrder = computeQueueOrder(matches);
+  const queueNo = new Map<string, number>();
+  queueOrder.forEach((m, i) => queueNo.set(m.id, i + 1));
+  const courtIndex = new Map(courts.map((c, i) => [c.id, i]));
+
+  // 예선/본선 서브탭
+  const hasGroup = remaining.some((m) => m.phase === 'group');
+  const hasKnockout = remaining.some((m) => m.phase === 'knockout');
+  const phases: { key: 'group' | 'knockout'; label: string }[] = [
+    ...(hasGroup ? [{ key: 'group' as const, label: '예선' }] : []),
+    ...(hasKnockout ? [{ key: 'knockout' as const, label: '본선' }] : []),
+  ];
+  const activePhase = phases.some((p) => p.key === phaseTab) ? phaseTab : phases[0]?.key ?? 'group';
+
+  // 현재 탭 경기: 배정됨 → 대기열(대기번호) → 대기(선수경기중/팀미정) 순 정렬
+  const rowRank = (m: TournamentMatch) => (m.court_id ? 0 : queueNo.has(m.id) ? 1 : 2);
+  const rowSub = (m: TournamentMatch) =>
+    m.court_id ? courtIndex.get(m.court_id) ?? 99 : queueNo.get(m.id) ?? 999;
+  const phaseRows = remaining
+    .filter((m) => m.phase === activePhase)
+    .sort((a, b) => rowRank(a) - rowRank(b) || rowSub(a) - rowSub(b));
+  // 대기번호는 탭(단계)별로 1부터
+  const phaseQueueNo = new Map<string, number>();
+  queueOrder.filter((m) => m.phase === activePhase).forEach((m, i) => phaseQueueNo.set(m.id, i + 1));
 
   // 수동 배정/변경 → 확정 상태는 초기화(다시 확정 필요)
   async function assign(matchId: string, courtId: string | null) {
@@ -150,48 +179,68 @@ export default function CourtsTab() {
         })}
       </div>
 
-      {/* 잔여 경기 리스트 */}
-      <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {/* 예선/본선 서브탭 */}
+      {phases.length > 1 && (
+        <div className="mt-4 flex gap-1.5">
+          {phases.map((p) => {
+            const cnt = remaining.filter((m) => m.phase === p.key).length;
+            return (
+              <button
+                key={p.key}
+                onClick={() => setPhaseTab(p.key)}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+                  activePhase === p.key ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {p.label}
+                <span className={`ml-1.5 text-xs ${activePhase === p.key ? 'text-emerald-100' : 'text-slate-400'}`}>{cnt}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 잔여 경기 리스트 (배정 → 대기번호 → 대기 순) */}
+      <div className={`${phases.length > 1 ? 'mt-3' : 'mt-4'} overflow-hidden rounded-xl border border-slate-200 bg-white`}>
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">단계</th>
               <th className="px-4 py-2 font-medium">경기</th>
-              <th className="px-4 py-2 font-medium">코트</th>
+              <th className="px-4 py-2 font-medium">대기 / 코트</th>
             </tr>
           </thead>
           <tbody>
-            {remaining.map((m) => (
-              <tr key={m.id} className="border-t border-slate-100">
-                <td className="whitespace-nowrap px-4 py-2 text-slate-500">{matchLabel(m)}</td>
-                <td className="px-4 py-2 font-medium text-slate-800">
-                  {name(m.entry1_id)} <span className="text-slate-400">vs</span> {name(m.entry2_id)}
-                </td>
-                <td className="px-4 py-2">
-                  {isOrganizer ? (
-                    !m.court_id && teamsBusy(m) ? (
-                      // 선수가 다른 코트에서 경기중이면 지금은 배정 불가
-                      <span className="text-xs font-medium text-amber-600">선수 경기중 · 대기</span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={m.court_id ?? ''}
-                          onChange={(e) => assign(m.id, e.target.value || null)}
-                          className={`rounded border px-2 py-1 text-sm outline-none focus:border-emerald-500 ${m.court_id ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
-                        >
-                          <option value="">미배정</option>
-                          {courts.map((c) => {
-                            // 다른 경기가 쓰고 있는 코트는 선택 불가 (자기 자신은 예외)
-                            const occupiedByOther = busyByCourt.has(c.id) && busyByCourt.get(c.id)!.id !== m.id;
-                            return (
-                              <option key={c.id} value={c.id} disabled={occupiedByOther}>
-                                {c.name} ({c.indoor ? '실내' : '실외'}){occupiedByOther ? ' · 사용중' : ''}
-                              </option>
-                            );
-                          })}
-                        </select>
-                        {m.court_id &&
-                          (m.court_confirmed ? (
+            {phaseRows.map((m) => {
+              const courtSelect = (
+                <select
+                  value={m.court_id ?? ''}
+                  onChange={(e) => assign(m.id, e.target.value || null)}
+                  className={`rounded border px-2 py-1 text-sm outline-none focus:border-emerald-500 ${m.court_id ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
+                >
+                  <option value="">미배정</option>
+                  {courts.map((c) => {
+                    const occupiedByOther = busyByCourt.has(c.id) && busyByCourt.get(c.id)!.id !== m.id;
+                    return (
+                      <option key={c.id} value={c.id} disabled={occupiedByOther}>
+                        {c.name} ({c.indoor ? '실내' : '실외'}){occupiedByOther ? ' · 사용중' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              );
+              return (
+                <tr key={m.id} className="border-t border-slate-100">
+                  <td className="whitespace-nowrap px-4 py-2 text-slate-500">{matchLabel(m)}</td>
+                  <td className="px-4 py-2 font-medium text-slate-800">
+                    {name(m.entry1_id)} <span className="text-slate-400">vs</span> {name(m.entry2_id)}
+                  </td>
+                  <td className="px-4 py-2">
+                    {isOrganizer ? (
+                      m.court_id ? (
+                        <div className="flex items-center gap-2">
+                          {courtSelect}
+                          {m.court_confirmed ? (
                             <button
                               onClick={() => confirmMatch(m.id, false)}
                               title="확정 취소"
@@ -206,21 +255,29 @@ export default function CourtsTab() {
                             >
                               확정
                             </button>
-                          ))}
-                      </div>
-                    )
-                  ) : m.court_id ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                      {courtName(m.court_id)} {m.court_confirmed ? '· 확정' : '· 예정'}
-                    </span>
-                  ) : teamsBusy(m) ? (
-                    <span className="text-xs text-amber-600">선수 경기중</span>
-                  ) : (
-                    <span className="text-xs text-slate-400">대기</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                          )}
+                        </div>
+                      ) : queueNo.has(m.id) ? (
+                        <div className="flex items-center gap-2">
+                          <span className="whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">대기 {phaseQueueNo.get(m.id)}</span>
+                          {courtSelect}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-amber-600">선수 경기중 · 대기</span>
+                      )
+                    ) : m.court_id ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        {courtName(m.court_id)} {m.court_confirmed ? '· 확정' : '· 예정'}
+                      </span>
+                    ) : queueNo.has(m.id) ? (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">대기 {phaseQueueNo.get(m.id)}</span>
+                    ) : (
+                      <span className="text-xs text-amber-600">선수 경기중</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
