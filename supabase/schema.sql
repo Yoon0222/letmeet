@@ -531,3 +531,37 @@ end;
 $$;
 revoke all on function public.delete_account() from public;
 grant execute on function public.delete_account() to authenticated;
+
+-- ============================================================
+-- 대회 중복 참가 방지 — 0013
+-- 신청자·파트너가 이미 그 대회에 참가(신청자/파트너)면 신청 거부.
+-- ============================================================
+create or replace function public.enforce_no_double_entry()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.partner_id is not null and new.partner_id = new.user_id then
+    raise exception '본인을 파트너로 지정할 수 없어요.';
+  end if;
+  if exists (
+    select 1 from public.tournament_entries e
+    where e.tournament_id = new.tournament_id
+      and (e.user_id = new.user_id or e.partner_id = new.user_id)
+  ) then
+    raise exception '이미 이 대회에 참가 신청되어 있어요.';
+  end if;
+  if new.partner_id is not null and exists (
+    select 1 from public.tournament_entries e
+    where e.tournament_id = new.tournament_id
+      and (e.user_id = new.partner_id or e.partner_id = new.partner_id)
+  ) then
+    raise exception '선택한 파트너는 이미 이 대회에 참가 중이에요.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists on_no_double_entry on public.tournament_entries;
+create trigger on_no_double_entry
+  before insert on public.tournament_entries
+  for each row execute function public.enforce_no_double_entry();

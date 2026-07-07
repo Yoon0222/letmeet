@@ -84,6 +84,8 @@ export default function TournamentDetail() {
   }, [navigation, t?.title]);
 
   const myEntry = entries.find((e) => e.user_id === uid);
+  // 내가 다른 사람의 파트너로 이미 등록돼 있는지 (중복 신청 방지)
+  const iAmPartner = entries.find((e) => e.partner_id === uid);
   const approved = entries.filter((e) => e.status === 'approved');
   const canRegister = t?.status === 'registration';
   const isDoubles = t?.discipline === 'doubles';
@@ -118,18 +120,23 @@ export default function TournamentDetail() {
       return;
     }
     setSearching(true);
+    // 이미 이 대회에 참가 중인 사람(신청자·파트너)은 파트너로 못 고르게 제외
+    const taken = new Set(
+      entries.flatMap((e) => [e.user_id, e.partner_id]).filter(Boolean) as string[],
+    );
     const timer = setTimeout(async () => {
       const { data } = await supabase
         .from('profiles')
         .select('id, nickname, skill_level, avatar_url, region')
         .ilike('nickname', `%${q}%`)
         .neq('id', uid ?? '')
-        .limit(8);
-      setPartnerResults((data as PartnerProfile[]) ?? []);
+        .limit(16);
+      const list = ((data as PartnerProfile[]) ?? []).filter((p) => !taken.has(p.id)).slice(0, 8);
+      setPartnerResults(list);
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [partnerQuery, partnerSel, uid]);
+  }, [partnerQuery, partnerSel, uid, entries]);
 
   async function apply() {
     if (!uid || !id) return;
@@ -313,8 +320,8 @@ export default function TournamentDetail() {
           </View>
         )}
 
-        {/* 복식 파트너 검색·선택 (미신청 + 접수중일 때) */}
-        {canRegister && !myEntry && isDoubles && (
+        {/* 복식 파트너 검색·선택 (미신청 + 파트너로도 미등록 + 접수중일 때) */}
+        {canRegister && !myEntry && !iAmPartner && isDoubles && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>파트너 선택 (복식)</Text>
             {partnerSel ? (
@@ -391,6 +398,13 @@ export default function TournamentDetail() {
             {myEntry.status !== 'rejected' && (
               <Button title="참가 신청 취소" variant="outline" onPress={confirmCancel} loading={acting} />
             )}
+          </View>
+        ) : iAmPartner ? (
+          <View style={styles.statusRow}>
+            <Ionicons name="people" size={18} color={theme.primary} />
+            <Text style={[styles.statusText, { color: theme.text }]}>
+              {iAmPartner.profiles?.nickname ?? '상대'}님의 파트너로 참가 신청됨
+            </Text>
           </View>
         ) : canRegister ? (
           <Button title="참가 신청하기" onPress={apply} loading={acting} />
