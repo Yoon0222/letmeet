@@ -129,6 +129,17 @@ export default function TournamentDetail() {
     [courts],
   );
 
+  // 참가자 프로필 사진 (경기 이름 옆 표시용)
+  const avatarOf = useCallback(
+    (entryId: string | null): { uri: string | null; nickname: string } | null => {
+      if (!entryId) return null;
+      const e = entries.find((x) => x.user_id === entryId);
+      if (!e?.profiles) return null;
+      return { uri: e.profiles.avatar_url, nickname: e.profiles.nickname };
+    },
+    [entries],
+  );
+
   // 이름 검색
   const q = search.trim().toLowerCase();
   const matchHit = (m: TournamentMatch) =>
@@ -372,7 +383,7 @@ export default function TournamentDetail() {
             <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
             <View style={{ gap: 6, marginTop: 6 }}>
               {myMatches.map((m) => (
-                <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight courtLabel={courtLabelOf(m.court_id)} />
+                <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
               ))}
             </View>
           </View>
@@ -432,7 +443,7 @@ export default function TournamentDetail() {
                   </View>
                   <View style={{ gap: 6, marginTop: 6 }}>
                     {shownGms.map((m) => (
-                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} courtLabel={courtLabelOf(m.court_id)} />
+                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
                     ))}
                   </View>
                 </View>
@@ -449,7 +460,7 @@ export default function TournamentDetail() {
                 검색어와 일치하는 선수를 강조 표시해요.
               </Text>
             ) : null}
-            <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} highlightQuery={q} />
+            <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} highlightQuery={q} avatarOf={avatarOf} />
           </View>
         )}
 
@@ -576,6 +587,7 @@ function MatchRow({
   theme,
   highlight = false,
   courtLabel,
+  avatarOf,
 }: {
   m: TournamentMatch;
   nameOf: (id: string | null) => string;
@@ -583,6 +595,7 @@ function MatchRow({
   theme: ReturnType<typeof useTheme>;
   highlight?: boolean;
   courtLabel?: string;
+  avatarOf?: (id: string | null) => { uri: string | null; nickname: string } | null;
 }) {
   const done = m.status === 'done';
   const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
@@ -598,19 +611,24 @@ function MatchRow({
         {[
           { id: m.entry1_id, score: m.score1, win: w1 },
           { id: m.entry2_id, score: m.score2, win: w2 },
-        ].map((side, i) => (
-          <View key={i} style={styles.matchSide}>
-            <Text
-              style={[styles.matchName, { color: theme.text, fontWeight: side.win ? '800' : '500' }]}
-              numberOfLines={1}>
-              {nameOf(side.id)}
-            </Text>
-            <Text
-              style={[styles.matchScore, { color: side.win ? theme.primary : theme.textSecondary }]}>
-              {done ? side.score ?? 0 : '·'}
-            </Text>
-          </View>
-        ))}
+        ].map((side, i) => {
+          const av = avatarOf?.(side.id);
+          return (
+            <View key={i} style={styles.matchSide}>
+              <View style={styles.matchNameWrap}>
+                {av ? <Avatar nickname={av.nickname} uri={av.uri} size={22} /> : null}
+                <Text
+                  style={[styles.matchName, { color: theme.text, fontWeight: side.win ? '800' : '500' }]}
+                  numberOfLines={1}>
+                  {nameOf(side.id)}
+                </Text>
+              </View>
+              <Text style={[styles.matchScore, { color: side.win ? theme.primary : theme.textSecondary }]}>
+                {done ? side.score ?? 0 : '·'}
+              </Text>
+            </View>
+          );
+        })}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         {courtLabel ? (
@@ -693,6 +711,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   matchSide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  matchNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   matchName: { flex: 1, fontSize: 14 },
   matchScore: { fontSize: 15, fontWeight: '800', minWidth: 18, textAlign: 'right' },
   matchTag: { fontSize: 12, fontWeight: '600' },
