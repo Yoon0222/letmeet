@@ -29,6 +29,13 @@ export default function CourtsTab() {
       if (a.phase === 'group') return (a.group_no ?? 0) - (b.group_no ?? 0) || a.slot - b.slot;
       return (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot;
     });
+
+  // 코트 점유: 아직 안 끝난 경기가 배정된 코트는 "사용중" (코트당 동시에 1경기만)
+  const busyByCourt = new Map<string, TournamentMatch>();
+  remaining.forEach((m) => {
+    if (m.court_id) busyByCourt.set(m.court_id, m);
+  });
+  const freeCourts = courts.filter((c) => !busyByCourt.has(c.id));
   const unassigned = remaining.filter((m) => !m.court_id);
   const courtName = (cid: string | null) => courts.find((c) => c.id === cid)?.name ?? null;
 
@@ -37,29 +44,13 @@ export default function CourtsTab() {
     reload();
   }
 
-  // 자동 배정: 미배정 잔여 경기를 "가장 적게 쓴 코트" 우선으로 균등 분배 (수동 배정은 유지)
+  // 자동 배정: 비어 있는 코트에만 미배정 경기를 하나씩 (사용중 코트엔 배정 안 함)
   async function autoAssign() {
-    if (courts.length === 0 || unassigned.length === 0) return;
-    const load = new Map(courts.map((c) => [c.id, 0]));
-    remaining.forEach((m) => {
-      if (m.court_id && load.has(m.court_id)) load.set(m.court_id, (load.get(m.court_id) ?? 0) + 1);
-    });
-    const updates: { id: string; court_id: string }[] = [];
-    for (const m of unassigned) {
-      let best = courts[0];
-      let min = Infinity;
-      for (const c of courts) {
-        const l = load.get(c.id) ?? 0;
-        if (l < min) {
-          min = l;
-          best = c;
-        }
-      }
-      load.set(best.id, (load.get(best.id) ?? 0) + 1);
-      updates.push({ id: m.id, court_id: best.id });
-    }
-    for (const u of updates) {
-      await supabase.from('tournament_matches').update({ court_id: u.court_id }).eq('id', u.id);
+    const free = [...freeCourts];
+    if (free.length === 0 || unassigned.length === 0) return;
+    const toAssign = unassigned.slice(0, free.length);
+    for (let i = 0; i < toAssign.length; i++) {
+      await supabase.from('tournament_matches').update({ court_id: free[i].id }).eq('id', toAssign[i].id);
     }
     reload();
   }
@@ -83,17 +74,18 @@ export default function CourtsTab() {
       {/* 요약 + 자동 배정 */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="text-sm text-slate-600">
-          잔여 경기 <b className="text-slate-900">{remaining.length}</b>개 · 미배정{' '}
-          <b className={unassigned.length ? 'text-amber-600' : 'text-emerald-600'}>{unassigned.length}</b>개 · 코트 {courts.length}면
+          잔여 <b className="text-slate-900">{remaining.length}</b> · 미배정{' '}
+          <b className={unassigned.length ? 'text-amber-600' : 'text-emerald-600'}>{unassigned.length}</b> · 코트 {courts.length}면 (여유{' '}
+          <b className="text-emerald-600">{freeCourts.length}</b> · 사용중 {courts.length - freeCourts.length})
         </div>
         {isOrganizer && (
           <div className="flex gap-2">
             <button
               onClick={autoAssign}
-              disabled={unassigned.length === 0}
+              disabled={freeCourts.length === 0 || unassigned.length === 0}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
             >
-              미배정 {unassigned.length}개 자동 배정
+              빈 코트 {freeCourts.length}면에 배정
             </button>
             <button onClick={clearAll} className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
               배정 초기화
@@ -102,17 +94,21 @@ export default function CourtsTab() {
         )}
       </div>
 
-      {/* 코트 범례 */}
+      {freeCourts.length === 0 && unassigned.length > 0 && (
+        <p className="mt-2 text-xs text-amber-600">모든 코트가 사용 중이에요. 진행 중인 경기가 끝나면(점수 입력) 코트가 비워져 다음 경기를 배정할 수 있어요.</p>
+      )}
+
+      {/* 코트 현황 */}
       <div className="mt-3 flex flex-wrap gap-2">
         {courts.map((c) => {
-          const cnt = remaining.filter((m) => m.court_id === c.id).length;
+          const busy = busyByCourt.get(c.id);
           return (
-            <span key={c.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-2 text-sm">
+            <span key={c.id} className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-2 text-sm ${busy ? 'border-slate-300 bg-slate-100' : 'border-emerald-200 bg-emerald-50'}`}>
               <span className="font-medium text-slate-800">{c.name}</span>
               <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${c.indoor ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
                 {c.indoor ? '실내' : '실외'}
               </span>
-              <span className="text-xs text-slate-400">{cnt}경기</span>
+              <span className={`text-xs font-medium ${busy ? 'text-slate-500' : 'text-emerald-600'}`}>{busy ? '사용중' : '여유'}</span>
             </span>
           );
         })}
@@ -143,16 +139,20 @@ export default function CourtsTab() {
                       className={`rounded border px-2 py-1 text-sm outline-none focus:border-emerald-500 ${m.court_id ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
                     >
                       <option value="">미배정</option>
-                      {courts.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.indoor ? '실내' : '실외'})
-                        </option>
-                      ))}
+                      {courts.map((c) => {
+                        // 다른 경기가 쓰고 있는 코트는 선택 불가 (자기 자신은 예외)
+                        const occupiedByOther = busyByCourt.has(c.id) && busyByCourt.get(c.id)!.id !== m.id;
+                        return (
+                          <option key={c.id} value={c.id} disabled={occupiedByOther}>
+                            {c.name} ({c.indoor ? '실내' : '실외'}){occupiedByOther ? ' · 사용중' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   ) : m.court_id ? (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{courtName(m.court_id)}</span>
                   ) : (
-                    <span className="text-xs text-slate-400">미배정</span>
+                    <span className="text-xs text-slate-400">대기</span>
                   )}
                 </td>
               </tr>
