@@ -95,6 +95,27 @@ export default function CourtDetail() {
 
   const toggle = (h: number) => setPicked((p) => (p.includes(h) ? p.filter((x) => x !== h) : [...p, h]));
 
+  // 슬롯 탭: 내 예약이면 취소, 아니면 선택 토글
+  function onSlotPress(h: number) {
+    const r = reservedByHour.get(h);
+    if (r && r.user_id === uid) {
+      Alert.alert('예약 취소', `${h}시 예약을 취소할까요?`, [
+        { text: '닫기', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('court_reservations').delete().eq('id', r.id);
+            if (error) Alert.alert('취소 실패', error.message);
+            else loadReservations(selectedDate);
+          },
+        },
+      ]);
+      return;
+    }
+    toggle(h);
+  }
+
   async function reserve() {
     if (!uid || picked.length === 0) return;
     setBooking(true);
@@ -119,7 +140,6 @@ export default function CourtDetail() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
       <Stack.Screen options={{ title: court.name }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.name, { color: theme.text }]}>{court.name}</Text>
         <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Info icon="location-outline" text={`${court.region || '지역 미설정'}${court.address ? ` · ${court.address}` : ''}`} theme={theme} />
           <Info icon="home-outline" text={court.indoor ? '실내 코트' : '실외 코트'} theme={theme} />
@@ -150,29 +170,26 @@ export default function CourtDetail() {
 
         {/* 시간 슬롯 */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>시간 선택</Text>
+        {reservations.some((r) => r.user_id === uid) ? (
+          <Text style={[styles.hint, { color: theme.textSecondary }]}>내 예약을 누르면 취소할 수 있어요.</Text>
+        ) : null}
         <View style={styles.slotWrap}>
           {hours.map((h) => {
             const r = reservedByHour.get(h);
-            const mine = r && r.user_id === uid;
-            const past = isToday && h <= curHour;
+            const mine = !!r && r.user_id === uid;
+            const past = isToday && h < curHour;
             const sel = picked.includes(h);
-            const disabled = !!r || past;
-            const bg = sel
-              ? theme.primary
-              : mine
-                ? 'rgba(45,127,249,0.15)'
-                : r
-                  ? theme.backgroundElement
-                  : past
-                    ? 'transparent'
-                    : theme.card;
-            const fg = sel ? '#fff' : mine ? '#185FA5' : r || past ? theme.textSecondary : theme.text;
+            // 타인 예약·지난 시간만 잠금. 내 예약은 눌러서 취소 가능.
+            const disabled = (!!r && !mine) || past;
+            const bg = sel ? theme.primary : mine ? theme.backgroundElement : r ? theme.backgroundElement : theme.card;
+            const fg = sel ? '#fff' : mine ? theme.accent : r || past ? theme.textSecondary : theme.text;
+            const borderColor = sel ? theme.primary : mine ? theme.accent : theme.border;
             return (
               <Pressable
                 key={h}
                 disabled={disabled}
-                onPress={() => toggle(h)}
-                style={[styles.slot, { backgroundColor: bg, borderColor: sel ? theme.primary : theme.border, opacity: past ? 0.4 : 1 }]}>
+                onPress={() => onSlotPress(h)}
+                style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past ? 0.4 : 1 }]}>
                 <Text style={[styles.slotHour, { color: fg }]}>{h}시</Text>
                 <Text style={[styles.slotState, { color: fg }]}>{mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
               </Pressable>
@@ -206,12 +223,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
-  name: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: 15, fontWeight: '500', flex: 1 },
   desc: { fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
+  hint: { fontSize: 12, marginTop: -6 },
   dateRow: { gap: 8, paddingBottom: 4 },
   dateChip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999 },
   dateText: { fontSize: 14, fontWeight: '700' },

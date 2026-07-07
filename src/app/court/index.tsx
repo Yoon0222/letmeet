@@ -35,12 +35,8 @@ export default function CourtListScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
       <Stack.Screen options={{ title: '코트 예약' }} />
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>코트 예약</Text>
-        <Text style={[styles.sub, { color: theme.textSecondary }]}>가까운 코트를 찾아 시간을 예약하세요</Text>
-      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -51,6 +47,11 @@ export default function CourtListScreen() {
           data={rows}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            rows.length > 0 ? (
+              <Text style={[styles.sub, { color: theme.textSecondary }]}>가까운 코트를 찾아 시간을 예약하세요</Text>
+            ) : null
+          }
           renderItem={({ item }) => (
             <Pressable
               onPress={() => router.push(`/court/${item.id}`)}
@@ -97,10 +98,8 @@ export default function CourtListScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  sub: { fontSize: 14, marginTop: 2 },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 40 },
+  sub: { fontSize: 14, marginBottom: Spacing.three },
+  list: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, padding: Spacing.three },
   name: { fontSize: 17, fontWeight: '700' },

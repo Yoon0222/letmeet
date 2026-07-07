@@ -454,12 +454,13 @@ create table if not exists public.courts (
   address      text not null default '',
   description  text not null default '',
   indoor       boolean not null default true,
-  hourly_price int not null default 0,
+  hourly_price int not null default 0 check (hourly_price >= 0),
   open_hour    int not null default 6,
   close_hour   int not null default 22,
   image_url    text,
   owner_id     uuid references public.profiles(id) on delete set null,
-  created_at   timestamptz not null default now()
+  created_at   timestamptz not null default now(),
+  constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
 );
 create index if not exists courts_region_idx on public.courts (region);
 alter table public.courts enable row level security;
@@ -475,7 +476,7 @@ create table if not exists public.court_reservations (
   court_id   uuid not null references public.courts(id) on delete cascade,
   user_id    uuid not null references public.profiles(id) on delete cascade,
   slot_date  date not null,
-  hour       int not null,
+  hour       int not null check (hour >= 0 and hour <= 23),
   status     text not null default 'reserved',
   created_at timestamptz not null default now()
 );
