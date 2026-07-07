@@ -1,5 +1,6 @@
 'use client';
 
+import { computeAutoAssign } from '@/lib/court-assign';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
 import type { TournamentMatch } from '@/lib/types';
@@ -46,38 +47,41 @@ export default function CourtsTab() {
     (!!m.entry1_id && playingTeams.has(m.entry1_id)) || (!!m.entry2_id && playingTeams.has(m.entry2_id));
   const unassigned = remaining.filter((m) => !m.court_id);
   const readyToAssign = unassigned.filter((m) => !teamsBusy(m)); // 선수가 비어있어 지금 배정 가능
+  const assigned = remaining.filter((m) => m.court_id);
+  const unconfirmed = assigned.filter((m) => !m.court_confirmed); // 배정됐지만 아직 확정 전
   const courtName = (cid: string | null) => courts.find((c) => c.id === cid)?.name ?? null;
 
+  // 수동 배정/변경 → 확정 상태는 초기화(다시 확정 필요)
   async function assign(matchId: string, courtId: string | null) {
-    await supabase.from('tournament_matches').update({ court_id: courtId }).eq('id', matchId);
+    await supabase.from('tournament_matches').update({ court_id: courtId, court_confirmed: false }).eq('id', matchId);
     reload();
   }
 
-  // 자동 배정: 선수가 비어있는(준비된) 경기를 순서대로 빈 코트에.
-  // 앞 순서 경기라도 선수가 경기중이면 건너뛰고 다음 준비된 경기를 배정 (같은 팀 동시 출전 방지).
+  // 자동 배정(미확정 상태로): 선수 가용성/코트 점유를 지켜 준비된 경기를 빈 코트에.
   async function autoAssign() {
-    const courtQueue = [...freeCourts];
-    if (courtQueue.length === 0) return;
-    const busy = new Set(playingTeams);
-    const updates: { id: string; court_id: string }[] = [];
-    for (const m of unassigned) {
-      if (courtQueue.length === 0) break;
-      if ((m.entry1_id && busy.has(m.entry1_id)) || (m.entry2_id && busy.has(m.entry2_id))) continue; // 선수 경기중 → 건너뜀
-      const court = courtQueue.shift()!;
-      updates.push({ id: m.id, court_id: court.id });
-      if (m.entry1_id) busy.add(m.entry1_id);
-      if (m.entry2_id) busy.add(m.entry2_id);
-    }
+    const updates = computeAutoAssign(remaining, courts);
     if (updates.length === 0) return;
     for (const u of updates) {
-      await supabase.from('tournament_matches').update({ court_id: u.court_id }).eq('id', u.id);
+      await supabase.from('tournament_matches').update({ court_id: u.court_id, court_confirmed: false }).eq('id', u.id);
+    }
+    reload();
+  }
+
+  async function confirmMatch(matchId: string, confirmed: boolean) {
+    await supabase.from('tournament_matches').update({ court_confirmed: confirmed }).eq('id', matchId);
+    reload();
+  }
+
+  async function confirmAll() {
+    for (const m of unconfirmed) {
+      await supabase.from('tournament_matches').update({ court_confirmed: true }).eq('id', m.id);
     }
     reload();
   }
 
   async function clearAll() {
-    for (const m of remaining.filter((x) => x.court_id)) {
-      await supabase.from('tournament_matches').update({ court_id: null }).eq('id', m.id);
+    for (const m of assigned) {
+      await supabase.from('tournament_matches').update({ court_id: null, court_confirmed: false }).eq('id', m.id);
     }
     reload();
   }
@@ -96,7 +100,8 @@ export default function CourtsTab() {
         <div className="text-sm text-slate-600">
           잔여 <b className="text-slate-900">{remaining.length}</b> · 미배정{' '}
           <b className={unassigned.length ? 'text-amber-600' : 'text-emerald-600'}>{unassigned.length}</b>
-          <span className="text-slate-400"> (준비 {readyToAssign.length} · 선수경기중 {unassigned.length - readyToAssign.length})</span> · 코트 {courts.length}면 (여유{' '}
+          <span className="text-slate-400"> (준비 {readyToAssign.length} · 선수경기중 {unassigned.length - readyToAssign.length})</span> · 확정대기{' '}
+          <b className={unconfirmed.length ? 'text-amber-600' : 'text-slate-400'}>{unconfirmed.length}</b> · 코트 {courts.length}면 (여유{' '}
           <b className="text-emerald-600">{freeCourts.length}</b> · 사용중 {courts.length - freeCourts.length})
         </div>
         {isOrganizer && (
@@ -107,6 +112,13 @@ export default function CourtsTab() {
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
             >
               준비된 경기 자동 배정
+            </button>
+            <button
+              onClick={confirmAll}
+              disabled={unconfirmed.length === 0}
+              className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
+            >
+              전체 확정 ({unconfirmed.length})
             </button>
             <button onClick={clearAll} className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
               배정 초기화
@@ -161,25 +173,46 @@ export default function CourtsTab() {
                       // 선수가 다른 코트에서 경기중이면 지금은 배정 불가
                       <span className="text-xs font-medium text-amber-600">선수 경기중 · 대기</span>
                     ) : (
-                      <select
-                        value={m.court_id ?? ''}
-                        onChange={(e) => assign(m.id, e.target.value || null)}
-                        className={`rounded border px-2 py-1 text-sm outline-none focus:border-emerald-500 ${m.court_id ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
-                      >
-                        <option value="">미배정</option>
-                        {courts.map((c) => {
-                          // 다른 경기가 쓰고 있는 코트는 선택 불가 (자기 자신은 예외)
-                          const occupiedByOther = busyByCourt.has(c.id) && busyByCourt.get(c.id)!.id !== m.id;
-                          return (
-                            <option key={c.id} value={c.id} disabled={occupiedByOther}>
-                              {c.name} ({c.indoor ? '실내' : '실외'}){occupiedByOther ? ' · 사용중' : ''}
-                            </option>
-                          );
-                        })}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={m.court_id ?? ''}
+                          onChange={(e) => assign(m.id, e.target.value || null)}
+                          className={`rounded border px-2 py-1 text-sm outline-none focus:border-emerald-500 ${m.court_id ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
+                        >
+                          <option value="">미배정</option>
+                          {courts.map((c) => {
+                            // 다른 경기가 쓰고 있는 코트는 선택 불가 (자기 자신은 예외)
+                            const occupiedByOther = busyByCourt.has(c.id) && busyByCourt.get(c.id)!.id !== m.id;
+                            return (
+                              <option key={c.id} value={c.id} disabled={occupiedByOther}>
+                                {c.name} ({c.indoor ? '실내' : '실외'}){occupiedByOther ? ' · 사용중' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {m.court_id &&
+                          (m.court_confirmed ? (
+                            <button
+                              onClick={() => confirmMatch(m.id, false)}
+                              title="확정 취소"
+                              className="whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+                            >
+                              ✓ 확정됨
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => confirmMatch(m.id, true)}
+                              className="whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700"
+                            >
+                              확정
+                            </button>
+                          ))}
+                      </div>
                     )
                   ) : m.court_id ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{courtName(m.court_id)}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                      {courtName(m.court_id)} {m.court_confirmed ? '· 확정' : '· 예정'}
+                    </span>
                   ) : teamsBusy(m) ? (
                     <span className="text-xs text-amber-600">선수 경기중</span>
                   ) : (

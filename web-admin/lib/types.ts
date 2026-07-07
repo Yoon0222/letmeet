@@ -55,6 +55,7 @@ export type TournamentMatch = {
   winner_id: string | null;
   status: 'scheduled' | 'done';
   court_id: string | null;
+  court_confirmed: boolean;
   created_at: string;
 };
 

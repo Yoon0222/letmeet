@@ -424,6 +424,7 @@ create table if not exists public.tournament_matches (
   winner_id     uuid references public.profiles(id) on delete set null,
   status        text not null default 'scheduled',
   court_id      uuid references public.tournament_courts(id) on delete set null,
+  court_confirmed boolean not null default false, -- 코트 배정 확정(경기 시작) 여부
   created_at    timestamptz not null default now()
 );
 create index if not exists tournament_matches_tid_idx on public.tournament_matches (tournament_id);

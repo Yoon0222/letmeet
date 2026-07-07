@@ -171,6 +171,7 @@ export type TournamentMatch = {
   winner_id: string | null;
   status: MatchStatus;
   court_id: string | null;
+  court_confirmed: boolean;
   created_at: string;
 };
 
