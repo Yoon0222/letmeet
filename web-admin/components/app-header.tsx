@@ -30,6 +30,11 @@ export function AppHeader() {
               대회
             </Link>
             {role === 'super_admin' && (
+              <Link href="/courts" className="text-slate-600 hover:text-slate-900">
+                코트
+              </Link>
+            )}
+            {role === 'super_admin' && (
               <Link href="/users" className="text-slate-600 hover:text-slate-900">
                 사용자
               </Link>

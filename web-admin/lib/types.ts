@@ -68,6 +68,22 @@ export type TournamentCourt = {
   created_at: string;
 };
 
+// 코트 예약 시설(대회와 무관한 상시 예약 코트)
+export type Court = {
+  id: string;
+  name: string;
+  region: string;
+  address: string;
+  description: string;
+  indoor: boolean;
+  hourly_price: number;
+  open_hour: number;
+  close_hour: number;
+  image_url: string | null;
+  owner_id: string | null;
+  created_at: string;
+};
+
 export type TournamentWithCounts = Tournament & {
   organizer_nickname: string;
   organizer_avatar_url: string | null;
@@ -154,6 +170,12 @@ export interface Database {
         Row: AuditLog;
         Insert: Write<AuditLog>;
         Update: Write<AuditLog>;
+        Relationships: [];
+      };
+      courts: {
+        Row: Court;
+        Insert: Write<Court> & { name: string };
+        Update: Write<Court>;
         Relationships: [];
       };
     };
