@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { Avatar } from '@/components/avatar';
 import type { TournamentCourt, TournamentMatch } from '@/lib/types';
 
 // 조별리그·본선 공용 경기 행 (점수 입력 + 차례 알림 + 코트 배정)
@@ -13,6 +14,7 @@ export function MatchRow({
   onSave,
   onNotify,
   onAssignCourt,
+  avatarOf,
 }: {
   m: TournamentMatch;
   name: (uid: string | null) => string;
@@ -21,6 +23,7 @@ export function MatchRow({
   onSave: (m: TournamentMatch, s1: number, s2: number) => void;
   onNotify: (m: TournamentMatch) => void;
   onAssignCourt?: (m: TournamentMatch, courtId: string | null) => void;
+  avatarOf?: (uid: string | null) => { url: string | null; nickname: string } | null;
 }) {
   const [s1, setS1] = useState<string>(m.score1?.toString() ?? '');
   const [s2, setS2] = useState<string>(m.score2?.toString() ?? '');
@@ -34,7 +37,8 @@ export function MatchRow({
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
       <div className="flex items-center gap-2">
-        <span className={`flex-1 ${!m.entry1_id ? 'text-slate-400' : done && m.winner_id === m.entry1_id ? 'font-semibold text-emerald-700' : ''}`}>
+        <span className={`flex flex-1 items-center gap-1.5 ${!m.entry1_id ? 'text-slate-400' : done && m.winner_id === m.entry1_id ? 'font-semibold text-emerald-700' : ''}`}>
+          {avatarOf?.(m.entry1_id) && <Avatar url={avatarOf(m.entry1_id)!.url} nickname={avatarOf(m.entry1_id)!.nickname} size={22} />}
           {label(m.entry1_id)}
         </span>
         {isBye ? (
@@ -59,8 +63,9 @@ export function MatchRow({
         ) : (
           <span className="text-xs text-slate-400">예정</span>
         )}
-        <span className={`flex-1 text-right ${!m.entry2_id ? 'text-slate-400' : done && m.winner_id === m.entry2_id ? 'font-semibold text-emerald-700' : ''}`}>
+        <span className={`flex flex-1 items-center justify-end gap-1.5 text-right ${!m.entry2_id ? 'text-slate-400' : done && m.winner_id === m.entry2_id ? 'font-semibold text-emerald-700' : ''}`}>
           {label(m.entry2_id)}
+          {avatarOf?.(m.entry2_id) && <Avatar url={avatarOf(m.entry2_id)!.url} nickname={avatarOf(m.entry2_id)!.nickname} size={22} />}
         </span>
         {isOrganizer && !done && bothPresent && (
           <button

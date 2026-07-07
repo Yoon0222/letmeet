@@ -22,7 +22,7 @@ import { useTournament } from '../_ctx';
 export default function PrelimTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, entries, matches, courts, loading, reload, name, query } = useTournament();
+  const { t, entries, matches, courts, loading, reload, name, avatarOf, query } = useTournament();
   const [perGroupInput, setPerGroupInput] = useState(4);
   const [groupTab, setGroupTab] = useState<number | 'all'>(1);
 
@@ -230,7 +230,7 @@ export default function PrelimTab() {
             </table>
             <div className="mt-3 space-y-1.5">
               {shownMatches.map((m) => (
-                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} />
+                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} avatarOf={avatarOf} />
               ))}
             </div>
           </div>

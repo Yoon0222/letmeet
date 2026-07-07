@@ -23,7 +23,7 @@ import { useTournament } from '../_ctx';
 export default function FinalTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, matches, courts, loading, reload, name, query } = useTournament();
+  const { t, matches, courts, loading, reload, name, avatarOf, query } = useTournament();
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -207,7 +207,7 @@ export default function FinalTab() {
             <h3 className="font-medium">{rm[0]?.round_name ?? `라운드 ${r}`}</h3>
             <div className="mt-2 space-y-1.5">
               {shown.map((m) => (
-                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} />
+                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} avatarOf={avatarOf} />
               ))}
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 
+import { Avatar } from '@/components/avatar';
 import { ENTRY_STATUS_LABEL } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
@@ -84,10 +85,15 @@ export default function EntriesTab() {
               {visibleEntries.map((e) => (
                 <tr key={e.user_id} className="border-t border-slate-100">
                   <td className="px-4 py-2 font-medium">
-                    {e.profiles?.nickname ?? '알 수 없음'}
-                    {t.discipline === 'doubles' && (e.partner?.nickname ?? e.partner_name) && (
-                      <span className="text-slate-500"> / {e.partner?.nickname ?? e.partner_name}</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Avatar url={e.profiles?.avatar_url} nickname={e.profiles?.nickname ?? '?'} size={26} />
+                      <span>
+                        {e.profiles?.nickname ?? '알 수 없음'}
+                        {t.discipline === 'doubles' && (e.partner?.nickname ?? e.partner_name) && (
+                          <span className="text-slate-500"> / {e.partner?.nickname ?? e.partner_name}</span>
+                        )}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-2">{e.profiles ? e.profiles.skill_level.toFixed(1) : '-'}</td>
                   <td className="px-4 py-2">

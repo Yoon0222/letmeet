@@ -19,6 +19,8 @@ type Ctx = {
   reload: () => Promise<void>;
   // 선수/팀 이름 (복식이면 "닉 / 파트너")
   name: (uid: string | null) => string;
+  // 참가자 프로필 아바타 (이름 옆 표시용)
+  avatarOf: (uid: string | null) => { url: string | null; nickname: string } | null;
   // 이름 검색어 (탭 공용)
   query: string;
   setQuery: (q: string) => void;
@@ -73,8 +75,15 @@ export function TournamentProvider({ id, children }: { id: string; children: Rea
     return t?.discipline === 'doubles' && partnerNick ? `${nick} / ${partnerNick}` : nick;
   };
 
+  const avatarOf = (uid: string | null) => {
+    if (!uid) return null;
+    const e = entries.find((x) => x.user_id === uid);
+    if (!e?.profiles) return null;
+    return { url: e.profiles.avatar_url, nickname: e.profiles.nickname };
+  };
+
   return (
-    <TournamentContext.Provider value={{ t, entries, matches, courts, loading, reload, name, query, setQuery }}>
+    <TournamentContext.Provider value={{ t, entries, matches, courts, loading, reload, name, avatarOf, query, setQuery }}>
       {children}
     </TournamentContext.Provider>
   );
