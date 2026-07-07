@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import CourtMap from '@/components/court-map';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +16,7 @@ export default function CourtListScreen() {
   const [rows, setRows] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [mode, setMode] = useState<'list' | 'map'>('list');
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('courts').select('*').order('region', { ascending: true });
@@ -38,10 +40,37 @@ export default function CourtListScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
       <Stack.Screen options={{ title: '코트 예약' }} />
 
+      {!loading && rows.length > 0 ? (
+        <View style={styles.toggleWrap}>
+          <View style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
+            {(['list', 'map'] as const).map((m) => {
+              const active = mode === m;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => setMode(m)}
+                  style={[styles.toggleBtn, active && { backgroundColor: theme.card }]}>
+                  <Ionicons
+                    name={m === 'list' ? 'list' : 'map'}
+                    size={15}
+                    color={active ? theme.primary : theme.textSecondary}
+                  />
+                  <Text style={[styles.toggleText, { color: active ? theme.text : theme.textSecondary }]}>
+                    {m === 'list' ? '목록' : '지도'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
         </View>
+      ) : mode === 'map' ? (
+        <CourtMap courts={rows} onSelect={(id) => router.push(`/court/${id}`)} />
       ) : (
         <FlatList
           data={rows}
@@ -98,6 +127,10 @@ export default function CourtListScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  toggleWrap: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.two },
+  toggle: { flexDirection: 'row', alignSelf: 'flex-start', borderRadius: 10, padding: 3, gap: 2 },
+  toggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  toggleText: { fontSize: 14, fontWeight: '700' },
   sub: { fontSize: 14, marginBottom: Spacing.three },
   list: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
