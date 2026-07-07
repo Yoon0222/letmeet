@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
@@ -158,16 +158,14 @@ export default function HomeScreen() {
           />
         </View>
         <Pressable
-          onPress={() => Alert.alert('코트 예약', '곧 오픈될 기능이에요. 조금만 기다려 주세요!')}
+          onPress={() => router.push('/court')}
           style={[styles.courtTile, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="location-outline" size={26} color={theme.tabIconDefault} />
+          <Ionicons name="location-outline" size={26} color={theme.primary} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.courtTitle, { color: theme.text }]}>코트 예약</Text>
             <Text style={[styles.courtDesc, { color: theme.textSecondary }]}>가까운 코트 찾고 예약</Text>
           </View>
-          <View style={[styles.soon, { backgroundColor: 'rgba(245,166,35,0.2)' }]}>
-            <Text style={[styles.soonText, { color: theme.accent }]}>곧 오픈</Text>
-          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
         </Pressable>
 
         {/* 3. 다가오는 내 일정 */}

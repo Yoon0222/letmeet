@@ -185,6 +185,39 @@ export type TournamentCourt = {
   created_at: string;
 };
 
+// ---- 코트 예약 (courts / court_reservations) ----
+export type Court = {
+  id: string;
+  name: string;
+  region: string;
+  address: string;
+  description: string;
+  indoor: boolean;
+  hourly_price: number;
+  open_hour: number;
+  close_hour: number;
+  image_url: string | null;
+  owner_id: string | null;
+  created_at: string;
+};
+
+export type ReservationStatus = 'reserved' | 'cancelled';
+
+export type CourtReservation = {
+  id: string;
+  court_id: string;
+  user_id: string;
+  slot_date: string; // YYYY-MM-DD
+  hour: number;
+  status: ReservationStatus;
+  created_at: string;
+};
+
+/** 예약 + 코트 (내 예약 조인 결과) */
+export type CourtReservationWithCourt = CourtReservation & {
+  courts: Pick<Court, 'id' | 'name' | 'region' | 'indoor' | 'hourly_price'>;
+};
+
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
 type WriteDefaults<T> = Partial<T>;
 
@@ -252,6 +285,18 @@ export interface Database {
         Row: TournamentCourt;
         Insert: WriteDefaults<TournamentCourt> & { tournament_id: string; name: string };
         Update: WriteDefaults<TournamentCourt>;
+        Relationships: [];
+      };
+      courts: {
+        Row: Court;
+        Insert: WriteDefaults<Court> & { name: string };
+        Update: WriteDefaults<Court>;
+        Relationships: [];
+      };
+      court_reservations: {
+        Row: CourtReservation;
+        Insert: { court_id: string; user_id: string; slot_date: string; hour: number } & WriteDefaults<CourtReservation>;
+        Update: WriteDefaults<CourtReservation>;
         Relationships: [];
       };
     };
