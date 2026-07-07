@@ -53,10 +53,12 @@ function MatchBox({ m, nameOf, uid, theme }: { m: TournamentMatch; nameOf: (id: 
   const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
   const w2 = done && !!m.winner_id && m.winner_id === m.entry2_id;
   const mine = m.entry1_id === uid || m.entry2_id === uid;
+  // 빈 슬롯: 확정 부전승은 '부전승', 아직 안 정해진 다음 라운드는 '미정'
+  const label = (id: string | null) => (id ? nameOf(id) : done ? '부전승' : '미정');
   return (
     <View style={[styles.box, { borderColor: mine ? theme.primary : theme.border, backgroundColor: theme.card }]}>
-      <Side name={nameOf(m.entry1_id)} score={done ? m.score1 : null} win={w1} theme={theme} border />
-      <Side name={nameOf(m.entry2_id)} score={done ? m.score2 : null} win={w2} theme={theme} />
+      <Side name={label(m.entry1_id)} score={done ? m.score1 : null} win={w1} theme={theme} border />
+      <Side name={label(m.entry2_id)} score={done ? m.score2 : null} win={w2} theme={theme} />
     </View>
   );
 }

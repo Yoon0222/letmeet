@@ -7,13 +7,13 @@ import { MatchRow } from '@/components/match-row';
 import {
   advanceCountForGroupSize,
   firstRoundPairs,
-  nextRoundPairs,
   roundName,
   seedQualifiersBySize,
   standings,
   type Standing,
 } from '@/lib/bracket';
 import { autoAdvanceCourts } from '@/lib/court-assign';
+import { advanceKnockoutWinners } from '@/lib/knockout';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
 import type { TournamentMatch } from '@/lib/types';
@@ -55,6 +55,7 @@ export default function FinalTab() {
     }
     const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
     await supabase.from('tournament_matches').update({ score1: s1, score2: s2, winner_id, status: 'done' }).eq('id', m.id);
+    await advanceKnockoutWinners(id); // 승자를 다음 라운드로 진출
     if (courts.length > 0) await autoAdvanceCourts(id);
     reload();
   }
@@ -91,41 +92,53 @@ export default function FinalTab() {
     }
     let size = 1;
     while (size < seeds.length) size *= 2;
+    const totalRounds = Math.log2(size);
     const pairs = firstRoundPairs(seeds);
-    await supabase.from('tournament_matches').insert(
-      pairs.map((p, i) => ({
+    type Row = {
+      tournament_id: string;
+      phase: 'knockout';
+      round_order: number;
+      round_name: string;
+      slot: number;
+      entry1_id: string | null;
+      entry2_id: string | null;
+      winner_id: string | null;
+      status: 'scheduled' | 'done';
+    };
+    const rows: Row[] = [];
+    // 1라운드: 시드 배치(부전승은 자동 확정)
+    pairs.forEach((p, i) =>
+      rows.push({
         tournament_id: id,
-        phase: 'knockout' as const,
+        phase: 'knockout',
         round_order: 1,
         round_name: roundName(size),
         slot: i,
         entry1_id: p[0],
         entry2_id: p[1],
-        winner_id: p[1] ? null : p[0], // 부전승 자동 처리
-        status: p[1] ? 'scheduled' : 'done',
-      })),
-    );
-    reload();
-  }
-
-  async function generateNextRound() {
-    const maxRound = Math.max(...koMatches.map((m) => m.round_order ?? 0));
-    const cur = koMatches.filter((m) => m.round_order === maxRound).sort((a, b) => a.slot - b.slot);
-    const winners = cur.map((m) => m.winner_id).filter(Boolean) as string[];
-    const pairs = nextRoundPairs(winners);
-    await supabase.from('tournament_matches').insert(
-      pairs.map((p, i) => ({
-        tournament_id: id,
-        phase: 'knockout' as const,
-        round_order: maxRound + 1,
-        round_name: roundName(winners.length),
-        slot: i,
-        entry1_id: p[0],
-        entry2_id: p[1],
         winner_id: p[1] ? null : p[0],
         status: p[1] ? 'scheduled' : 'done',
-      })),
+      }),
     );
+    // 2라운드 ~ 결승: 빈 골격 미리 생성 (트리 전체 표시용)
+    for (let r = 2; r <= totalRounds; r++) {
+      const players = size / 2 ** (r - 1);
+      for (let s = 0; s < players / 2; s++) {
+        rows.push({
+          tournament_id: id,
+          phase: 'knockout',
+          round_order: r,
+          round_name: roundName(players),
+          slot: s,
+          entry1_id: null,
+          entry2_id: null,
+          winner_id: null,
+          status: 'scheduled',
+        });
+      }
+    }
+    await supabase.from('tournament_matches').insert(rows);
+    await advanceKnockoutWinners(id); // 부전승 승자를 다음 라운드로 전파
     reload();
   }
 
@@ -195,11 +208,6 @@ export default function FinalTab() {
           </div>
         );
       })}
-      {isOrganizer && !champion && curKoDone && curKo.length > 1 && (
-        <button onClick={generateNextRound} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-          다음 라운드 생성
-        </button>
-      )}
     </div>
   );
 }

@@ -25,17 +25,22 @@ export function MatchRow({
   const [s1, setS1] = useState<string>(m.score1?.toString() ?? '');
   const [s2, setS2] = useState<string>(m.score2?.toString() ?? '');
   const done = m.status === 'done';
-  const bye = !m.entry2_id;
+  const bothPresent = !!m.entry1_id && !!m.entry2_id; // 양쪽 팀 확정
+  const isBye = done && !bothPresent; // 부전승(자동 확정)
   const court = courts.find((c) => c.id === m.court_id) ?? null;
+  // 빈 슬롯 표시: 확정 부전승은 '부전승', 아직 안 정해진 다음 라운드는 '미정'
+  const label = (id: string | null) => (id ? name(id) : done ? '부전승' : '미정');
 
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
       <div className="flex items-center gap-2">
-        <span className={`flex-1 ${done && m.winner_id === m.entry1_id ? 'font-semibold text-emerald-700' : ''}`}>
-          {name(m.entry1_id)}
+        <span className={`flex-1 ${!m.entry1_id ? 'text-slate-400' : done && m.winner_id === m.entry1_id ? 'font-semibold text-emerald-700' : ''}`}>
+          {label(m.entry1_id)}
         </span>
-        {bye ? (
+        {isBye ? (
           <span className="text-xs text-slate-400">부전승</span>
+        ) : !bothPresent ? (
+          <span className="text-xs text-slate-400">대기</span>
         ) : done && !isOrganizer ? (
           <span className="tabular-nums">{m.score1} : {m.score2}</span>
         ) : isOrganizer ? (
@@ -54,10 +59,10 @@ export function MatchRow({
         ) : (
           <span className="text-xs text-slate-400">예정</span>
         )}
-        <span className={`flex-1 text-right ${done && m.winner_id === m.entry2_id ? 'font-semibold text-emerald-700' : ''}`}>
-          {name(m.entry2_id)}
+        <span className={`flex-1 text-right ${!m.entry2_id ? 'text-slate-400' : done && m.winner_id === m.entry2_id ? 'font-semibold text-emerald-700' : ''}`}>
+          {label(m.entry2_id)}
         </span>
-        {isOrganizer && !done && !bye && (
+        {isOrganizer && !done && bothPresent && (
           <button
             onClick={() => onNotify(m)}
             title="이 경기 선수들에게 차례 알림 보내기"
@@ -68,8 +73,8 @@ export function MatchRow({
         )}
       </div>
 
-      {/* 코트 배정 (코트가 있고 부전승이 아닐 때) */}
-      {courts.length > 0 && !bye && (
+      {/* 코트 배정 (양팀 확정 + 미완료일 때) */}
+      {courts.length > 0 && bothPresent && !done && (
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-xs text-slate-400">🏟 코트</span>
           {isOrganizer && !done && onAssignCourt ? (
