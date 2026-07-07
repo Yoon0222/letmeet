@@ -222,7 +222,7 @@ export default function TournamentDetail() {
             theme={theme}
           />
           <Info icon="ribbon-outline" text={`실력 ${skillRangeLabel(t.skill_min, t.skill_max)}`} theme={theme} />
-          <Info icon="people-outline" text={`정원 ${t.approved_count}/${t.max_participants}명`} theme={theme} />
+          <Info icon="people-outline" text={`정원 ${t.approved_count}/${t.max_participants}${isDoubles ? '팀' : '명'}`} theme={theme} />
           <Info icon="cash-outline" text={t.fee > 0 ? `참가비 ${t.fee.toLocaleString()}원` : '참가비 무료'} theme={theme} />
         </View>
 
@@ -234,7 +234,7 @@ export default function TournamentDetail() {
         ) : null}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>참가자 {approved.length}명</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>참가자 {approved.length}{isDoubles ? '팀' : '명'}</Text>
           <View style={{ gap: 10, marginTop: 8 }}>
             {approved.length === 0 ? (
               <Text style={{ color: theme.textSecondary, fontSize: 14 }}>아직 확정된 참가자가 없어요.</Text>

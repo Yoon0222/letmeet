@@ -75,7 +75,7 @@ export function TournamentCard({
           <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="people-outline" size={13} color={theme.textSecondary} />
             <Text style={[styles.pillText, { color: theme.textSecondary }]}>
-              {t.approved_count}/{t.max_participants}
+              {t.approved_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
             </Text>
           </View>
         </View>

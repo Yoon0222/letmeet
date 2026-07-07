@@ -53,11 +53,11 @@ export default function HomeScreen() {
         next = data?.[0] ?? null;
       }
 
-      // 내가 신청한 다음 대회
+      // 내가 신청했거나 파트너로 등록된 다음 대회
       const { data: ents } = await supabase
         .from('tournament_entries')
         .select('tournament_id')
-        .eq('user_id', uid)
+        .or(`user_id.eq.${uid},partner_id.eq.${uid}`)
         .neq('status', 'rejected');
       const tids = (ents ?? []).map((e) => e.tournament_id);
       if (tids.length > 0) {

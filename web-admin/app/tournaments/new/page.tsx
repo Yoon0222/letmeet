@@ -114,7 +114,7 @@ function NewTournamentInner() {
           </Field>
         </div>
         <div className="grid grid-cols-4 gap-4">
-          <Field label="정원">
+          <Field label={discipline === 'doubles' ? '정원 (팀 수)' : '정원 (인원)'}>
             <input type="number" min={2} max={256} className={inputCls} value={maxP} onChange={(e) => setMaxP(Number(e.target.value))} />
           </Field>
           <Field label="최소 실력">

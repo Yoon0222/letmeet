@@ -87,7 +87,7 @@ function TournamentsInner() {
               </p>
               <div className="mt-3 flex gap-4 text-sm text-slate-600">
                 <span>
-                  승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}
+                  승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
                 </span>
                 {t.pending_count > 0 && (
                   <span className="text-amber-600">대기 {t.pending_count}건</span>
