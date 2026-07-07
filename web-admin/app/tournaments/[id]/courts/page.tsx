@@ -59,7 +59,7 @@ export default function CourtsTab() {
 
   // 자동 배정(미확정 상태로): 선수 가용성/코트 점유를 지켜 준비된 경기를 빈 코트에.
   async function autoAssign() {
-    const updates = computeAutoAssign(remaining, courts);
+    const updates = computeAutoAssign(matches, courts); // 조별 진행수 계산을 위해 done 포함 전체 전달
     if (updates.length === 0) return;
     for (const u of updates) {
       await supabase.from('tournament_matches').update({ court_id: u.court_id, court_confirmed: false }).eq('id', u.id);

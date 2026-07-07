@@ -12,8 +12,19 @@ function remainingMatches(matches: TournamentMatch[]): TournamentMatch[] {
     });
 }
 
+// 숫자 배열 사전식 비교 (작을수록 우선)
+function cmpKey(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return 0;
+}
+
 // 지금 배정 가능한 경기를 빈 코트에 배정한 결과를 계산한다.
-// 규칙: 코트당 1경기, 같은 팀 동시 출전 금지(선수가 경기중이면 건너뜀), 순서 우선.
+// 규칙:
+//  - 코트당 1경기, 같은 팀 동시 출전 금지(선수가 경기중이면 건너뜀)
+//  - 우선순위: "덜 진행한 조" 먼저 (조별 완료+진행중 경기 수가 적은 조 우선) → 조번호 → 슬롯
+//    (예: 1조가 이미 한 번 뛰었고 6조가 아직이면, 빈 코트엔 6조가 먼저 들어간다)
 export function computeAutoAssign(
   matches: TournamentMatch[],
   courts: TournamentCourt[],
@@ -32,17 +43,45 @@ export function computeAutoAssign(
   });
 
   const courtQueue = courts.filter((c) => !occupiedCourtIds.has(c.id));
-  const unassigned = remaining.filter((m) => !m.court_id);
+  if (courtQueue.length === 0) return [];
 
+  // 조별 진행 횟수(완료 + 진행중) — 전체 경기 기준
+  const groupPlayed = new Map<number, number>();
+  matches.forEach((m) => {
+    if (m.phase !== 'group' || m.group_no == null) return;
+    if (m.status === 'done' || m.court_id) groupPlayed.set(m.group_no, (groupPlayed.get(m.group_no) ?? 0) + 1);
+  });
+
+  const priorityKey = (m: TournamentMatch): number[] =>
+    m.phase === 'group'
+      ? [0, groupPlayed.get(m.group_no ?? 0) ?? 0, m.group_no ?? 0, m.slot]
+      : [1, 0, m.round_order ?? 0, m.slot];
+
+  const pool = remaining.filter((m) => !m.court_id);
   const updates: { id: string; court_id: string }[] = [];
   let qi = 0;
-  for (const m of unassigned) {
-    if (qi >= courtQueue.length) break;
-    if ((m.entry1_id && busyTeams.has(m.entry1_id)) || (m.entry2_id && busyTeams.has(m.entry2_id))) continue;
+  while (qi < courtQueue.length && pool.length > 0) {
+    // 준비된(선수 안 겹치는) 경기 중 우선순위가 가장 높은 것을 고른다
+    let bestIdx = -1;
+    let bestKey: number[] | null = null;
+    for (let i = 0; i < pool.length; i++) {
+      const m = pool[i];
+      if ((m.entry1_id && busyTeams.has(m.entry1_id)) || (m.entry2_id && busyTeams.has(m.entry2_id))) continue;
+      const key = priorityKey(m);
+      if (bestKey === null || cmpKey(key, bestKey) < 0) {
+        bestKey = key;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx === -1) break; // 준비된 경기 없음
+    const m = pool.splice(bestIdx, 1)[0];
     updates.push({ id: m.id, court_id: courtQueue[qi].id });
     qi += 1;
     if (m.entry1_id) busyTeams.add(m.entry1_id);
     if (m.entry2_id) busyTeams.add(m.entry2_id);
+    if (m.phase === 'group' && m.group_no != null) {
+      groupPlayed.set(m.group_no, (groupPlayed.get(m.group_no) ?? 0) + 1); // 방금 배정 반영 → 다음 선택은 다른 조 우선
+    }
   }
   return updates;
 }
