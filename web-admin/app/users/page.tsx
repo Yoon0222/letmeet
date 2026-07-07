@@ -20,26 +20,33 @@ const ROLE_STYLE: Record<UserRole, string> = {
   super_admin: 'text-purple-700',
 };
 
+const PAGE_SIZE = 20;
+
 function UsersInner() {
   const [rows, setRows] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
-  const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500);
+  const load = useCallback(async (p: number, term: string) => {
+    setLoading(true);
+    let req = supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+    const t = term.trim();
+    if (t) req = req.ilike('nickname', `%${t}%`);
+    const from = p * PAGE_SIZE;
+    const { data, count } = await req.range(from, from + PAGE_SIZE - 1);
     setRows(data ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+    // 검색 입력 디바운스(250ms), 페이지 이동도 동일 경로
+    const timer = setTimeout(() => load(page, q), 250);
+    return () => clearTimeout(timer);
+  }, [load, page, q]);
 
   async function changeRole(id: string, role: UserRole) {
     setSaving(id);
@@ -49,12 +56,10 @@ function UsersInner() {
       alert('역할 변경 실패: ' + error.message);
       return;
     }
-    load();
+    load(page, q);
   }
 
-  const visible = q
-    ? rows.filter((r) => r.nickname.toLowerCase().includes(q.toLowerCase()))
-    : rows;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -66,7 +71,10 @@ function UsersInner() {
       <input
         placeholder="닉네임 검색"
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setPage(0);
+        }}
         className="mt-4 w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
       />
 
@@ -85,7 +93,7 @@ function UsersInner() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((p) => (
+              {rows.map((p) => (
                 <tr key={p.id} className="border-t border-slate-100">
                   <td className="px-4 py-2 font-medium">{p.nickname}</td>
                   <td className="px-4 py-2 text-slate-500">{p.region || '-'}</td>
@@ -110,6 +118,34 @@ function UsersInner() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* 페이징 */}
+      {!loading && total > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+          <span>
+            {page + 1} / {totalPages} 페이지 · 총 {total}명
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40"
+            >
+              이전
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40"
+            >
+              다음
+            </button>
+          </div>
+        </div>
+      )}
+      {!loading && total === 0 && (
+        <p className="mt-6 text-sm text-slate-500">{q ? '검색 결과가 없어요.' : '사용자가 없습니다.'}</p>
       )}
     </div>
   );
