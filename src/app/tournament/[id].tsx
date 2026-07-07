@@ -30,6 +30,7 @@ const ENTRY_LABEL: Record<EntryStatus, string> = {
   approved: '참가 확정',
   rejected: '거절됨',
   withdrawn: '철회됨',
+  waitlist: '대기열',
 };
 
 export default function TournamentDetail() {
@@ -138,6 +139,10 @@ export default function TournamentDetail() {
       (e.profiles?.nickname ?? '').toLowerCase().includes(q) ||
       (e.partner?.nickname ?? e.partner_name ?? '').toLowerCase().includes(q),
   );
+  // 대기열: 내 순번 / 정원이 찼는지
+  const myWaitlistRank = entries.filter((e) => e.status === 'waitlist').findIndex((e) => e.user_id === uid) + 1;
+  const slotsFull =
+    !!t && entries.filter((e) => e.status === 'pending' || e.status === 'approved').length >= t.max_participants;
 
   // 대진이 있으면 정보/예선/본선 탭으로 분리
   const hasBracket = matches.length > 0;
@@ -521,10 +526,12 @@ export default function TournamentDetail() {
                 size={18}
                 color={myEntry.status === 'approved' ? theme.primary : theme.textSecondary}
               />
-              <Text style={[styles.statusText, { color: theme.text }]}>{ENTRY_LABEL[myEntry.status]}</Text>
+              <Text style={[styles.statusText, { color: theme.text }]}>
+                {myEntry.status === 'waitlist' ? `대기 ${myWaitlistRank}번` : ENTRY_LABEL[myEntry.status]}
+              </Text>
             </View>
             {myEntry.status !== 'rejected' && (
-              <Button title="참가 신청 취소" variant="outline" onPress={confirmCancel} loading={acting} />
+              <Button title={myEntry.status === 'waitlist' ? '대기 취소' : '참가 신청 취소'} variant="outline" onPress={confirmCancel} loading={acting} />
             )}
           </View>
         ) : iAmPartner ? (
@@ -535,7 +542,7 @@ export default function TournamentDetail() {
             </Text>
           </View>
         ) : canRegister ? (
-          <Button title="참가 신청하기" onPress={apply} loading={acting} />
+          <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={apply} loading={acting} />
         ) : (
           <Button title="접수가 마감되었어요" variant="secondary" disabled onPress={() => {}} />
         )}

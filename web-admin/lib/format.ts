@@ -19,10 +19,11 @@ export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, string> = {
 };
 
 export const ENTRY_STATUS_LABEL: Record<EntryStatus, string> = {
-  pending: '대기',
+  pending: '승인대기',
   approved: '승인',
   rejected: '거절',
   withdrawn: '철회',
+  waitlist: '대기열',
 };
 
 export function skillRange(min: number, max: number): string {

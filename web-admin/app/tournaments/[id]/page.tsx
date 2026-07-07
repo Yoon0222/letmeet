@@ -14,6 +14,7 @@ const ENTRY_STYLE: Record<string, string> = {
   approved: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-red-50 text-red-600',
   withdrawn: 'bg-slate-100 text-slate-500',
+  waitlist: 'bg-sky-50 text-sky-700',
 };
 
 export default function EntriesTab() {
@@ -35,6 +36,12 @@ export default function EntriesTab() {
         (e.profiles?.nickname ?? '').toLowerCase().includes(q) ||
         (e.partner?.nickname ?? e.partner_name ?? '').toLowerCase().includes(q),
     );
+
+  // 대기열 순번 (신청 순)
+  const waitlistRank = new Map<string, number>();
+  entries.filter((e) => e.status === 'waitlist').forEach((e, i) => waitlistRank.set(e.user_id, i + 1));
+  const statusText = (e: (typeof entries)[number]) =>
+    e.status === 'waitlist' ? `대기 ${waitlistRank.get(e.user_id) ?? '-'}번` : ENTRY_STATUS_LABEL[e.status];
 
   async function setEntryStatus(userId: string, status: EntryStatus) {
     await supabase.from('tournament_entries').update({ status }).eq('tournament_id', id).eq('user_id', userId);
@@ -85,7 +92,7 @@ export default function EntriesTab() {
                   <td className="px-4 py-2">{e.profiles ? e.profiles.skill_level.toFixed(1) : '-'}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ENTRY_STYLE[e.status]}`}>
-                      {ENTRY_STATUS_LABEL[e.status]}
+                      {statusText(e)}
                     </span>
                   </td>
                   {isOrganizer && (

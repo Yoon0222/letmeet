@@ -592,3 +592,49 @@ drop trigger if exists on_no_double_entry on public.tournament_entries;
 create trigger on_no_double_entry
   before insert on public.tournament_entries
   for each row execute function public.enforce_no_double_entry();
+
+-- 대기열: 정원 초과 신청은 waitlist, 슬롯이 비면 대기 맨 앞 자동 승격 (0016)
+create or replace function public.enforce_waitlist()
+returns trigger language plpgsql security definer as $$
+declare cap int; occupied int;
+begin
+  if new.status = 'pending' then
+    select max_participants into cap from public.tournaments where id = new.tournament_id;
+    select count(*) into occupied from public.tournament_entries
+      where tournament_id = new.tournament_id and status in ('pending', 'approved');
+    if cap is not null and occupied >= cap then
+      new.status := 'waitlist';
+    end if;
+  end if;
+  return new;
+end; $$;
+drop trigger if exists on_waitlist_insert on public.tournament_entries;
+create trigger on_waitlist_insert
+  before insert on public.tournament_entries
+  for each row execute function public.enforce_waitlist();
+
+create or replace function public.promote_waitlist()
+returns trigger language plpgsql security definer as $$
+declare cap int; occupied int; tid uuid; nextw uuid;
+begin
+  if pg_trigger_depth() > 1 then return null; end if;
+  tid := coalesce(new.tournament_id, old.tournament_id);
+  select max_participants into cap from public.tournaments where id = tid;
+  if cap is null then return null; end if;
+  loop
+    select count(*) into occupied from public.tournament_entries
+      where tournament_id = tid and status in ('pending', 'approved');
+    exit when occupied >= cap;
+    select user_id into nextw from public.tournament_entries
+      where tournament_id = tid and status = 'waitlist'
+      order by created_at asc limit 1;
+    exit when nextw is null;
+    update public.tournament_entries set status = 'pending'
+      where tournament_id = tid and user_id = nextw;
+  end loop;
+  return null;
+end; $$;
+drop trigger if exists on_waitlist_promote on public.tournament_entries;
+create trigger on_waitlist_promote
+  after update or delete on public.tournament_entries
+  for each row execute function public.promote_waitlist();

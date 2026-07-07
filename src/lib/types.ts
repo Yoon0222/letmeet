@@ -101,7 +101,7 @@ export type ClubMemberWithProfile = ClubMember & {
 
 // ---- 대회(tournaments) ----
 export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancelled';
-export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'waitlist';
 export type Discipline = 'singles' | 'doubles';
 
 export type Tournament = {
