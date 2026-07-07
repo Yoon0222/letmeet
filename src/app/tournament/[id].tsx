@@ -116,6 +116,16 @@ export default function TournamentDetail() {
   const groupNos = [...new Set(groupMatchesAll.map((m) => m.group_no ?? 1))].sort((a, b) => a - b);
   const myMatches = matches.filter((m) => m.entry1_id === uid || m.entry2_id === uid);
 
+  // 경기에 배정된 코트 라벨 (예: "3 · 실내")
+  const courtLabelOf = useCallback(
+    (cid: string | null): string | undefined => {
+      if (!cid) return undefined;
+      const c = courts.find((x) => x.id === cid);
+      return c ? `${c.name} · ${c.indoor ? '실내' : '실외'}` : undefined;
+    },
+    [courts],
+  );
+
   // 대진이 있으면 정보/예선/본선 탭으로 분리
   const hasBracket = matches.length > 0;
   const tabItems: { key: 'info' | 'prelim' | 'final'; label: string }[] = [
@@ -324,7 +334,7 @@ export default function TournamentDetail() {
             <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
             <View style={{ gap: 6, marginTop: 6 }}>
               {myMatches.map((m) => (
-                <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight />
+                <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight courtLabel={courtLabelOf(m.court_id)} />
               ))}
             </View>
           </View>
@@ -359,7 +369,7 @@ export default function TournamentDetail() {
                   </View>
                   <View style={{ gap: 6, marginTop: 6 }}>
                     {gms.map((m) => (
-                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} />
+                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} courtLabel={courtLabelOf(m.court_id)} />
                     ))}
                   </View>
                 </View>
@@ -495,12 +505,14 @@ function MatchRow({
   uid,
   theme,
   highlight = false,
+  courtLabel,
 }: {
   m: TournamentMatch;
   nameOf: (id: string | null) => string;
   uid: string | undefined;
   theme: ReturnType<typeof useTheme>;
   highlight?: boolean;
+  courtLabel?: string;
 }) {
   const done = m.status === 'done';
   const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
@@ -530,7 +542,14 @@ function MatchRow({
           </View>
         ))}
       </View>
-      {!done && <Text style={[styles.matchTag, { color: theme.textSecondary }]}>예정</Text>}
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        {courtLabel ? (
+          <View style={[styles.matchCourt, { backgroundColor: theme.backgroundElement }]}>
+            <Text style={[styles.matchCourtText, { color: theme.textSecondary }]}>🏟 {courtLabel}</Text>
+          </View>
+        ) : null}
+        {!done && <Text style={[styles.matchTag, { color: theme.textSecondary }]}>예정</Text>}
+      </View>
     </View>
   );
 }
@@ -602,6 +621,8 @@ const styles = StyleSheet.create({
   matchName: { flex: 1, fontSize: 14 },
   matchScore: { fontSize: 15, fontWeight: '800', minWidth: 18, textAlign: 'right' },
   matchTag: { fontSize: 12, fontWeight: '600' },
+  matchCourt: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  matchCourtText: { fontSize: 11, fontWeight: '700' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',

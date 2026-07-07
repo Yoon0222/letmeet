@@ -21,7 +21,7 @@ import { useTournament } from '../_ctx';
 export default function PrelimTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, entries, matches, loading, reload, name } = useTournament();
+  const { t, entries, matches, courts, loading, reload, name } = useTournament();
   const [perGroupInput, setPerGroupInput] = useState(4);
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
@@ -99,6 +99,11 @@ export default function PrelimTab() {
     alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
   }
 
+  async function assignCourt(m: TournamentMatch, courtId: string | null) {
+    await supabase.from('tournament_matches').update({ court_id: courtId }).eq('id', m.id);
+    reload();
+  }
+
   // 조별리그 없이 바로 본선으로 진행하는 대회
   if (groupMatches.length === 0 && koMatches.length > 0) {
     return (
@@ -172,7 +177,7 @@ export default function PrelimTab() {
             </table>
             <div className="mt-3 space-y-1.5">
               {gm.map((m) => (
-                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} onNotify={notifyTurn} />
+                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} />
               ))}
             </div>
           </div>
