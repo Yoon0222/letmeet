@@ -48,6 +48,35 @@ function NewTournamentInner() {
   const [numCount, setNumCount] = useState(4);
   const [letterCount, setLetterCount] = useState(4);
   const [manualName, setManualName] = useState('');
+  const [venueHint, setVenueHint] = useState<string | null>(null);
+
+  // 같은 장소로 열린 지난 대회의 코트 구성을 자동으로 불러온다 (코트를 아직 안 짰을 때만)
+  async function loadVenueCourts() {
+    const v = venue.trim();
+    if (!v || courts.length > 0) return;
+    const { data: past } = await supabase
+      .from('tournaments')
+      .select('id')
+      .eq('venue', v)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (!past?.length) return;
+    const ids = past.map((p) => p.id);
+    const { data: cs } = await supabase
+      .from('tournament_courts')
+      .select('tournament_id, name, indoor, sort')
+      .in('tournament_id', ids)
+      .order('sort', { ascending: true });
+    if (!cs?.length) return;
+    for (const tid of ids) {
+      const group = cs.filter((c) => c.tournament_id === tid);
+      if (group.length) {
+        setCourts(group.map((c) => ({ name: c.name, indoor: c.indoor })));
+        setVenueHint(`'${v}'의 지난 코트 구성 ${group.length}면을 불러왔어요. 필요하면 수정하세요.`);
+        return;
+      }
+    }
+  }
 
   function addCourts(names: string[]) {
     setCourts((prev) => {
@@ -138,7 +167,16 @@ function NewTournamentInner() {
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="장소">
-            <input className={inputCls} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="올림픽공원 피클볼장" />
+            <input
+              className={inputCls}
+              value={venue}
+              onChange={(e) => {
+                setVenue(e.target.value);
+                if (venueHint) setVenueHint(null);
+              }}
+              onBlur={loadVenueCourts}
+              placeholder="올림픽공원 피클볼장"
+            />
           </Field>
           <Field label="지역">
             <input className={inputCls} value={region} onChange={(e) => setRegion(e.target.value)} placeholder="서울 송파구" />
@@ -173,6 +211,11 @@ function NewTournamentInner() {
         {/* 코트 구성 */}
         <div>
           <span className="mb-1 block text-sm font-medium text-slate-700">코트 구성 (선택)</span>
+          {venueHint && (
+            <p className="mb-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200">
+              🏟 {venueHint}
+            </p>
+          )}
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap items-end gap-4">
               <div>
