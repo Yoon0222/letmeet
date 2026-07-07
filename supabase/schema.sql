@@ -459,10 +459,14 @@ create table if not exists public.courts (
   close_hour   int not null default 22,
   image_url    text,
   owner_id     uuid references public.profiles(id) on delete set null,
+  latitude     double precision,
+  longitude    double precision,
   created_at   timestamptz not null default now(),
   constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
 );
 create index if not exists courts_region_idx on public.courts (region);
+create index if not exists courts_geo_idx on public.courts (latitude, longitude)
+  where latitude is not null and longitude is not null;
 alter table public.courts enable row level security;
 drop policy if exists "courts_facility_select" on public.courts;
 create policy "courts_facility_select" on public.courts for select using (true);

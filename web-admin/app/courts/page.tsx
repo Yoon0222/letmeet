@@ -26,9 +26,11 @@ type Form = {
   open_hour: number;
   close_hour: number;
   description: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
-const EMPTY: Form = { name: '', region: '', address: '', indoor: true, hourly_price: 0, open_hour: 6, close_hour: 22, description: '' };
+const EMPTY: Form = { name: '', region: '', address: '', indoor: true, hourly_price: 0, open_hour: 6, close_hour: 22, description: '', latitude: null, longitude: null };
 
 function CourtsInner() {
   const [rows, setRows] = useState<Court[]>([]);
@@ -37,6 +39,8 @@ function CourtsInner() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoStatus, setGeoStatus] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +57,7 @@ function CourtsInner() {
     setEditingId(null);
     setForm(EMPTY);
     setError('');
+    setGeoStatus(null);
   }
 
   function startEdit(c: Court) {
@@ -66,8 +71,35 @@ function CourtsInner() {
       open_hour: c.open_hour,
       close_hour: c.close_hour,
       description: c.description,
+      latitude: c.latitude,
+      longitude: c.longitude,
     });
     setError('');
+    setGeoStatus(c.latitude != null ? { ok: true, msg: '저장된 좌표가 있어요.' } : null);
+  }
+
+  // 주소 → 좌표(네이버 지오코딩 프록시)
+  async function geocode() {
+    const addr = form.address.trim();
+    if (!addr) {
+      setGeoStatus({ ok: false, msg: '먼저 주소를 입력하세요.' });
+      return;
+    }
+    setGeoLoading(true);
+    setGeoStatus(null);
+    try {
+      const res = await fetch(`/api/geocode?query=${encodeURIComponent(addr)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setGeoStatus({ ok: false, msg: data.error ?? '좌표 변환에 실패했어요.' });
+      } else {
+        setForm((f) => ({ ...f, latitude: data.lat, longitude: data.lng }));
+        setGeoStatus({ ok: true, msg: `변환됨: ${data.roadAddress || data.jibunAddress || addr}` });
+      }
+    } catch {
+      setGeoStatus({ ok: false, msg: '좌표 변환 요청에 실패했어요.' });
+    }
+    setGeoLoading(false);
   }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -93,6 +125,8 @@ function CourtsInner() {
       open_hour: form.open_hour,
       close_hour: form.close_hour,
       description: form.description.trim(),
+      latitude: form.latitude,
+      longitude: form.longitude,
     };
     const { error: err } = editingId
       ? await supabase.from('courts').update(payload).eq('id', editingId)
@@ -143,6 +177,52 @@ function CourtsInner() {
         <Field label="주소">
           <input className={inputCls} value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="용산구 이촌로 100" />
         </Field>
+
+        {/* 위치(좌표) — 지도 표시용. 주소로 자동변환 + 필요 시 수동 보정 */}
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">지도 위치 (좌표)</span>
+            <button
+              type="button"
+              onClick={geocode}
+              disabled={geoLoading}
+              className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+            >
+              {geoLoading ? '변환 중…' : '주소로 좌표 찾기'}
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs text-slate-500">위도 (latitude)</span>
+              <input
+                type="number"
+                step="any"
+                className={inputCls}
+                value={form.latitude ?? ''}
+                onChange={(e) => set('latitude', e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="37.5326"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-slate-500">경도 (longitude)</span>
+              <input
+                type="number"
+                step="any"
+                className={inputCls}
+                value={form.longitude ?? ''}
+                onChange={(e) => set('longitude', e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="126.9906"
+              />
+            </label>
+          </div>
+          {geoStatus && (
+            <p className={`mt-2 text-xs ${geoStatus.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+              {geoStatus.ok ? '📍 ' : '⚠ '}
+              {geoStatus.msg}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-slate-400">좌표가 있어야 선수 앱 지도에 표시됩니다. 주소로 자동 변환하거나 위/경도를 직접 입력하세요.</p>
+        </div>
         <div className="grid grid-cols-4 gap-4">
           <Field label="실내/실외">
             <select className={inputCls} value={form.indoor ? 'in' : 'out'} onChange={(e) => set('indoor', e.target.value === 'in')}>
@@ -191,6 +271,7 @@ function CourtsInner() {
                 <th className="px-4 py-2 font-medium">유형</th>
                 <th className="px-4 py-2 font-medium">운영시간</th>
                 <th className="px-4 py-2 font-medium">요금</th>
+                <th className="px-4 py-2 font-medium">위치</th>
                 <th className="px-4 py-2 font-medium"></th>
               </tr>
             </thead>
@@ -206,6 +287,13 @@ function CourtsInner() {
                   </td>
                   <td className="px-4 py-2 text-slate-500">{c.open_hour}–{c.close_hour}시</td>
                   <td className="px-4 py-2 text-slate-700">{c.hourly_price > 0 ? `${c.hourly_price.toLocaleString()}원` : '무료'}</td>
+                  <td className="px-4 py-2">
+                    {c.latitude != null && c.longitude != null ? (
+                      <span className="text-emerald-600" title={`${c.latitude}, ${c.longitude}`}>📍 설정됨</span>
+                    ) : (
+                      <span className="text-slate-400">미설정</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-right">
                     <button onClick={() => startEdit(c)} className="mr-3 text-slate-500 hover:text-emerald-700 hover:underline">
                       수정

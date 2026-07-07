@@ -198,6 +198,8 @@ export type Court = {
   close_hour: number;
   image_url: string | null;
   owner_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 };
 
