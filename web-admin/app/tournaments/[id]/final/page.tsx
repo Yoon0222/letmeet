@@ -23,7 +23,7 @@ import { useTournament } from '../_ctx';
 export default function FinalTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, matches, courts, loading, reload, name } = useTournament();
+  const { t, matches, courts, loading, reload, name, query } = useTournament();
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -186,6 +186,9 @@ export default function FinalTab() {
   const curKoDone = curKo.length > 0 && curKo.every((m) => m.status === 'done');
   const champion = maxRound > 0 && curKo.length === 1 && curKoDone ? curKo[0].winner_id : null;
   const koRounds = Array.from(new Set(koMatches.map((m) => m.round_order))).sort((a, b) => (a ?? 0) - (b ?? 0));
+  const q = query.trim().toLowerCase();
+  const matchHit = (m: TournamentMatch) =>
+    !q || name(m.entry1_id).toLowerCase().includes(q) || name(m.entry2_id).toLowerCase().includes(q);
 
   return (
     <div className="space-y-4">
@@ -197,11 +200,13 @@ export default function FinalTab() {
       )}
       {koRounds.map((r) => {
         const rm = koMatches.filter((m) => m.round_order === r).sort((a, b) => a.slot - b.slot);
+        const shown = q ? rm.filter(matchHit) : rm;
+        if (q && shown.length === 0) return null;
         return (
           <div key={r} className="rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="font-medium">{rm[0]?.round_name ?? `라운드 ${r}`}</h3>
             <div className="mt-2 space-y-1.5">
-              {rm.map((m) => (
+              {shown.map((m) => (
                 <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} />
               ))}
             </div>

@@ -17,7 +17,7 @@ function matchLabel(m: TournamentMatch): string {
 
 export default function CourtsTab() {
   const { session } = useSession();
-  const { t, matches, courts, loading, reload, name } = useTournament();
+  const { t, matches, courts, loading, reload, name, query } = useTournament();
   const [phaseTab, setPhaseTab] = useState<'group' | 'knockout'>('group');
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
@@ -73,8 +73,12 @@ export default function CourtsTab() {
   const rowRank = (m: TournamentMatch) => (m.court_id ? 0 : queueNo.has(m.id) ? 1 : 2);
   const rowSub = (m: TournamentMatch) =>
     m.court_id ? courtIndex.get(m.court_id) ?? 99 : queueNo.get(m.id) ?? 999;
+  const q = query.trim().toLowerCase();
+  const matchHit = (m: TournamentMatch) =>
+    !q || name(m.entry1_id).toLowerCase().includes(q) || name(m.entry2_id).toLowerCase().includes(q);
   const phaseRows = remaining
     .filter((m) => m.phase === activePhase)
+    .filter(matchHit)
     .sort((a, b) => rowRank(a) - rowRank(b) || rowSub(a) - rowSub(b));
   // 대기번호는 탭(단계)별로 1부터
   const phaseQueueNo = new Map<string, number>();

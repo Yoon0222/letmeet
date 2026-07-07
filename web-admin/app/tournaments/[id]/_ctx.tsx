@@ -19,6 +19,9 @@ type Ctx = {
   reload: () => Promise<void>;
   // 선수/팀 이름 (복식이면 "닉 / 파트너")
   name: (uid: string | null) => string;
+  // 이름 검색어 (탭 공용)
+  query: string;
+  setQuery: (q: string) => void;
 };
 
 const TournamentContext = createContext<Ctx | null>(null);
@@ -35,6 +38,7 @@ export function TournamentProvider({ id, children }: { id: string; children: Rea
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [courts, setCourts] = useState<TournamentCourt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
 
   const reload = useCallback(async () => {
     const [{ data: tour }, { data: ents }, { data: ms }, { data: cs }] = await Promise.all([
@@ -70,7 +74,7 @@ export function TournamentProvider({ id, children }: { id: string; children: Rea
   };
 
   return (
-    <TournamentContext.Provider value={{ t, entries, matches, courts, loading, reload, name }}>
+    <TournamentContext.Provider value={{ t, entries, matches, courts, loading, reload, name, query, setQuery }}>
       {children}
     </TournamentContext.Provider>
   );

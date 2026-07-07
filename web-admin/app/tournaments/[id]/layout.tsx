@@ -16,7 +16,7 @@ function Header() {
   const { id } = useParams<{ id: string }>();
   const pathname = usePathname();
   const { session } = useSession();
-  const { t, courts, reload } = useTournament();
+  const { t, courts, reload, query, setQuery } = useTournament();
 
   if (!t) return <p className="text-slate-500">불러오는 중…</p>;
 
@@ -72,6 +72,26 @@ function Header() {
           );
         })}
       </nav>
+
+      {/* 이름 검색 (탭 공용) */}
+      <div className="relative mt-3 max-w-sm">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="이름으로 검색 (참가자·경기)"
+          className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-8 text-sm outline-none focus:border-emerald-500"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+            title="지우기"
+          >
+            ✕
+          </button>
+        )}
+      </div>
     </div>
   );
 }

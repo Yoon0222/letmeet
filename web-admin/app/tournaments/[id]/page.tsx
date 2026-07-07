@@ -19,14 +19,22 @@ const ENTRY_STYLE: Record<string, string> = {
 export default function EntriesTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, entries, courts, loading, reload } = useTournament();
+  const { t, entries, courts, loading, reload, query } = useTournament();
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
 
   const isOrganizer = t.organizer_id === session?.user.id;
-  // 거절된 신청은 목록에서 숨긴다
-  const visibleEntries = entries.filter((e) => e.status !== 'rejected');
+  const q = query.trim().toLowerCase();
+  // 거절된 신청은 목록에서 숨기고, 검색어가 있으면 이름(닉/파트너)으로 필터
+  const visibleEntries = entries
+    .filter((e) => e.status !== 'rejected')
+    .filter(
+      (e) =>
+        !q ||
+        (e.profiles?.nickname ?? '').toLowerCase().includes(q) ||
+        (e.partner?.nickname ?? e.partner_name ?? '').toLowerCase().includes(q),
+    );
 
   async function setEntryStatus(userId: string, status: EntryStatus) {
     await supabase.from('tournament_entries').update({ status }).eq('tournament_id', id).eq('user_id', userId);

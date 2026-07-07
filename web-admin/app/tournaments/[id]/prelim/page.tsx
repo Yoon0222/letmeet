@@ -22,7 +22,7 @@ import { useTournament } from '../_ctx';
 export default function PrelimTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, entries, matches, courts, loading, reload, name } = useTournament();
+  const { t, entries, matches, courts, loading, reload, name, query } = useTournament();
   const [perGroupInput, setPerGroupInput] = useState(4);
   const [groupTab, setGroupTab] = useState<number | 'all'>(1);
 
@@ -153,7 +153,12 @@ export default function PrelimTab() {
   // 조별리그 진행
   const gc = t.group_count ?? 0;
   const groupNos = Array.from({ length: gc }, (_, gi) => gi + 1);
-  const shownGroups = groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab);
+  // 이름 검색
+  const q = query.trim().toLowerCase();
+  const matchHit = (m: TournamentMatch) =>
+    !q || name(m.entry1_id).toLowerCase().includes(q) || name(m.entry2_id).toLowerCase().includes(q);
+  // 검색 중이면 조 탭 무시하고 전체 조에서 찾는다
+  const shownGroups = q ? groupNos : groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab);
   // 조별 완료/전체 경기 수 (탭 배지)
   const groupProgress = (g: number) => {
     const gm = groupMatches.filter((m) => m.group_no === g);
@@ -197,6 +202,9 @@ export default function PrelimTab() {
         const gm = groupMatches.filter((m) => m.group_no === g);
         const members = Array.from(new Set(gm.flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[]));
         const st = standings(members, gm);
+        // 검색 시: 이름이 걸리는 경기만, 매칭 없는 조는 숨김
+        const shownMatches = q ? gm.filter(matchHit) : gm;
+        if (q && shownMatches.length === 0) return null;
         return (
           <div key={g} className="rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="font-medium">{g}조</h3>
@@ -221,7 +229,7 @@ export default function PrelimTab() {
               </tbody>
             </table>
             <div className="mt-3 space-y-1.5">
-              {gm.map((m) => (
+              {shownMatches.map((m) => (
                 <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} />
               ))}
             </div>
