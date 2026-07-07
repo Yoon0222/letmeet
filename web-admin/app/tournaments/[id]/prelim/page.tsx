@@ -36,6 +36,7 @@ export default function PrelimTab() {
   const koMatches = matches.filter((m) => m.phase === 'knockout');
 
   async function generateGroups() {
+    if (matches.length > 0) return; // 이미 대진 있음 → 중복 방지
     const per = Math.max(2, perGroupInput);
     const gc = groupCountForSize(approved.length, per);
     const { rows } = buildGroups(approved.map((e) => e.user_id), gc);
@@ -59,6 +60,7 @@ export default function PrelimTab() {
 
   // 조별리그 없이 바로 본선 토너먼트 (참가 순서 시드)
   async function generateStraightKnockout() {
+    if (matches.length > 0) return; // 이미 대진 있음 → 중복 방지
     const seeds = approved.map((e) => e.user_id);
     if (seeds.length < 2) return;
     let size = 1;

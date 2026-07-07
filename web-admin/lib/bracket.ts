@@ -59,6 +59,26 @@ export function seedQualifiersTotal(standingsByGroup: Standing[][], totalAdvance
   return seeds.slice(0, Math.max(2, totalAdvance));
 }
 
+// 조 크기별 진출 수: 2팀이면 전원(2), 3팀 이상이면 (크기-1), 1팀이면 1.
+export function advanceCountForGroupSize(size: number): number {
+  if (size <= 2) return size;
+  return size - 1;
+}
+
+// 조 크기 규칙에 따라 각 조 상위 진출자를 랭크-우선(각 조 1위 → 각 조 2위 …)으로 시드.
+// 예: 4팀 조는 1·2·3위, 3팀 조는 1·2위, 2팀 조는 전원.
+export function seedQualifiersBySize(standingsByGroup: Standing[][]): string[] {
+  const advance = standingsByGroup.map((g) => advanceCountForGroupSize(g.length));
+  const maxAdv = Math.max(0, ...advance);
+  const seeds: string[] = [];
+  for (let rank = 0; rank < maxAdv; rank++) {
+    standingsByGroup.forEach((g, gi) => {
+      if (rank < advance[gi] && g[rank]) seeds.push(g[rank].id);
+    });
+  }
+  return seeds;
+}
+
 // 조당 목표 인원으로 조 개수 계산
 export function groupCountForSize(n: number, perGroup: number): number {
   return Math.max(1, Math.ceil(n / Math.max(1, perGroup)));

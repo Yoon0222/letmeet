@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
 
 import { MatchRow } from '@/components/match-row';
 import {
+  advanceCountForGroupSize,
   firstRoundPairs,
   nextRoundPairs,
   roundName,
-  seedQualifiersTotal,
+  seedQualifiersBySize,
   standings,
   type Standing,
 } from '@/lib/bracket';
@@ -24,7 +24,6 @@ export default function FinalTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
   const { t, matches, courts, loading, reload, name } = useTournament();
-  const [advanceInput, setAdvanceInput] = useState(4);
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -34,6 +33,20 @@ export default function FinalTab() {
   const groupMatches = matches.filter((m) => m.phase === 'group');
   const koMatches = matches.filter((m) => m.phase === 'knockout');
   const groupsDone = groupMatches.length > 0 && groupMatches.every((m) => m.status === 'done');
+
+  // 조 크기별 자동 진출 수 (2팀=전원, 3팀↑=크기-1)
+  const groupSizes = Array.from({ length: t.group_count ?? 0 }, (_, i) => i + 1).map(
+    (g) =>
+      new Set(
+        groupMatches.filter((m) => m.group_no === g).flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[],
+      ).size,
+  );
+  const totalAdvance = groupSizes.reduce((sum, s) => sum + advanceCountForGroupSize(s), 0);
+  const bracketSize = (() => {
+    let s = 1;
+    while (s < Math.max(2, totalAdvance)) s *= 2;
+    return s;
+  })();
 
   async function saveScore(m: TournamentMatch, s1: number, s2: number) {
     if (s1 === s2) {
@@ -62,6 +75,7 @@ export default function FinalTab() {
   }
 
   async function generateKnockout() {
+    if (koMatches.length > 0) return; // 이미 생성됨 → 중복 방지
     const gc = t?.group_count ?? 0;
     const byGroup: Standing[][] = [];
     for (let g = 1; g <= gc; g++) {
@@ -69,7 +83,8 @@ export default function FinalTab() {
       const members = Array.from(new Set(gm.flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[]));
       byGroup.push(standings(members, gm));
     }
-    const seeds = seedQualifiersTotal(byGroup, advanceInput);
+    // 조 크기 규칙에 따라 자동 진출 (2팀=전원, 3팀=상위2, 4팀=상위3 …)
+    const seeds = seedQualifiersBySize(byGroup);
     if (seeds.length < 2) {
       alert('진출자가 2명 이상이어야 토너먼트를 만들 수 있어요.');
       return;
@@ -90,7 +105,6 @@ export default function FinalTab() {
         status: p[1] ? 'scheduled' : 'done',
       })),
     );
-    await supabase.from('tournaments').update({ advance_per_group: advanceInput }).eq('id', id);
     reload();
   }
 
@@ -138,17 +152,17 @@ export default function FinalTab() {
       return <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">아직 본선이 생성되지 않았습니다.</div>;
     }
     return (
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-5">
-        <label className="text-sm">
-          <span className="mb-1 block text-slate-600">본선 진출 {t.discipline === 'doubles' ? '팀 수' : '인원'} (총)</span>
-          <input type="number" min={2} value={advanceInput} onChange={(e) => setAdvanceInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-        </label>
-        <button onClick={generateKnockout} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-          본선 토너먼트 생성
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="text-sm text-slate-600">
+          조 크기별 자동 진출 — <b>2{unit} 조: 전원</b> · <b>3{unit} 조: 상위 2</b> · <b>4{unit} 조: 상위 3</b> (그 외 크기−1)
+        </div>
+        <div className="mt-1.5 text-sm text-slate-500">
+          현재 {groupSizes.length}개 조 → 총 <b className="text-emerald-700">{totalAdvance}{unit}</b> 진출 → {roundName(bracketSize)}
+          {bracketSize > totalAdvance ? ` (${bracketSize - totalAdvance}자리 상위 시드 부전승)` : ''}
+        </div>
+        <button onClick={generateKnockout} className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+          본선 토너먼트 생성 ({totalAdvance}{unit})
         </button>
-        <span className="pb-2 text-xs text-slate-400">
-          상위 {advanceInput}{unit} 진출 → {roundName((() => { let s = 1; while (s < Math.max(2, advanceInput)) s *= 2; return s; })())} (부족분은 상위 시드 부전승)
-        </span>
       </div>
     );
   }
