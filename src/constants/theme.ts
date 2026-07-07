@@ -7,39 +7,39 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
-// 피클볼 브랜드: 생기 있는 라임 그린 + 코트 블루 액센트
+// 피넛 브랜드: 밝은 화이트 + 비비드 그린 + 따뜻한 골드 포인트
 export const Brand = {
-  primary: '#3DBA6F', // 메인 그린
-  primaryDark: '#2E9457',
-  accent: '#2D7FF9', // 코트 블루
-  warning: '#F5A623',
-  danger: '#E5484D',
+  primary: '#12B981', // 비비드 피넛 그린
+  primaryDark: '#0E9E6E',
+  accent: '#F5A623', // 골드 포인트
+  warning: '#F59E0B',
+  danger: '#F0453F',
 } as const;
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#ffffff',
-    backgroundElement: '#F0F2F4',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#17191C',
+    background: '#FBFCFB', // 거의 화이트 (밝게)
+    backgroundElement: '#F0F2F1',
+    backgroundSelected: '#E4E7E5',
+    textSecondary: '#757C78',
     primary: Brand.primary,
     accent: Brand.accent,
-    border: '#E2E5E9',
+    border: '#EBEEEC',
     card: '#FFFFFF',
-    tabIconDefault: '#8A9099',
+    tabIconDefault: '#A7ADA9',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#0B0D0E',
-    backgroundElement: '#1A1D1F',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#9BA1A6',
-    primary: Brand.primary,
-    accent: '#5A9DFF',
-    border: '#2A2E31',
-    card: '#16181A',
-    tabIconDefault: '#6B7178',
+    text: '#F1F3F2',
+    background: '#0F1211',
+    backgroundElement: '#1B1F1D',
+    backgroundSelected: '#2A2F2C',
+    textSecondary: '#9BA29E',
+    primary: '#2FD08B', // 다크에서 더 밝은 그린
+    accent: '#F5B84B',
+    border: '#262B28',
+    card: '#161A18',
+    tabIconDefault: '#6E756F',
   },
 } as const;
 

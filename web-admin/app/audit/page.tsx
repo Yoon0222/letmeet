@@ -19,6 +19,7 @@ const ENTRY_STATUS: Record<string, string> = {
   approved: '승인',
   rejected: '거절',
   withdrawn: '철회',
+  waitlist: '대기열',
 };
 
 type Json = Record<string, unknown> | null;
@@ -96,24 +97,33 @@ function detailText(log: AuditLogWithActor): string {
   }
 }
 
+const PAGE_SIZE = 20;
+
 function AuditInner() {
   const [rows, setRows] = useState<AuditLogWithActor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
-  const load = useCallback(async () => {
-    const { data } = await supabase
+  const load = useCallback(async (p: number) => {
+    setLoading(true);
+    const from = p * PAGE_SIZE;
+    const { data, count } = await supabase
       .from('audit_logs')
-      .select('*, actor:profiles!audit_logs_actor_id_fkey(id, nickname)')
+      .select('*, actor:profiles!audit_logs_actor_id_fkey(id, nickname)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(300);
+      .range(from, from + PAGE_SIZE - 1);
     setRows((data as unknown as AuditLogWithActor[]) ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+    load(page);
+  }, [load, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -121,14 +131,11 @@ function AuditInner() {
         <div>
           <h1 className="text-2xl font-semibold">감사 로그</h1>
           <p className="mt-1 text-sm text-slate-500">
-            누가·무엇을·언제·어떻게 했는지 기록합니다. (최근 300건)
+            누가·무엇을·언제·어떻게 했는지 기록합니다. (총 {total}건)
           </p>
         </div>
         <button
-          onClick={() => {
-            setLoading(true);
-            load();
-          }}
+          onClick={() => load(page)}
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
           새로고침
         </button>
@@ -172,6 +179,31 @@ function AuditInner() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* 페이징 */}
+      {total > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+          <span>
+            {page + 1} / {totalPages} 페이지 · 총 {total}건
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || loading}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40"
+            >
+              이전
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1 || loading}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-40"
+            >
+              다음
+            </button>
+          </div>
         </div>
       )}
     </div>

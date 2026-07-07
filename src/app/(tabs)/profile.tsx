@@ -8,9 +8,10 @@ import { MeetupCard } from '@/components/meetup-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Spacing } from '@/constants/theme';
+import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { confirmDestructive } from '@/lib/confirm';
 import { playStyleLabel, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
@@ -18,8 +19,9 @@ import type { MeetupWithCounts } from '@/lib/types';
 export default function ProfileScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { session, profile, signOut } = useAuth();
+  const { session, profile, signOut, deleteAccount } = useAuth();
   const [myMeetups, setMyMeetups] = useState<MeetupWithCounts[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const uid = session?.user.id;
@@ -48,10 +50,27 @@ export default function ProfileScreen() {
   );
 
   function confirmSignOut() {
-    Alert.alert('로그아웃', '정말 로그아웃 하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
-    ]);
+    confirmDestructive('로그아웃', '정말 로그아웃 하시겠어요?', '로그아웃', () => signOut());
+  }
+
+  async function doDelete() {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+    } catch (e) {
+      Alert.alert('탈퇴 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function confirmDelete() {
+    confirmDestructive(
+      '회원 탈퇴',
+      '정말 탈퇴하시겠어요?\n계정과 모든 데이터(프로필·모임·대회 참가 기록)가 영구 삭제되며 되돌릴 수 없어요.',
+      '탈퇴하기',
+      doDelete,
+    );
   }
 
   const needsSetup = profile && !profile.region;
@@ -128,6 +147,11 @@ export default function ProfileScreen() {
 
         <Button title="로그아웃" variant="outline" onPress={confirmSignOut} style={{ marginTop: Spacing.four }} />
         <Text style={[styles.email, { color: theme.tabIconDefault }]}>{session?.user.email}</Text>
+        <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
+          <Text style={[styles.deleteText, { color: Brand.danger }]}>
+            {deleting ? '탈퇴 처리 중…' : '회원 탈퇴'}
+          </Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -181,4 +205,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '700', marginTop: Spacing.three },
   emptyMeetup: { fontSize: 14, lineHeight: 20 },
   email: { fontSize: 12, textAlign: 'center', marginTop: Spacing.three },
+  deleteBtn: { alignSelf: 'center', marginTop: Spacing.three, padding: 8 },
+  deleteText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
 });

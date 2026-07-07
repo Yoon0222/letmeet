@@ -383,6 +383,31 @@ select
 from public.tournaments t
 join public.profiles p on p.id = t.organizer_id;
 
+-- 대회 코트 구성 (코트명 + 실내/실외) — 대회마다 자유롭게 정의
+create table if not exists public.tournament_courts (
+  id            uuid primary key default uuid_generate_v4(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  name          text not null,                 -- 예: '1', 'A', '센터코트'
+  indoor        boolean not null default true, -- true=실내, false=실외
+  sort          int not null default 0,
+  created_at    timestamptz not null default now()
+);
+create index if not exists tournament_courts_tid_idx on public.tournament_courts (tournament_id);
+
+alter table public.tournament_courts enable row level security;
+drop policy if exists "courts_select" on public.tournament_courts;
+create policy "courts_select" on public.tournament_courts for select using (true);
+drop policy if exists "courts_write_organizer" on public.tournament_courts;
+create policy "courts_write_organizer" on public.tournament_courts
+  for all using (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  )
+  with check (
+    public.my_role() = 'super_admin'
+    or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
+  );
+
 -- 대회 진행: 경기(조별리그 + 토너먼트)
 create table if not exists public.tournament_matches (
   id            uuid primary key default uuid_generate_v4(),
@@ -398,6 +423,8 @@ create table if not exists public.tournament_matches (
   score2        int,
   winner_id     uuid references public.profiles(id) on delete set null,
   status        text not null default 'scheduled',
+  court_id      uuid references public.tournament_courts(id) on delete set null,
+  court_confirmed boolean not null default false, -- 코트 배정 확정(경기 시작) 여부
   created_at    timestamptz not null default now()
 );
 create index if not exists tournament_matches_tid_idx on public.tournament_matches (tournament_id);
@@ -490,3 +517,124 @@ alter table public.audit_logs enable row level security;
 drop policy if exists "audit_select_super" on public.audit_logs;
 create policy "audit_select_super" on public.audit_logs
   for select using (public.my_role() = 'super_admin');
+
+-- ============================================================
+-- 프로필 사진(아바타) Storage — 0011
+-- 경로: avatars/{user_id}/파일명. 조회 공개, 쓰기는 본인 폴더만.
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "avatars_read" on storage.objects;
+create policy "avatars_read" on storage.objects
+  for select using (bucket_id = 'avatars');
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own" on storage.objects
+  for insert with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own" on storage.objects
+  for update using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own" on storage.objects
+  for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================
+-- 회원 탈퇴 (계정 삭제) — 0012
+-- SECURITY DEFINER RPC 로 본인 auth.users 삭제 → profiles 등 연쇄 정리.
+-- ============================================================
+create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+revoke all on function public.delete_account() from public;
+grant execute on function public.delete_account() to authenticated;
+
+-- ============================================================
+-- 대회 중복 참가 방지 — 0013
+-- 신청자·파트너가 이미 그 대회에 참가(신청자/파트너)면 신청 거부.
+-- ============================================================
+create or replace function public.enforce_no_double_entry()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.partner_id is not null and new.partner_id = new.user_id then
+    raise exception '본인을 파트너로 지정할 수 없어요.';
+  end if;
+  if exists (
+    select 1 from public.tournament_entries e
+    where e.tournament_id = new.tournament_id
+      and (e.user_id = new.user_id or e.partner_id = new.user_id)
+  ) then
+    raise exception '이미 이 대회에 참가 신청되어 있어요.';
+  end if;
+  if new.partner_id is not null and exists (
+    select 1 from public.tournament_entries e
+    where e.tournament_id = new.tournament_id
+      and (e.user_id = new.partner_id or e.partner_id = new.partner_id)
+  ) then
+    raise exception '선택한 파트너는 이미 이 대회에 참가 중이에요.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists on_no_double_entry on public.tournament_entries;
+create trigger on_no_double_entry
+  before insert on public.tournament_entries
+  for each row execute function public.enforce_no_double_entry();
+
+-- 대기열: 정원 초과 신청은 waitlist, 슬롯이 비면 대기 맨 앞 자동 승격 (0016)
+create or replace function public.enforce_waitlist()
+returns trigger language plpgsql security definer as $$
+declare cap int; occupied int;
+begin
+  if new.status = 'pending' then
+    select max_participants into cap from public.tournaments where id = new.tournament_id;
+    select count(*) into occupied from public.tournament_entries
+      where tournament_id = new.tournament_id and status in ('pending', 'approved');
+    if cap is not null and occupied >= cap then
+      new.status := 'waitlist';
+    end if;
+  end if;
+  return new;
+end; $$;
+drop trigger if exists on_waitlist_insert on public.tournament_entries;
+create trigger on_waitlist_insert
+  before insert on public.tournament_entries
+  for each row execute function public.enforce_waitlist();
+
+create or replace function public.promote_waitlist()
+returns trigger language plpgsql security definer as $$
+declare cap int; occupied int; tid uuid; nextw uuid;
+begin
+  if pg_trigger_depth() > 1 then return null; end if;
+  tid := coalesce(new.tournament_id, old.tournament_id);
+  select max_participants into cap from public.tournaments where id = tid;
+  if cap is null then return null; end if;
+  loop
+    select count(*) into occupied from public.tournament_entries
+      where tournament_id = tid and status in ('pending', 'approved');
+    exit when occupied >= cap;
+    select user_id into nextw from public.tournament_entries
+      where tournament_id = tid and status = 'waitlist'
+      order by created_at asc limit 1;
+    exit when nextw is null;
+    update public.tournament_entries set status = 'pending'
+      where tournament_id = tid and user_id = nextw;
+  end loop;
+  return null;
+end; $$;
+drop trigger if exists on_waitlist_promote on public.tournament_entries;
+create trigger on_waitlist_promote
+  after update or delete on public.tournament_entries
+  for each row execute function public.promote_waitlist();

@@ -1,258 +1,73 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
 
-import { Protected } from '@/components/protected';
-import {
-  buildGroups,
-  firstRoundPairs,
-  groupCountForSize,
-  nextRoundPairs,
-  roundName,
-  seedQualifiersTotal,
-  standings,
-  type Standing,
-} from '@/lib/bracket';
-import {
-  ENTRY_STATUS_LABEL,
-  formatDateTime,
-  skillRange,
-  TOURNAMENT_STATUS_LABEL,
-} from '@/lib/format';
+import { Avatar } from '@/components/avatar';
+import { ENTRY_STATUS_LABEL } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
-import type {
-  EntryStatus,
-  TournamentEntryWithProfile,
-  TournamentMatch,
-  TournamentStatus,
-  TournamentWithCounts,
-} from '@/lib/types';
+import type { EntryStatus } from '@/lib/types';
+
+import { useTournament } from './_ctx';
 
 const ENTRY_STYLE: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
   approved: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-red-50 text-red-600',
   withdrawn: 'bg-slate-100 text-slate-500',
+  waitlist: 'bg-sky-50 text-sky-700',
 };
 
-function DetailInner() {
+export default function EntriesTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const [t, setT] = useState<TournamentWithCounts | null>(null);
-  const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
-  const [matches, setMatches] = useState<TournamentMatch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [perGroupInput, setPerGroupInput] = useState(4);
-  const [advanceInput, setAdvanceInput] = useState(4);
-
-  const load = useCallback(async () => {
-    const [{ data: tour }, { data: ents }, { data: ms }] = await Promise.all([
-      supabase.from('tournaments_with_counts').select('*').eq('id', id).maybeSingle(),
-      supabase
-        .from('tournament_entries')
-        .select(
-          '*, profiles:profiles!tournament_entries_user_id_fkey(id, nickname, skill_level, avatar_url, region), partner:profiles!tournament_entries_partner_id_fkey(id, nickname, skill_level, avatar_url, region)',
-        )
-        .eq('tournament_id', id)
-        .order('created_at', { ascending: true }),
-      supabase.from('tournament_matches').select('*').eq('tournament_id', id).order('slot', { ascending: true }),
-    ]);
-    setT(tour ?? null);
-    setEntries((ents as unknown as TournamentEntryWithProfile[]) ?? []);
-    setMatches((ms as TournamentMatch[]) ?? []);
-    setLoading(false);
-  }, [id]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
-
-  const isOrganizer = !!t && (t.organizer_id === session?.user.id);
-  const name = (uid: string | null) => {
-    if (!uid) return '부전승';
-    const e = entries.find((x) => x.user_id === uid);
-    const nick = e?.profiles?.nickname ?? '알 수 없음';
-    const partnerNick = e?.partner?.nickname ?? e?.partner_name;
-    return t?.discipline === 'doubles' && partnerNick ? `${nick} / ${partnerNick}` : nick;
-  };
-
-  const approved = entries.filter((e) => e.status === 'approved');
-  // 거절된 신청은 목록에서 숨긴다
-  const visibleEntries = entries.filter((e) => e.status !== 'rejected');
-  const groupMatches = matches.filter((m) => m.phase === 'group');
-  const koMatches = matches.filter((m) => m.phase === 'knockout');
-  const groupsDone = groupMatches.length > 0 && groupMatches.every((m) => m.status === 'done');
-
-  async function setEntryStatus(userId: string, status: EntryStatus) {
-    await supabase.from('tournament_entries').update({ status }).eq('tournament_id', id).eq('user_id', userId);
-    load();
-  }
-  async function setTournamentStatus(status: TournamentStatus) {
-    await supabase.from('tournaments').update({ status }).eq('id', id);
-    load();
-  }
-
-  async function generateGroups() {
-    const per = Math.max(2, perGroupInput);
-    const gc = groupCountForSize(approved.length, per);
-    const { rows } = buildGroups(approved.map((e) => e.user_id), gc);
-    if (rows.length === 0) {
-      alert('경기를 만들 수 없어요. 승인 인원과 조당 인원을 확인하세요.');
-      return;
-    }
-    await supabase.from('tournament_matches').insert(
-      rows.map((r) => ({
-        tournament_id: id,
-        phase: 'group' as const,
-        group_no: r.group_no,
-        slot: r.slot,
-        entry1_id: r.entry1_id,
-        entry2_id: r.entry2_id,
-      })),
-    );
-    await supabase.from('tournaments').update({ group_count: gc, status: 'ongoing' }).eq('id', id);
-    load();
-  }
-
-  // 조별리그 없이 바로 본선 토너먼트 (참가 순서 시드)
-  async function generateStraightKnockout() {
-    const seeds = approved.map((e) => e.user_id);
-    if (seeds.length < 2) return;
-    let size = 1;
-    while (size < seeds.length) size *= 2;
-    const pairs = firstRoundPairs(seeds);
-    await supabase.from('tournament_matches').insert(
-      pairs.map((p, i) => ({
-        tournament_id: id,
-        phase: 'knockout' as const,
-        round_order: 1,
-        round_name: roundName(size),
-        slot: i,
-        entry1_id: p[0],
-        entry2_id: p[1],
-        winner_id: p[1] ? null : p[0],
-        status: p[1] ? 'scheduled' : 'done',
-      })),
-    );
-    await supabase.from('tournaments').update({ status: 'ongoing' }).eq('id', id);
-    load();
-  }
-
-  async function saveScore(m: TournamentMatch, s1: number, s2: number) {
-    if (s1 === s2) {
-      alert('무승부는 없어요. 점수를 다르게 입력하세요.');
-      return;
-    }
-    const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
-    await supabase
-      .from('tournament_matches')
-      .update({ score1: s1, score2: s2, winner_id, status: 'done' })
-      .eq('id', m.id);
-    load();
-  }
-
-  // 해당 경기 선수들에게 "차례 알림" 푸시 발송 (notify-turn 엣지 함수)
-  async function notifyTurn(m: TournamentMatch) {
-    const { data, error } = await supabase.functions.invoke('notify-turn', {
-      body: { match_id: m.id },
-    });
-    if (error) {
-      alert(`알림 전송 실패: ${error.message}`);
-      return;
-    }
-    const sent = (data as { sent?: number })?.sent ?? 0;
-    alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
-  }
-
-  async function generateKnockout() {
-    const gc = t?.group_count ?? 0;
-    const byGroup: Standing[][] = [];
-    for (let g = 1; g <= gc; g++) {
-      const gm = groupMatches.filter((m) => m.group_no === g);
-      const members = Array.from(new Set(gm.flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[]));
-      byGroup.push(standings(members, gm));
-    }
-    const seeds = seedQualifiersTotal(byGroup, advanceInput);
-    if (seeds.length < 2) {
-      alert('진출자가 2명 이상이어야 토너먼트를 만들 수 있어요.');
-      return;
-    }
-    let size = 1;
-    while (size < seeds.length) size *= 2;
-    const pairs = firstRoundPairs(seeds);
-    await supabase.from('tournament_matches').insert(
-      pairs.map((p, i) => ({
-        tournament_id: id,
-        phase: 'knockout' as const,
-        round_order: 1,
-        round_name: roundName(size),
-        slot: i,
-        entry1_id: p[0],
-        entry2_id: p[1],
-        winner_id: p[1] ? null : p[0], // 부전승 자동 처리
-        status: p[1] ? 'scheduled' : 'done',
-      })),
-    );
-    await supabase.from('tournaments').update({ advance_per_group: advanceInput }).eq('id', id);
-    load();
-  }
-
-  async function generateNextRound() {
-    const maxRound = Math.max(...koMatches.map((m) => m.round_order ?? 0));
-    const cur = koMatches.filter((m) => m.round_order === maxRound).sort((a, b) => a.slot - b.slot);
-    const winners = cur.map((m) => m.winner_id).filter(Boolean) as string[];
-    const pairs = nextRoundPairs(winners);
-    await supabase.from('tournament_matches').insert(
-      pairs.map((p, i) => ({
-        tournament_id: id,
-        phase: 'knockout' as const,
-        round_order: maxRound + 1,
-        round_name: roundName(winners.length),
-        slot: i,
-        entry1_id: p[0],
-        entry2_id: p[1],
-        winner_id: p[1] ? null : p[0],
-        status: p[1] ? 'scheduled' : 'done',
-      })),
-    );
-    load();
-  }
+  const { t, entries, courts, loading, reload, query } = useTournament();
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
 
-  // 우승자 판정
-  const maxRound = koMatches.length ? Math.max(...koMatches.map((m) => m.round_order ?? 0)) : 0;
-  const curKo = koMatches.filter((m) => m.round_order === maxRound);
-  const curKoDone = curKo.length > 0 && curKo.every((m) => m.status === 'done');
-  const champion = maxRound > 0 && curKo.length === 1 && curKoDone ? curKo[0].winner_id : null;
+  const isOrganizer = t.organizer_id === session?.user.id;
+  const q = query.trim().toLowerCase();
+  // 거절된 신청은 목록에서 숨기고, 검색어가 있으면 이름(닉/파트너)으로 필터
+  const visibleEntries = entries
+    .filter((e) => e.status !== 'rejected')
+    .filter(
+      (e) =>
+        !q ||
+        (e.profiles?.nickname ?? '').toLowerCase().includes(q) ||
+        (e.partner?.nickname ?? e.partner_name ?? '').toLowerCase().includes(q),
+    );
 
-  const koRounds = Array.from(new Set(koMatches.map((m) => m.round_order))).sort((a, b) => (a ?? 0) - (b ?? 0));
+  // 대기열 순번 (신청 순)
+  const waitlistRank = new Map<string, number>();
+  entries.filter((e) => e.status === 'waitlist').forEach((e, i) => waitlistRank.set(e.user_id, i + 1));
+  const statusText = (e: (typeof entries)[number]) =>
+    e.status === 'waitlist' ? `대기 ${waitlistRank.get(e.user_id) ?? '-'}번` : ENTRY_STATUS_LABEL[e.status];
+
+  async function setEntryStatus(userId: string, status: EntryStatus) {
+    await supabase.from('tournament_entries').update({ status }).eq('tournament_id', id).eq('user_id', userId);
+    reload();
+  }
 
   return (
     <div>
-      <div className="flex items-start justify-between">
-        <div>
-          <span className="text-sm text-slate-500">{TOURNAMENT_STATUS_LABEL[t.status]}</span>
-          <h1 className="text-2xl font-semibold">{t.title}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {t.discipline === 'doubles' ? '복식' : '단식'} · {formatDateTime(t.start_at)} · {t.venue || '장소 미정'}
-            {t.region ? ` · ${t.region}` : ''} · 정원 {t.approved_count}/{t.max_participants}
-            {' · '}실력 {skillRange(t.skill_min, t.skill_max)}
-          </p>
+      {courts.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-medium">코트 {courts.length}면</h2>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {courts.map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-2 text-sm">
+                <span className="font-medium text-slate-800">{c.name}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${c.indoor ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {c.indoor ? '실내' : '실외'}
+                </span>
+              </span>
+            ))}
+          </div>
         </div>
-        {isOrganizer && t.status !== 'cancelled' && t.status !== 'finished' && (
-          <button onClick={() => setTournamentStatus('finished')} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
-            대회 종료
-          </button>
-        )}
-      </div>
+      )}
 
-      {/* 참가 신청 */}
-      <h2 className="mt-8 text-lg font-medium">참가 신청 {visibleEntries.length}건</h2>
+      <h2 className="text-lg font-medium">참가 신청 {visibleEntries.length}건</h2>
       {visibleEntries.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">아직 신청이 없습니다.</p>
       ) : (
@@ -270,15 +85,20 @@ function DetailInner() {
               {visibleEntries.map((e) => (
                 <tr key={e.user_id} className="border-t border-slate-100">
                   <td className="px-4 py-2 font-medium">
-                    {e.profiles?.nickname ?? '알 수 없음'}
-                    {t?.discipline === 'doubles' && (e.partner?.nickname ?? e.partner_name) && (
-                      <span className="text-slate-500"> / {e.partner?.nickname ?? e.partner_name}</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Avatar url={e.profiles?.avatar_url} nickname={e.profiles?.nickname ?? '?'} size={26} />
+                      <span>
+                        {e.profiles?.nickname ?? '알 수 없음'}
+                        {t.discipline === 'doubles' && (e.partner?.nickname ?? e.partner_name) && (
+                          <span className="text-slate-500"> / {e.partner?.nickname ?? e.partner_name}</span>
+                        )}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-2">{e.profiles ? e.profiles.skill_level.toFixed(1) : '-'}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ENTRY_STYLE[e.status]}`}>
-                      {ENTRY_STATUS_LABEL[e.status]}
+                      {statusText(e)}
                     </span>
                   </td>
                   {isOrganizer && (
@@ -299,190 +119,6 @@ function DetailInner() {
           </table>
         </div>
       )}
-
-      {/* 대회 진행 */}
-      <h2 className="mt-10 text-lg font-medium">대회 진행</h2>
-
-      {champion && (
-        <div className="mt-3 rounded-xl bg-amber-50 p-4 text-center ring-1 ring-amber-200">
-          <div className="text-sm text-amber-700">🏆 우승</div>
-          <div className="mt-1 text-2xl font-semibold text-amber-900">{name(champion)}</div>
-        </div>
-      )}
-
-      {/* 대진 생성 전 */}
-      {groupMatches.length === 0 && koMatches.length === 0 && (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
-          {approved.length < 2 ? (
-            <p className="text-sm text-slate-500">참가 승인이 2명 이상이면 조별리그 대진을 만들 수 있어요.</p>
-          ) : !isOrganizer ? (
-            <p className="text-sm text-slate-500">아직 대진이 생성되지 않았습니다.</p>
-          ) : (
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-sm">
-                <span className="mb-1 block text-slate-600">
-                  조당 인원 (승인 {approved.length}{t.discipline === 'doubles' ? '팀' : '명'})
-                </span>
-                <input type="number" min={2} value={perGroupInput} onChange={(e) => setPerGroupInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-              </label>
-              <button onClick={generateGroups} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-                조별리그 생성 ({groupCountForSize(approved.length, Math.max(2, perGroupInput))}개 조)
-              </button>
-              <button onClick={generateStraightKnockout} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
-                조별리그 없이 바로 본선
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 조별리그 */}
-      {t.group_count && groupMatches.length > 0 && (
-        <div className="mt-4 space-y-4">
-          {Array.from({ length: t.group_count }, (_, gi) => gi + 1).map((g) => {
-            const gm = groupMatches.filter((m) => m.group_no === g);
-            const members = Array.from(new Set(gm.flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[]));
-            const st = standings(members, gm);
-            return (
-              <div key={g} className="rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="font-medium">{g}조</h3>
-                <table className="mt-2 w-full text-sm">
-                  <thead className="text-left text-slate-500">
-                    <tr>
-                      <th className="py-1 font-medium">순위</th>
-                      <th className="py-1 font-medium">닉네임</th>
-                      <th className="py-1 font-medium">승</th>
-                      <th className="py-1 font-medium">득실</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {st.map((s, i) => (
-                      <tr key={s.id} className="border-t border-slate-100">
-                        <td className="py-1">{i + 1}</td>
-                        <td className="py-1 font-medium">{name(s.id)}</td>
-                        <td className="py-1">{s.wins}</td>
-                        <td className="py-1">{s.diff > 0 ? '+' : ''}{s.diff}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="mt-3 space-y-1.5">
-                  {gm.map((m) => (
-                    <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} onNotify={notifyTurn} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 토너먼트 생성 */}
-      {groupsDone && koMatches.length === 0 && isOrganizer && (
-        <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
-          <label className="text-sm">
-            <span className="mb-1 block text-slate-600">본선 진출 인원 (총)</span>
-            <input type="number" min={2} value={advanceInput} onChange={(e) => setAdvanceInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          </label>
-          <button onClick={generateKnockout} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            본선 토너먼트 생성
-          </button>
-          <span className="pb-2 text-xs text-slate-400">
-            상위 {advanceInput}명 진출 → {roundName((() => { let s = 1; while (s < Math.max(2, advanceInput)) s *= 2; return s; })())} (부족분은 상위 시드 부전승)
-          </span>
-        </div>
-      )}
-
-      {/* 토너먼트 라운드 */}
-      {koMatches.length > 0 && (
-        <div className="mt-4 space-y-4">
-          {koRounds.map((r) => {
-            const rm = koMatches.filter((m) => m.round_order === r).sort((a, b) => a.slot - b.slot);
-            return (
-              <div key={r} className="rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="font-medium">{rm[0]?.round_name ?? `라운드 ${r}`}</h3>
-                <div className="mt-2 space-y-1.5">
-                  {rm.map((m) => (
-                    <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} onSave={saveScore} onNotify={notifyTurn} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {isOrganizer && !champion && curKoDone && curKo.length > 1 && (
-            <button onClick={generateNextRound} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-              다음 라운드 생성
-            </button>
-          )}
-        </div>
-      )}
     </div>
-  );
-}
-
-function MatchRow({
-  m,
-  name,
-  isOrganizer,
-  onSave,
-  onNotify,
-}: {
-  m: TournamentMatch;
-  name: (uid: string | null) => string;
-  isOrganizer: boolean;
-  onSave: (m: TournamentMatch, s1: number, s2: number) => void;
-  onNotify: (m: TournamentMatch) => void;
-}) {
-  const [s1, setS1] = useState<string>(m.score1?.toString() ?? '');
-  const [s2, setS2] = useState<string>(m.score2?.toString() ?? '');
-  const done = m.status === 'done';
-  const bye = !m.entry2_id;
-
-  return (
-    <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
-      <span className={`flex-1 ${done && m.winner_id === m.entry1_id ? 'font-semibold text-emerald-700' : ''}`}>
-        {name(m.entry1_id)}
-      </span>
-      {bye ? (
-        <span className="text-xs text-slate-400">부전승</span>
-      ) : done && !isOrganizer ? (
-        <span className="tabular-nums">{m.score1} : {m.score2}</span>
-      ) : isOrganizer ? (
-        <div className="flex items-center gap-1">
-          <input value={s1} onChange={(e) => setS1(e.target.value)} inputMode="numeric" className="w-12 rounded border border-slate-300 px-1.5 py-1 text-center" />
-          <span className="text-slate-400">:</span>
-          <input value={s2} onChange={(e) => setS2(e.target.value)} inputMode="numeric" className="w-12 rounded border border-slate-300 px-1.5 py-1 text-center" />
-          <button
-            onClick={() => onSave(m, Number(s1), Number(s2))}
-            disabled={s1 === '' || s2 === ''}
-            className="ml-1 rounded bg-slate-800 px-2 py-1 text-xs text-white hover:bg-slate-700 disabled:opacity-40"
-          >
-            저장
-          </button>
-        </div>
-      ) : (
-        <span className="text-xs text-slate-400">예정</span>
-      )}
-      <span className={`flex-1 text-right ${done && m.winner_id === m.entry2_id ? 'font-semibold text-emerald-700' : ''}`}>
-        {name(m.entry2_id)}
-      </span>
-      {isOrganizer && !done && !bye && (
-        <button
-          onClick={() => onNotify(m)}
-          title="이 경기 선수들에게 차례 알림 보내기"
-          className="ml-1 whitespace-nowrap rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
-        >
-          🔔 차례 알림
-        </button>
-      )}
-    </div>
-  );
-}
-
-export default function TournamentDetailPage() {
-  return (
-    <Protected>
-      <DetailInner />
-    </Protected>
   );
 }

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { KakaoButton } from '@/components/ui/kakao-button';
 import { TextField } from '@/components/ui/text-field';
+import { KAKAO_LOGIN_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
@@ -92,13 +93,18 @@ export default function SignIn() {
             />
             <Button title="로그인" onPress={onSubmit} loading={loading} style={{ marginTop: 4 }} />
 
-            <View style={styles.divider}>
-              <View style={[styles.line, { backgroundColor: theme.border }]} />
-              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>또는</Text>
-              <View style={[styles.line, { backgroundColor: theme.border }]} />
-            </View>
+            {/* 카카오 로그인은 비즈앱 승인 후 활성화 (constants/features.ts) */}
+            {KAKAO_LOGIN_ENABLED && (
+              <>
+                <View style={styles.divider}>
+                  <View style={[styles.line, { backgroundColor: theme.border }]} />
+                  <Text style={[styles.dividerText, { color: theme.textSecondary }]}>또는</Text>
+                  <View style={[styles.line, { backgroundColor: theme.border }]} />
+                </View>
 
-            <KakaoButton onPress={onKakao} loading={kakaoLoading} />
+                <KakaoButton onPress={onKakao} loading={kakaoLoading} />
+              </>
+            )}
           </View>
 
           <View style={styles.footer}>

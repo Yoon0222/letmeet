@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -11,8 +13,10 @@ import {
   View,
 } from 'react-native';
 
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
+import { PEANUT_AVATARS, peanutFromUrl, peanutUrl } from '@/constants/avatars';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,7 +35,78 @@ export default function EditProfile() {
   const [style, setStyle] = useState<PlayStyle>(profile?.play_style ?? 'all');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [duprId, setDuprId] = useState(profile?.dupr_id ?? '');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // 갤러리에서 사진 선택 → Storage 업로드 → profiles.avatar_url 갱신
+  async function pickAvatar() {
+    const uid = session?.user.id;
+    if (!uid || uploading) return;
+    // 네이티브 모듈이라 지연 로드 — 없는 빌드에서도 화면이 크래시나지 않게
+    let ImagePicker: typeof import('expo-image-picker');
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      ImagePicker = require('expo-image-picker');
+    } catch {
+      Alert.alert('사진 업로드', '이 기능은 최신 앱 빌드에서 사용할 수 있어요.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('권한 필요', '사진을 올리려면 갤러리 접근 권한이 필요해요.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    const img = result.assets[0];
+    setUploading(true);
+    try {
+      const ext = (img.uri.split('.').pop() ?? 'jpg').toLowerCase();
+      const path = `${uid}/avatar_${Date.now()}.${ext}`;
+      const arraybuffer = await fetch(img.uri).then((r) => r.arrayBuffer());
+      const { error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, arraybuffer, { contentType: img.mimeType ?? 'image/jpeg', upsert: true });
+      if (upErr) throw upErr;
+      const url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+      const { error: dbErr } = await supabase
+        .from('profiles')
+        .update({ avatar_url: url, updated_at: new Date().toISOString() })
+        .eq('id', uid);
+      if (dbErr) throw dbErr;
+      setAvatarUrl(url);
+      await refreshProfile();
+    } catch (e) {
+      Alert.alert('사진 업로드 실패', e instanceof Error ? e.message : '다시 시도해주세요.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // 피넛 캐릭터 선택 → avatar_url 을 'peanut:NN' 으로 저장
+  async function choosePeanut(index0: number) {
+    const uid = session?.user.id;
+    if (!uid || uploading) return;
+    const val = peanutUrl(index0);
+    setUploading(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar_url: val, updated_at: new Date().toISOString() })
+      .eq('id', uid);
+    setUploading(false);
+    if (error) {
+      Alert.alert('변경 실패', error.message);
+      return;
+    }
+    setAvatarUrl(val);
+    await refreshProfile();
+  }
 
   function adjustSkill(delta: number) {
     setSkill((s) => Math.min(8, Math.max(2, Math.round((s + delta) * 10) / 10)));
@@ -70,6 +145,39 @@ export default function EditProfile() {
       style={{ flex: 1, backgroundColor: theme.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.avatarWrap}>
+          <Pressable onPress={pickAvatar} disabled={uploading}>
+            <Avatar nickname={nickname || '?'} uri={avatarUrl} size={96} />
+            <View style={[styles.avatarBadge, { backgroundColor: theme.primary, borderColor: theme.background }]}>
+              <Ionicons name="camera" size={16} color="#fff" />
+            </View>
+          </Pressable>
+          <Text onPress={pickAvatar} style={[styles.avatarText, { color: theme.primary }]}>
+            {uploading ? '처리 중…' : '사진 올리기'}
+          </Text>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>피넛 캐릭터 선택</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: 8, paddingVertical: 4, paddingHorizontal: 2 }}>
+            {PEANUT_AVATARS.map((src, i) => {
+              const selected = peanutFromUrl(avatarUrl) === i;
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => choosePeanut(i)}
+                  style={[styles.peanutCell, { borderColor: selected ? theme.primary : theme.border }]}>
+                  <Image source={src} style={styles.peanutImg} contentFit="cover" />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         <TextField
           label="닉네임"
           value={nickname}
@@ -153,6 +261,21 @@ export default function EditProfile() {
 
 const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  avatarWrap: { alignItems: 'center', gap: 8, marginBottom: Spacing.two },
+  avatarBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 14, fontWeight: '700', paddingVertical: 4, paddingHorizontal: 8 },
+  peanutCell: { borderWidth: 2, borderRadius: 30, padding: 2 },
+  peanutImg: { width: 52, height: 52, borderRadius: 26 },
   field: { gap: 6 },
   label: { fontSize: 13, fontWeight: '600', marginLeft: 2 },
   skillRow: {

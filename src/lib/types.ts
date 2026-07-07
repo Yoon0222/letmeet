@@ -101,7 +101,7 @@ export type ClubMemberWithProfile = ClubMember & {
 
 // ---- 대회(tournaments) ----
 export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancelled';
-export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'waitlist';
 export type Discipline = 'singles' | 'doubles';
 
 export type Tournament = {
@@ -170,6 +170,17 @@ export type TournamentMatch = {
   score2: number | null;
   winner_id: string | null;
   status: MatchStatus;
+  court_id: string | null;
+  court_confirmed: boolean;
+  created_at: string;
+};
+
+export type TournamentCourt = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  indoor: boolean;
+  sort: number;
   created_at: string;
 };
 
@@ -236,6 +247,12 @@ export interface Database {
         Update: WriteDefaults<TournamentMatch>;
         Relationships: [];
       };
+      tournament_courts: {
+        Row: TournamentCourt;
+        Insert: WriteDefaults<TournamentCourt> & { tournament_id: string; name: string };
+        Update: WriteDefaults<TournamentCourt>;
+        Relationships: [];
+      };
     };
     Views: {
       meetups_with_counts: {
@@ -251,7 +268,9 @@ export interface Database {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      delete_account: { Args: Record<string, never>; Returns: undefined };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 
 import { Protected } from '@/components/protected';
 import { formatDateTime, TOURNAMENT_STATUS_LABEL } from '@/lib/format';
@@ -16,6 +16,22 @@ const STATUS_STYLE: Record<string, string> = {
   finished: 'bg-slate-100 text-slate-500',
   cancelled: 'bg-red-50 text-red-600',
 };
+
+// 날짜순으로 들어온 목록을 월별 그룹으로 (입력 순서 유지)
+function groupByMonth(list: TournamentWithCounts[]) {
+  const groups: { key: string; label: string; items: TournamentWithCounts[] }[] = [];
+  for (const t of list) {
+    const d = new Date(t.start_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    let g = groups.find((x) => x.key === key);
+    if (!g) {
+      g = { key, label: `${d.getFullYear()}년 ${d.getMonth() + 1}월`, items: [] };
+      groups.push(g);
+    }
+    g.items.push(t);
+  }
+  return groups;
+}
 
 function TournamentsInner() {
   const { session } = useSession();
@@ -68,32 +84,42 @@ function TournamentsInner() {
         </div>
       ) : (
         <div className="mt-6 grid gap-3">
-          {rows.map((t) => (
-            <Link
-              key={t.id}
-              href={`/tournaments/${t.id}`}
-              className="rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">{formatDateTime(t.start_at)}</span>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[t.status]}`}>
-                  {TOURNAMENT_STATUS_LABEL[t.status]}
-                </span>
-              </div>
-              <h2 className="mt-1 text-lg font-medium">{t.title}</h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {t.venue || '장소 미정'}
-                {t.region ? ` · ${t.region}` : ''}
-              </p>
-              <div className="mt-3 flex gap-4 text-sm text-slate-600">
-                <span>
-                  승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}
-                </span>
-                {t.pending_count > 0 && (
-                  <span className="text-amber-600">대기 {t.pending_count}건</span>
-                )}
-              </div>
-            </Link>
+          {groupByMonth(rows).map((g) => (
+            <Fragment key={g.key}>
+              <h2 className="mt-2 text-sm font-semibold text-slate-500 first:mt-0">{g.label}</h2>
+              {g.items.map((t) => {
+                const isEnded = t.status === 'finished' || t.status === 'cancelled';
+                return (
+                  <Link
+                    key={t.id}
+                    href={`/tournaments/${t.id}`}
+                    className={`rounded-xl border p-4 ${
+                      isEnded
+                        ? 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
+                        : 'border-slate-200 bg-white hover:border-emerald-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">{formatDateTime(t.start_at)}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[t.status]}`}>
+                        {TOURNAMENT_STATUS_LABEL[t.status]}
+                      </span>
+                    </div>
+                    <h3 className="mt-1 text-lg font-medium">{t.title}</h3>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {t.venue || '장소 미정'}
+                      {t.region ? ` · ${t.region}` : ''}
+                    </p>
+                    <div className="mt-3 flex gap-4 text-sm text-slate-600">
+                      <span>
+                        승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
+                      </span>
+                      {t.pending_count > 0 && <span className="text-amber-600">대기 {t.pending_count}건</span>}
+                    </div>
+                  </Link>
+                );
+              })}
+            </Fragment>
           ))}
         </div>
       )}

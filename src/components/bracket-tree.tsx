@@ -3,6 +3,10 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import type { TournamentMatch } from '@/lib/types';
 
+import { Avatar } from './ui/avatar';
+
+type Av = { uri: string | null; nickname: string } | null;
+
 // 토너먼트 대진을 좌→우 트리(브래킷)로 그린다. 조별리그는 별도(순위표).
 const BOX_W = 150;
 const BOX_H = 54;
@@ -25,12 +29,14 @@ function Side({
   win,
   theme,
   border,
+  avatar,
 }: {
   name: string;
   score: number | null;
   win: boolean;
   theme: Theme;
   border?: boolean;
+  avatar?: Av;
 }) {
   return (
     <View
@@ -38,9 +44,12 @@ function Side({
         styles.side,
         border && { borderBottomWidth: 1, borderBottomColor: theme.border },
       ]}>
-      <Text style={[styles.name, { color: theme.text, fontWeight: win ? '800' : '500' }]} numberOfLines={1}>
-        {name}
-      </Text>
+      <View style={styles.sideName}>
+        {avatar ? <Avatar nickname={avatar.nickname} uri={avatar.uri} size={18} /> : null}
+        <Text style={[styles.name, { color: theme.text, fontWeight: win ? '800' : '500' }]} numberOfLines={1}>
+          {name}
+        </Text>
+      </View>
       <Text style={[styles.score, { color: win ? theme.primary : theme.textSecondary }]}>
         {score == null ? '·' : score}
       </Text>
@@ -48,15 +57,24 @@ function Side({
   );
 }
 
-function MatchBox({ m, nameOf, uid, theme }: { m: TournamentMatch; nameOf: (id: string | null) => string; uid: string | undefined; theme: Theme }) {
+function MatchBox({ m, nameOf, uid, theme, hl, avatarOf }: { m: TournamentMatch; nameOf: (id: string | null) => string; uid: string | undefined; theme: Theme; hl: string; avatarOf?: (id: string | null) => Av }) {
   const done = m.status === 'done';
   const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
   const w2 = done && !!m.winner_id && m.winner_id === m.entry2_id;
   const mine = m.entry1_id === uid || m.entry2_id === uid;
+  // 빈 슬롯: 확정 부전승은 '부전승', 아직 안 정해진 다음 라운드는 '미정'
+  const label = (id: string | null) => (id ? nameOf(id) : done ? '부전승' : '미정');
+  // 검색어와 일치하는 경기 강조
+  const matchHit = !!hl && (label(m.entry1_id).toLowerCase().includes(hl) || label(m.entry2_id).toLowerCase().includes(hl));
   return (
-    <View style={[styles.box, { borderColor: mine ? theme.primary : theme.border, backgroundColor: theme.card }]}>
-      <Side name={nameOf(m.entry1_id)} score={done ? m.score1 : null} win={w1} theme={theme} border />
-      <Side name={nameOf(m.entry2_id)} score={done ? m.score2 : null} win={w2} theme={theme} />
+    <View
+      style={[
+        styles.box,
+        { borderColor: matchHit ? theme.accent : mine ? theme.primary : theme.border, backgroundColor: theme.card },
+        matchHit && { borderWidth: 2 },
+      ]}>
+      <Side name={label(m.entry1_id)} score={done ? m.score1 : null} win={w1} theme={theme} border avatar={avatarOf?.(m.entry1_id)} />
+      <Side name={label(m.entry2_id)} score={done ? m.score2 : null} win={w2} theme={theme} avatar={avatarOf?.(m.entry2_id)} />
     </View>
   );
 }
@@ -65,12 +83,17 @@ export function BracketTree({
   matches,
   nameOf,
   uid,
+  highlightQuery = '',
+  avatarOf,
 }: {
   matches: TournamentMatch[];
   nameOf: (id: string | null) => string;
   uid: string | undefined;
+  highlightQuery?: string;
+  avatarOf?: (id: string | null) => Av;
 }) {
   const theme = useTheme();
+  const hl = highlightQuery.trim().toLowerCase();
 
   const roundOrders = [...new Set(matches.map((m) => m.round_order ?? 0))].sort((a, b) => a - b);
   const rounds = roundOrders.map((ro) =>
@@ -145,7 +168,7 @@ export function BracketTree({
         {rounds.map((rms, r) =>
           rms.map((m, j) => (
             <View key={m.id} style={{ position: 'absolute', left: colX(r), top: centers[r][j] - BOX_H / 2, width: BOX_W }}>
-              <MatchBox m={m} nameOf={nameOf} uid={uid} theme={theme} />
+              <MatchBox m={m} nameOf={nameOf} uid={uid} theme={theme} hl={hl} avatarOf={avatarOf} />
             </View>
           )),
         )}
@@ -174,6 +197,7 @@ export function BracketTree({
 const styles = StyleSheet.create({
   box: { borderWidth: 1, borderRadius: 8, overflow: 'hidden', height: BOX_H },
   side: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, gap: 6 },
+  sideName: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { flex: 1, fontSize: 13 },
   score: { fontSize: 14, fontWeight: '800', minWidth: 14, textAlign: 'right' },
   champBox: { height: BOX_H, borderWidth: 1.5, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },

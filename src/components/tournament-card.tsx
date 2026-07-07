@@ -18,13 +18,14 @@ export function TournamentCard({
   const theme = useTheme();
   const t = tournament;
   const registering = t.status === 'registration';
+  const ended = t.status === 'finished' || t.status === 'cancelled';
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 },
+        { backgroundColor: theme.card, borderColor: theme.border, opacity: ended ? 0.55 : pressed ? 0.9 : 1 },
       ]}>
       <View style={styles.topRow}>
         <Text style={[styles.time, { color: theme.primary }]}>{formatMeetupTime(t.start_at)}</Text>
@@ -75,7 +76,7 @@ export function TournamentCard({
           <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="people-outline" size={13} color={theme.textSecondary} />
             <Text style={[styles.pillText, { color: theme.textSecondary }]}>
-              {t.approved_count}/{t.max_participants}
+              {t.approved_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
             </Text>
           </View>
         </View>
