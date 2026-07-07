@@ -24,6 +24,7 @@ export default function PrelimTab() {
   const { session } = useSession();
   const { t, entries, matches, courts, loading, reload, name } = useTournament();
   const [perGroupInput, setPerGroupInput] = useState(4);
+  const [groupTab, setGroupTab] = useState<number | 'all'>(1);
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -149,9 +150,48 @@ export default function PrelimTab() {
 
   // 조별리그 진행
   const gc = t.group_count ?? 0;
+  const groupNos = Array.from({ length: gc }, (_, gi) => gi + 1);
+  const shownGroups = groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab);
+  // 조별 완료/전체 경기 수 (탭 배지)
+  const groupProgress = (g: number) => {
+    const gm = groupMatches.filter((m) => m.group_no === g);
+    return { done: gm.filter((m) => m.status === 'done').length, total: gm.length };
+  };
+
   return (
-    <div className="space-y-4">
-      {Array.from({ length: gc }, (_, gi) => gi + 1).map((g) => {
+    <div>
+      {/* 조별 서브탭 */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        <button
+          onClick={() => setGroupTab('all')}
+          className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+            groupTab === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          전체
+        </button>
+        {groupNos.map((g) => {
+          const { done, total } = groupProgress(g);
+          const complete = total > 0 && done === total;
+          return (
+            <button
+              key={g}
+              onClick={() => setGroupTab(g)}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+                groupTab === g ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {g}조
+              <span className={`ml-1.5 text-xs ${groupTab === g ? 'text-emerald-100' : complete ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {done}/{total}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="space-y-4">
+      {shownGroups.map((g) => {
         const gm = groupMatches.filter((m) => m.group_no === g);
         const members = Array.from(new Set(gm.flatMap((m) => [m.entry1_id, m.entry2_id]).filter(Boolean) as string[]));
         const st = standings(members, gm);
@@ -186,6 +226,7 @@ export default function PrelimTab() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
