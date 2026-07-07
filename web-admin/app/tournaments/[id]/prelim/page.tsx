@@ -165,8 +165,20 @@ export default function PrelimTab() {
     return { done: gm.filter((m) => m.status === 'done').length, total: gm.length };
   };
 
+  const revealAt = (() => {
+    const d = new Date(t.start_at);
+    d.setDate(d.getDate() - 1);
+    d.setHours(19, 0, 0, 0);
+    return d;
+  })();
+
   return (
     <div>
+      {/* 조추첨 선수 공개 안내 */}
+      <p className="mb-3 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-700 ring-1 ring-sky-100">
+        🔒 선수에게는 <b>{revealAt.getMonth() + 1}월 {revealAt.getDate()}일 오후 7시</b>에 공개돼요 (전날 19:00). 운영자는 지금 편성·수정할 수 있어요.
+      </p>
+
       {/* 조별 서브탭 (전체/조별 전환) */}
       <div className="mb-4 flex flex-wrap gap-1.5">
         <button

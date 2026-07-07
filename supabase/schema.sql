@@ -329,6 +329,7 @@ create table if not exists public.tournament_entries (
   partner_name  text,                              -- 복식 파트너 이름(표시용 스냅샷)
   partner_id    uuid references public.profiles(id) on delete set null, -- 복식 파트너(회원 연결)
   seed          int,                               -- 대진 시드(추후)
+  checked_in_at timestamptz,                       -- 출전 신고(당일 체크인) 시각
   created_at    timestamptz not null default now(),
   primary key (tournament_id, user_id)
 );

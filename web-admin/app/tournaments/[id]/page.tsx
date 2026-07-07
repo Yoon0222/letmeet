@@ -67,7 +67,14 @@ export default function EntriesTab() {
         </div>
       )}
 
-      <h2 className="text-lg font-medium">참가 신청 {visibleEntries.length}건</h2>
+      <h2 className="text-lg font-medium">
+        참가 신청 {visibleEntries.length}건
+        {(() => {
+          const appr = entries.filter((e) => e.status === 'approved');
+          const inCnt = appr.filter((e) => e.checked_in_at).length;
+          return inCnt > 0 ? <span className="ml-2 text-sm font-normal text-emerald-600">출전 {inCnt}/{appr.length}</span> : null;
+        })()}
+      </h2>
       {visibleEntries.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">아직 신청이 없습니다.</p>
       ) : (
@@ -100,6 +107,9 @@ export default function EntriesTab() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ENTRY_STYLE[e.status]}`}>
                       {statusText(e)}
                     </span>
+                    {e.checked_in_at && (
+                      <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">✓ 출전</span>
+                    )}
                   </td>
                   {isOrganizer && (
                     <td className="px-4 py-2">

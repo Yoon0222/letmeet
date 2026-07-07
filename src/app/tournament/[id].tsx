@@ -50,6 +50,7 @@ export default function TournamentDetail() {
   const [tab, setTab] = useState<'info' | 'prelim' | 'final'>('info');
   const [groupTab, setGroupTab] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -79,6 +80,7 @@ export default function TournamentDetail() {
     setEntries((ents as unknown as TournamentEntryWithProfile[]) ?? []);
     setMatches((ms as TournamentMatch[]) ?? []);
     setCourts((cs as TournamentCourt[]) ?? []);
+    setNowMs(Date.now());
     setLoading(false);
   }, [id]);
 
@@ -97,6 +99,22 @@ export default function TournamentDetail() {
   const approved = entries.filter((e) => e.status === 'approved');
   const canRegister = t?.status === 'registration';
   const isDoubles = t?.discipline === 'doubles';
+  const isOrganizer = !!t && t.organizer_id === uid;
+
+  // 조추첨 공개: 시합 전날 오후 7시부터 선수에게 공개 (운영자는 항상)
+  const drawRevealAt = t
+    ? (() => {
+        const d = new Date(t.start_at);
+        d.setDate(d.getDate() - 1);
+        d.setHours(19, 0, 0, 0);
+        return d;
+      })()
+    : null;
+  const drawRevealed = isOrganizer || (!!drawRevealAt && nowMs >= drawRevealAt.getTime());
+
+  // 출전 신고: 대회 당일에만 가능
+  const isEventDay = !!t && nowMs > 0 && new Date(t.start_at).toDateString() === new Date(nowMs).toDateString();
+  const checkedIn = !!myEntry?.checked_in_at;
 
   // 참가자 id → 표시 이름(복식은 파트너 포함)
   const nameOf = useCallback(
@@ -155,8 +173,9 @@ export default function TournamentDetail() {
   const slotsFull =
     !!t && entries.filter((e) => e.status === 'pending' || e.status === 'approved').length >= t.max_participants;
 
-  // 대진이 있으면 정보/예선/본선 탭으로 분리
-  const hasBracket = matches.length > 0;
+  // 대진이 있고 공개됐으면 정보/예선/본선 탭으로 분리 (미공개 시 선수에겐 정보 탭만)
+  const drawGenerated = matches.length > 0;
+  const hasBracket = drawGenerated && drawRevealed;
   const tabItems: { key: 'info' | 'prelim' | 'final'; label: string }[] = [
     { key: 'info', label: '정보' },
     ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: '예선' }] : []),
@@ -228,6 +247,22 @@ export default function TournamentDetail() {
         },
       },
     ]);
+  }
+
+  async function checkIn() {
+    if (!uid || !id) return;
+    setActing(true);
+    const { error } = await supabase
+      .from('tournament_entries')
+      .update({ checked_in_at: new Date().toISOString() })
+      .eq('tournament_id', id)
+      .eq('user_id', uid);
+    setActing(false);
+    if (error) {
+      Alert.alert('출전 신고 실패', error.message);
+      return;
+    }
+    load();
   }
 
   if (loading) {
@@ -377,8 +412,18 @@ export default function TournamentDetail() {
           </View>
         </View>
 
+        {/* 조추첨 미공개 (선수) */}
+        {drawGenerated && !drawRevealed && drawRevealAt && (
+          <View style={[styles.revealBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} />
+            <Text style={[styles.revealText, { color: theme.text }]}>
+              조추첨은 {formatMeetupTime(drawRevealAt.toISOString())}에 공개돼요
+            </Text>
+          </View>
+        )}
+
         {/* 내 경기 (대진 편성 시 정보 탭에 요약) */}
-        {myMatches.length > 0 && (
+        {drawRevealed && myMatches.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
             <View style={{ gap: 6, marginTop: 6 }}>
@@ -541,6 +586,17 @@ export default function TournamentDetail() {
                 {myEntry.status === 'waitlist' ? `대기 ${myWaitlistRank}번` : ENTRY_LABEL[myEntry.status]}
               </Text>
             </View>
+            {/* 출전 신고 (승인 + 대회 당일) */}
+            {myEntry.status === 'approved' &&
+              isEventDay &&
+              (checkedIn ? (
+                <View style={styles.statusRow}>
+                  <Ionicons name="checkmark-done-circle" size={18} color={theme.primary} />
+                  <Text style={[styles.statusText, { color: theme.primary }]}>출전 신고 완료</Text>
+                </View>
+              ) : (
+                <Button title="출전 신고" onPress={checkIn} loading={acting} />
+              ))}
             {myEntry.status !== 'rejected' && (
               <Button title={myEntry.status === 'waitlist' ? '대기 취소' : '참가 신청 취소'} variant="outline" onPress={confirmCancel} loading={acting} />
             )}
@@ -695,6 +751,8 @@ const styles = StyleSheet.create({
   groupTabRow: { gap: 8, paddingBottom: 4 },
   groupPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   groupPillText: { fontSize: 14, fontWeight: '700' },
+  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 14, marginTop: Spacing.two },
+  revealText: { fontSize: 15, fontWeight: '600', flex: 1 },
   subLabel: { fontSize: 14, fontWeight: '700', marginTop: 2 },
   tableCard: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },

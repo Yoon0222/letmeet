@@ -82,6 +82,7 @@ export type TournamentEntry = {
   partner_name: string | null;
   partner_id: string | null;
   seed: number | null;
+  checked_in_at: string | null;
   created_at: string;
 };
 
