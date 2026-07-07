@@ -32,7 +32,7 @@
 - [x] MVP 커뮤니티 매칭 구현 및 웹에서 동작 확인
 
 ### 향후 대형 에픽 (상세는 노션 로드맵)
-- [~] 코트 예약(사용자) — **1차 완료**(선수 예약 + 관리자 코트 등록, `0018`/`0019`). 남은 것: 지도 연동 + 결제 + 코트 소유자 배정 + 내 예약 목록
+- [~] 코트 예약(사용자) — **선수 예약 + 관리자 코트 등록 + 네이버 지오코딩 라이브 + 네이버 지도(SDK) 코드 완료**(`0018`~`0020`). 안드로이드 개발 빌드로 실기기 지도 확인 중. 남은 것: 결제(PG) + 코트 소유자 배정 + 내 예약 목록 화면
 - [ ] 대회: 개설·운영(관리자) · 참여 · 내 차례 카카오톡 알림톡
 - [ ] 웹 관리자 페이지(별도 웹앱) + 권한(역할) 체계
 - [ ] 커뮤니티 화면 (자유게시판 · 후기 · 팁)
@@ -52,7 +52,9 @@
 - **관리자 지오코딩**: `web-admin/app/api/geocode/route.ts` — 네이버 클라우드 Geocoding 프록시(서버 키). 코트 폼에 **"주소로 좌표 찾기"** + 위/경도 수동 보정, 목록에 위치(📍설정됨/미설정).
 - **네이버 클라우드 키**: Maps Application 등록(Dynamic Map + Geocoding, 번들ID `com.pickle.app`). Geocoding 키를 `web-admin/.env.local`(NAVER_MAP_GEOCODE_ID/KEY, git 제외)에 설정 → **실동작 검증 완료**(예: 송파 올림픽로 424 → 37.52093,127.12296). 데모 코트 4개 실주소 지오코딩으로 좌표 갱신.
 - **선수앱 네이버 지도(③) — 코드 완료**: `@mj-studio/react-native-naver-map` 2.9.0(새 아키텍처) + `expo-build-properties`(네이버 maven). 목록/지도 토글 → 지도에 코트 마커(캡션) → 탭하면 예약 화면. 플랫폼 분리(`court-map.native.tsx`=네이버 지도 / `court-map.tsx`=웹 폴백)로 **웹 번들 안 깨짐**(웹·iOS export 통과). `app.config.js`가 `client_id`를 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`(=지오코딩 Client ID, `.env` gitignore)로 주입 → git 미커밋. (커밋 `5d02615`)
-  - **남은 것**: 네이티브 지도는 Expo Go·웹에서 안 뜸 → **EAS 개발 빌드**(#9)로만 실제 지도 확인. 빌드 시 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`를 EAS env(또는 eas.json)에 넣어야 함(현재 로컬 `.env`만). 네이버 Application 서비스환경에 Android 패키지/iOS 번들 `com.pickle.app` 등록 필요.
+  - **빌드 준비 완료**: `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`를 **EAS env(development·preview·production)** 에 등록(`eas env:create`, git 미커밋). 네이버 Application 서비스환경에 `com.pickle.app`(Android/iOS) **등록 확인**. → **안드로이드 개발 빌드 실행 중**(EAS build id `ea7e7972`, development 프로필). APK 나오면 실기기에서 지도 토글·마커 4개·마커 탭→예약 확인 예정.
+- **푸시**: 코트 예약~지도 커밋 8개 원격 `dev` 반영(`ece4cbc..a752019`).
+- **남은/다음 후보**: ① 실기기 지도 동작 확인(빌드 후) ② **내 예약 목록 화면**(현재 취소는 코트 상세에서만) ③ 코트 소유자(owner_id) 배정 UI ④ 결제 흐름(PG). 코트 지도 남은 Low(예약 UI): 다중 insert 부분충돌 안내, RLS select 타인 user_id 노출.
 
 ## 2026-07-07
 
