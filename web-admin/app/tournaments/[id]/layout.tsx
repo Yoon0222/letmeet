@@ -16,7 +16,7 @@ function Header() {
   const { id } = useParams<{ id: string }>();
   const pathname = usePathname();
   const { session } = useSession();
-  const { t, reload } = useTournament();
+  const { t, courts, reload } = useTournament();
 
   if (!t) return <p className="text-slate-500">불러오는 중…</p>;
 
@@ -27,6 +27,7 @@ function Header() {
     { href: base, label: '신청현황' },
     { href: `${base}/prelim`, label: '예선' },
     { href: `${base}/final`, label: '본선' },
+    ...(courts.length > 0 ? [{ href: `${base}/courts`, label: '코트배정' }] : []),
   ];
 
   async function endTournament() {
