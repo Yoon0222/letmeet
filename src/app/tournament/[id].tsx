@@ -44,6 +44,7 @@ export default function TournamentDetail() {
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [tab, setTab] = useState<'info' | 'prelim' | 'final'>('info');
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -110,6 +111,14 @@ export default function TournamentDetail() {
     .sort((a, b) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot);
   const groupNos = [...new Set(groupMatchesAll.map((m) => m.group_no ?? 1))].sort((a, b) => a - b);
   const myMatches = matches.filter((m) => m.entry1_id === uid || m.entry2_id === uid);
+
+  // 대진이 있으면 정보/예선/본선 탭으로 분리
+  const hasBracket = matches.length > 0;
+  const tabItems: { key: 'info' | 'prelim' | 'final'; label: string }[] = [
+    { key: 'info', label: '정보' },
+    ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: '예선' }] : []),
+    ...(koMatches.length > 0 ? [{ key: 'final' as const, label: '본선' }] : []),
+  ];
 
   // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
   useEffect(() => {
@@ -195,7 +204,7 @@ export default function TournamentDetail() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <View style={styles.headerArea}>
         <View style={styles.badgeRow}>
           <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#7A4E00" bg="rgba(245,166,35,0.16)" />
           {t.status === 'registration' ? (
@@ -208,9 +217,28 @@ export default function TournamentDetail() {
             />
           )}
         </View>
-
         <Text style={[styles.title, { color: theme.text }]}>{t.title}</Text>
+      </View>
 
+      {hasBracket && (
+        <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
+          {tabItems.map((it) => {
+            const active = tab === it.key;
+            return (
+              <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
+                <Text style={[styles.tabText, { color: active ? theme.primary : theme.textSecondary }]}>
+                  {it.label}
+                </Text>
+                <View style={[styles.tabUnderline, { backgroundColor: active ? theme.primary : 'transparent' }]} />
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {(!hasBracket || tab === 'info') && (
+          <>
         <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Info icon="time-outline" text={formatMeetupTime(t.start_at)} theme={theme} />
           {t.registration_deadline ? (
@@ -264,22 +292,23 @@ export default function TournamentDetail() {
           </View>
         </View>
 
-        {/* 대진표 (경기가 편성된 경우) */}
-        {matches.length > 0 && (
+        {/* 내 경기 (대진 편성 시 정보 탭에 요약) */}
+        {myMatches.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>대진표</Text>
+            <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
+            <View style={{ gap: 6, marginTop: 6 }}>
+              {myMatches.map((m) => (
+                <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight />
+              ))}
+            </View>
+          </View>
+        )}
+          </>
+        )}
 
-            {myMatches.length > 0 && (
-              <View style={{ marginTop: 8 }}>
-                <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
-                <View style={{ gap: 6, marginTop: 6 }}>
-                  {myMatches.map((m) => (
-                    <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight />
-                  ))}
-                </View>
-              </View>
-            )}
-
+        {/* 예선 (조별리그) */}
+        {hasBracket && tab === 'prelim' && (
+          <View style={styles.section}>
             {groupNos.map((gno) => {
               const gms = groupMatchesAll.filter((m) => (m.group_no ?? 1) === gno);
               const table = standings(groupMembers(gms), gms);
@@ -310,18 +339,18 @@ export default function TournamentDetail() {
                 </View>
               );
             })}
+          </View>
+        )}
 
-            {koMatches.length > 0 && (
-              <View style={{ marginTop: 14 }}>
-                <Text style={[styles.subLabel, { color: theme.textSecondary }]}>토너먼트</Text>
-                <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} />
-              </View>
-            )}
+        {/* 본선 (토너먼트) */}
+        {hasBracket && tab === 'final' && (
+          <View style={styles.section}>
+            <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} />
           </View>
         )}
 
         {/* 복식 파트너 검색·선택 (미신청 + 파트너로도 미등록 + 접수중일 때) */}
-        {canRegister && !myEntry && !iAmPartner && isDoubles && (
+        {(!hasBracket || tab === 'info') && canRegister && !myEntry && !iAmPartner && isDoubles && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>파트너 선택 (복식)</Text>
             {partnerSel ? (
@@ -484,6 +513,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
+  headerArea: { paddingHorizontal: Spacing.four, paddingTop: Spacing.four, paddingBottom: Spacing.three, gap: 10 },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: Spacing.four },
+  tabItem: { marginRight: 22, paddingTop: 8, alignItems: 'center' },
+  tabText: { fontSize: 15, fontWeight: '700' },
+  tabUnderline: { height: 2.5, alignSelf: 'stretch', marginTop: 8, borderRadius: 2 },
   badgeRow: { flexDirection: 'row', gap: 6 },
   title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
