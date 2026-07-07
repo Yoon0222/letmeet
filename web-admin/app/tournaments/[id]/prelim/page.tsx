@@ -160,7 +160,7 @@ export default function PrelimTab() {
 
   return (
     <div>
-      {/* 조별 서브탭 */}
+      {/* 조별 서브탭 (전체/조별 전환) */}
       <div className="mb-4 flex flex-wrap gap-1.5">
         <button
           onClick={() => setGroupTab('all')}
