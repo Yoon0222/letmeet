@@ -12,7 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { startCourtPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
-import type { Court, CourtReservation } from '@/lib/types';
+import type { Court, CourtBlock, CourtReservation } from '@/lib/types';
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -26,6 +26,7 @@ export default function CourtDetail() {
   const [reservations, setReservations] = useState<CourtReservation[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [openDays, setOpenDays] = useState<string[]>([]);
+  const [blocks, setBlocks] = useState<CourtBlock[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
   const [nowMs, setNowMs] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -36,16 +37,19 @@ export default function CourtDetail() {
     (async () => {
       const now = Date.now();
       const today = ymd(new Date(now));
-      const [courtRes, openRes] = await Promise.all([
+      const [courtRes, openRes, blockRes] = await Promise.all([
         supabase.from('courts').select('*').eq('id', id).maybeSingle(),
         // 오늘 이후 오픈일만 (운영자가 연 날짜)
         supabase.from('court_open_days').select('day').eq('court_id', id).gte('day', today).order('day', { ascending: true }),
+        // 연대관(정기 대관) 차단 시간대
+        supabase.from('court_blocks').select('*').eq('court_id', id),
       ]);
       const openList = (openRes.data ?? []).map((r) => r.day);
       const autoN = courtRes.data?.auto_open_days ?? 0;
       setCourt(courtRes.data ?? null);
       setNowMs(now);
       setOpenDays(openList);
+      setBlocks((blockRes.data as CourtBlock[]) ?? []);
       // 자동 오픈이 있으면 오늘이 가장 가까운 예약일, 없으면 가장 이른 수동 오픈일
       setSelectedDate(autoN > 0 ? today : (openList[0] ?? ''));
       setLoading(false);
@@ -108,6 +112,13 @@ export default function CourtDetail() {
   reservations.forEach((r) => reservedByHour.set(r.hour, r));
   const isToday = selectedDate === ymd(new Date(nowMs));
   const curHour = new Date(nowMs).getHours();
+
+  // 연대관 차단 시간: 선택한 날짜의 요일에 걸린 블록의 [start, end) 시간
+  const selWeekday = selectedDate ? new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)) - 1, Number(selectedDate.slice(8, 10))).getDay() : -1;
+  const blockedHours = new Set<number>();
+  blocks.forEach((b) => {
+    if (b.weekday === selWeekday) for (let h = b.start_hour; h < b.end_hour; h++) blockedHours.add(h);
+  });
 
   // 예약창에서는 선택/예약만. 취소·변경은 '내 예약' 화면에서.
   const toggle = (h: number) => setPicked((p) => (p.includes(h) ? p.filter((x) => x !== h) : [...p, h]));
@@ -192,20 +203,21 @@ export default function CourtDetail() {
             const r = reservedByHour.get(h);
             const mine = !!r && r.user_id === uid;
             const past = isToday && h < curHour;
+            const blocked = blockedHours.has(h); // 연대관
             const sel = picked.includes(h);
-            // 예약된 슬롯(내 것 포함)·지난 시간은 선택 불가. 취소는 '내 예약' 화면에서.
-            const disabled = !!r || past;
-            const bg = sel ? theme.primary : mine ? theme.backgroundElement : r ? theme.backgroundElement : theme.card;
-            const fg = sel ? '#fff' : mine ? theme.accent : r || past ? theme.textSecondary : theme.text;
+            // 연대관·예약됨(내 것 포함)·지난 시간은 선택 불가. 취소는 '내 예약' 화면에서.
+            const disabled = blocked || !!r || past;
+            const bg = sel ? theme.primary : mine ? theme.backgroundElement : r || blocked ? theme.backgroundElement : theme.card;
+            const fg = sel ? '#fff' : mine ? theme.accent : r || past || blocked ? theme.textSecondary : theme.text;
             const borderColor = sel ? theme.primary : mine ? theme.accent : theme.border;
             return (
               <Pressable
                 key={h}
                 disabled={disabled}
                 onPress={() => toggle(h)}
-                style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past ? 0.4 : 1 }]}>
+                style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past || blocked ? 0.5 : 1 }]}>
                 <Text style={[styles.slotHour, { color: fg }]}>{h}시</Text>
-                <Text style={[styles.slotState, { color: fg }]}>{mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
+                <Text style={[styles.slotState, { color: fg }]}>{blocked ? '대관' : mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
               </Pressable>
             );
           })}

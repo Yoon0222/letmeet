@@ -93,10 +93,21 @@ export type Court = {
   created_at: string;
 };
 
-/** 코트 영업일(오픈일) — 관리자가 연 날짜만 예약 가능 */
+/** 코트 예약 가능일(오픈일) — 관리자가 연 날짜만 예약 가능 */
 export type CourtOpenDay = {
   court_id: string;
   day: string; // YYYY-MM-DD
+  created_at: string;
+};
+
+/** 코트 연대관(정기 대관) — 매주 반복 예약 차단 시간대 [start_hour, end_hour) */
+export type CourtBlock = {
+  id: string;
+  court_id: string;
+  weekday: number; // 0=일 ~ 6=토
+  start_hour: number;
+  end_hour: number;
+  label: string;
   created_at: string;
 };
 
@@ -198,6 +209,12 @@ export interface Database {
         Row: CourtOpenDay;
         Insert: { court_id: string; day: string };
         Update: Write<CourtOpenDay>;
+        Relationships: [];
+      };
+      court_blocks: {
+        Row: CourtBlock;
+        Insert: { court_id: string; weekday: number; start_hour: number; end_hour: number } & Write<CourtBlock>;
+        Update: Write<CourtBlock>;
         Relationships: [];
       };
     };

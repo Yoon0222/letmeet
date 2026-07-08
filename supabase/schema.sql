@@ -554,6 +554,46 @@ create policy "payments_update_self" on public.court_payments for update using (
 alter table public.court_reservations add column if not exists payment_id uuid references public.court_payments(id) on delete set null;
 create index if not exists court_reservations_payment_idx on public.court_reservations (payment_id);
 
+-- 코트 연대관(정기 대관) — 0027. 매주 반복 예약 차단 시간대. [start_hour, end_hour)
+create table if not exists public.court_blocks (
+  id         uuid primary key default uuid_generate_v4(),
+  court_id   uuid not null references public.courts(id) on delete cascade,
+  weekday    int not null check (weekday between 0 and 6),
+  start_hour int not null check (start_hour between 0 and 23),
+  end_hour   int not null check (end_hour between 1 and 24),
+  label      text not null default '',
+  created_at timestamptz not null default now(),
+  constraint court_blocks_range_chk check (start_hour < end_hour)
+);
+create index if not exists court_blocks_court_idx on public.court_blocks (court_id);
+alter table public.court_blocks enable row level security;
+drop policy if exists "blocks_select" on public.court_blocks;
+create policy "blocks_select" on public.court_blocks for select using (true);
+drop policy if exists "blocks_write" on public.court_blocks;
+create policy "blocks_write" on public.court_blocks
+  for all using (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id))
+  with check (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id));
+
+-- 연대관 시간대 예약 차단(서버 강제)
+create or replace function public.enforce_court_block()
+returns trigger language plpgsql as $$
+begin
+  if exists (
+    select 1 from public.court_blocks b
+    where b.court_id = new.court_id
+      and b.weekday = extract(dow from new.slot_date)::int
+      and new.hour >= b.start_hour and new.hour < b.end_hour
+  ) then
+    raise exception '연대관(정기 대관) 시간대는 예약할 수 없습니다.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists court_reservations_block_check on public.court_reservations;
+create trigger court_reservations_block_check
+  before insert on public.court_reservations
+  for each row execute function public.enforce_court_block();
+
 -- ============================================================
 -- 감사 로그(audit log) — 0009
 -- 주요 행위(승인/거절/생성/수정/권한변경)를 트리거로 자동 기록.

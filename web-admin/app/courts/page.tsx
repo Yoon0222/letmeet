@@ -6,9 +6,11 @@ import { MonthCalendar } from '@/components/month-calendar';
 import { Protected } from '@/components/protected';
 import { AMENITIES, SURFACES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { supabase } from '@/lib/supabase';
-import type { Court, CourtUnit } from '@/lib/types';
+import type { Court, CourtBlock, CourtUnit } from '@/lib/types';
 import { useRole } from '@/lib/use-role';
 import { useSession } from '@/lib/use-session';
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500';
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -100,6 +102,8 @@ function CourtsInner() {
   const [geoStatus, setGeoStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [unitCount, setUnitCount] = useState(4);
   const [openDays, setOpenDays] = useState<Set<string>>(new Set()); // 편집 중 코트의 오픈일
+  const [blocks, setBlocks] = useState<CourtBlock[]>([]); // 연대관(정기 대관)
+  const [blk, setBlk] = useState({ weekday: 2, start: 19, end: 21, label: '' }); // 새 연대관 입력
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,11 +138,52 @@ function CourtsInner() {
     setError('');
     setGeoStatus(null);
     setOpenDays(new Set());
+    setBlocks([]);
   }
 
   async function loadOpenDays(courtId: string) {
     const { data } = await supabase.from('court_open_days').select('day').eq('court_id', courtId);
     setOpenDays(new Set((data ?? []).map((r) => r.day)));
+  }
+
+  async function loadBlocks(courtId: string) {
+    const { data } = await supabase
+      .from('court_blocks')
+      .select('*')
+      .eq('court_id', courtId)
+      .order('weekday', { ascending: true })
+      .order('start_hour', { ascending: true });
+    setBlocks((data as CourtBlock[]) ?? []);
+  }
+
+  // 연대관 추가/삭제 (즉시 저장)
+  async function addBlock() {
+    if (!editingId) return;
+    if (blk.start >= blk.end) {
+      alert('시작 시각이 종료 시각보다 빨라야 합니다.');
+      return;
+    }
+    const { error: err } = await supabase.from('court_blocks').insert({
+      court_id: editingId,
+      weekday: blk.weekday,
+      start_hour: blk.start,
+      end_hour: blk.end,
+      label: blk.label.trim(),
+    });
+    if (err) {
+      alert('연대관 저장 실패: ' + err.message);
+      return;
+    }
+    setBlk((b) => ({ ...b, label: '' }));
+    loadBlocks(editingId);
+  }
+  async function removeBlock(id: string) {
+    const { error: err } = await supabase.from('court_blocks').delete().eq('id', id);
+    if (err) {
+      alert('삭제 실패: ' + err.message);
+      return;
+    }
+    if (editingId) loadBlocks(editingId);
   }
 
   // 예약 가능일 열기/닫기 (즉시 저장)
@@ -164,6 +209,7 @@ function CourtsInner() {
   function startEdit(c: Court) {
     setEditingId(c.id);
     loadOpenDays(c.id);
+    loadBlocks(c.id);
     setForm({
       name: c.name,
       region: c.region,
@@ -469,6 +515,60 @@ function CourtsInner() {
             ) : (
               <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                 코트를 먼저 등록·저장한 뒤, 수정 화면에서 특정일을 추가로 열 수 있어요.
+              </p>
+            )}
+          </div>
+
+          {/* 연대관(정기 대관) — 매주 반복 예약 차단. 자동 오픈이어도 이 시간은 예약 불가 */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-slate-700">연대관 (정기 대관 차단)</span>
+            {editingId ? (
+              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="text-xs text-slate-500">
+                    <span className="mb-1 block">매주</span>
+                    <select value={blk.weekday} onChange={(e) => setBlk((b) => ({ ...b, weekday: Number(e.target.value) }))} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+                      {WEEKDAYS.map((w, i) => (
+                        <option key={w} value={i}>
+                          {w}요일
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs text-slate-500">
+                    <span className="mb-1 block">시작</span>
+                    <input type="number" min={0} max={23} value={blk.start} onChange={(e) => setBlk((b) => ({ ...b, start: Number(e.target.value) }))} className="w-16 rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="text-xs text-slate-500">
+                    <span className="mb-1 block">종료</span>
+                    <input type="number" min={1} max={24} value={blk.end} onChange={(e) => setBlk((b) => ({ ...b, end: Number(e.target.value) }))} className="w-16 rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="flex-1 text-xs text-slate-500">
+                    <span className="mb-1 block">대관자 (선택)</span>
+                    <input value={blk.label} onChange={(e) => setBlk((b) => ({ ...b, label: e.target.value }))} placeholder="예: A클럽" className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
+                  </label>
+                  <button type="button" onClick={addBlock} className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-900">
+                    추가
+                  </button>
+                </div>
+                {blocks.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {blocks.map((b) => (
+                      <span key={b.id} className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 py-1 pl-3 pr-1.5 text-sm text-rose-700">
+                        매주 {WEEKDAYS[b.weekday]} {b.start_hour}–{b.end_hour}시{b.label ? ` · ${b.label}` : ''}
+                        <button type="button" onClick={() => removeBlock(b.id)} className="rounded-full px-1.5 text-rose-400 hover:bg-rose-100 hover:text-rose-700">
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">연대관 시간대는 예약 오픈일이어도 사용자가 예약할 수 없어요.</p>
+                )}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                코트를 먼저 등록·저장한 뒤, 수정 화면에서 연대관을 설정할 수 있어요.
               </p>
             )}
           </div>

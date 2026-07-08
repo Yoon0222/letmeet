@@ -217,6 +217,17 @@ export type CourtOpenDay = {
   created_at: string;
 };
 
+/** 코트 연대관(정기 대관) — 매주 반복 예약 차단 시간대 [start_hour, end_hour) */
+export type CourtBlock = {
+  id: string;
+  court_id: string;
+  weekday: number; // 0=일 ~ 6=토
+  start_hour: number;
+  end_hour: number;
+  label: string;
+  created_at: string;
+};
+
 export type ReservationStatus = 'reserved' | 'cancelled';
 
 export type CourtReservation = {
@@ -344,6 +355,12 @@ export interface Database {
         Row: CourtPayment;
         Insert: { order_id: string; user_id: string; court_id: string; slot_date: string } & WriteDefaults<CourtPayment>;
         Update: WriteDefaults<CourtPayment>;
+        Relationships: [];
+      };
+      court_blocks: {
+        Row: CourtBlock;
+        Insert: { court_id: string; weekday: number; start_hour: number; end_hour: number } & WriteDefaults<CourtBlock>;
+        Update: WriteDefaults<CourtBlock>;
         Relationships: [];
       };
     };
