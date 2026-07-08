@@ -111,11 +111,13 @@ export default function CourtListScreen() {
 
   const statusText = searching
     ? `'${query.trim()}' 검색 결과 ${visible.length}곳`
-    : locState === 'locating'
-      ? '내 위치 확인 중…'
-      : myLoc
-        ? `내 주변 ${RADIUS_KM}km · ${visible.length}곳`
-        : '위치 권한이 꺼져 있어요. 전체 코트예요 — 지역으로 검색해보세요.';
+    : mode === 'map'
+      ? `지도 · 전체 ${rows.length}곳`
+      : locState === 'locating'
+        ? '내 위치 확인 중…'
+        : myLoc
+          ? `내 주변 ${RADIUS_KM}km · ${visible.length}곳`
+          : '위치 권한이 꺼져 있어요. 전체 코트예요 — 지역으로 검색해보세요.';
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
@@ -171,8 +173,9 @@ export default function CourtListScreen() {
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : mode === 'map' ? (
+        // 지도는 공간 탐색용 — 5km 제한 없이 전부(검색 중이면 검색결과)
         <CourtMap
-          courts={visible.map((v) => v.court)}
+          courts={searching ? visible.map((v) => v.court) : rows}
           center={myLoc ? { latitude: myLoc.lat, longitude: myLoc.lng } : undefined}
           onSelect={(id) => router.push(`/court/${id}`)}
         />
