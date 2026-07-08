@@ -453,7 +453,6 @@ create table if not exists public.courts (
   region       text not null default '',
   address      text not null default '',
   description  text not null default '',
-  phone        text not null default '',
   indoor       boolean not null default true,
   hourly_price int not null default 0 check (hourly_price >= 0),
   open_hour    int not null default 6,

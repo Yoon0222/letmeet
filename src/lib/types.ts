@@ -195,7 +195,6 @@ export type Court = {
   region: string;
   address: string;
   description: string;
-  phone: string;
   indoor: boolean;
   hourly_price: number;
   open_hour: number;
