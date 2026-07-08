@@ -226,7 +226,26 @@ export type CourtReservation = {
   slot_date: string; // YYYY-MM-DD
   hour: number;
   status: ReservationStatus;
+  payment_id: string | null; // null = 무료/구제도(결제 없이 확정)
   created_at: string;
+};
+
+// ---- 코트 예약 결제 (court_payments) ----
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'canceled' | 'refunded';
+
+export type CourtPayment = {
+  id: string;
+  order_id: string;
+  user_id: string;
+  court_id: string;
+  slot_date: string;
+  hours: number[];
+  amount: number;
+  status: PaymentStatus;
+  provider: string; // portone | toss | mock
+  provider_tx: string | null;
+  created_at: string;
+  paid_at: string | null;
 };
 
 /** 예약 + 코트 (내 예약 조인 결과) */
@@ -319,6 +338,12 @@ export interface Database {
         Row: CourtOpenDay;
         Insert: { court_id: string; day: string };
         Update: WriteDefaults<CourtOpenDay>;
+        Relationships: [];
+      };
+      court_payments: {
+        Row: CourtPayment;
+        Insert: { order_id: string; user_id: string; court_id: string; slot_date: string } & WriteDefaults<CourtPayment>;
+        Update: WriteDefaults<CourtPayment>;
         Relationships: [];
       };
     };

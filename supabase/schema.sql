@@ -522,6 +522,38 @@ create policy "open_days_write" on public.court_open_days
   for all using (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id))
   with check (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id));
 
+-- 코트 예약 결제(court_payments) — 0026. 주문 1건 = 슬롯 N개 결제.
+create table if not exists public.court_payments (
+  id           uuid primary key default uuid_generate_v4(),
+  order_id     text not null unique,
+  user_id      uuid not null references public.profiles(id) on delete cascade,
+  court_id     uuid not null references public.courts(id) on delete cascade,
+  slot_date    date not null,
+  hours        int[] not null default '{}',
+  amount       int not null default 0,
+  status       text not null default 'pending' check (status in ('pending','paid','failed','canceled','refunded')),
+  provider     text not null default 'portone',
+  provider_tx  text,
+  created_at   timestamptz not null default now(),
+  paid_at      timestamptz
+);
+create index if not exists court_payments_user_idx on public.court_payments (user_id, created_at desc);
+create index if not exists court_payments_status_idx on public.court_payments (status, created_at);
+alter table public.court_payments enable row level security;
+drop policy if exists "payments_select" on public.court_payments;
+create policy "payments_select" on public.court_payments
+  for select using (
+    auth.uid() = user_id or public.my_role() = 'super_admin'
+    or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id)
+  );
+drop policy if exists "payments_insert_self" on public.court_payments;
+create policy "payments_insert_self" on public.court_payments for insert with check (auth.uid() = user_id);
+drop policy if exists "payments_update_self" on public.court_payments;
+create policy "payments_update_self" on public.court_payments for update using (auth.uid() = user_id);
+
+alter table public.court_reservations add column if not exists payment_id uuid references public.court_payments(id) on delete set null;
+create index if not exists court_reservations_payment_idx on public.court_reservations (payment_id);
+
 -- ============================================================
 -- 감사 로그(audit log) — 0009
 -- 주요 행위(승인/거절/생성/수정/권한변경)를 트리거로 자동 기록.

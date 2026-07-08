@@ -10,6 +10,7 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
+import { startCourtPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import type { Court, CourtReservation } from '@/lib/types';
 
@@ -114,16 +115,20 @@ export default function CourtDetail() {
   async function reserve() {
     if (!uid || picked.length === 0) return;
     setBooking(true);
-    const rows = picked.map((h) => ({ court_id: court!.id, user_id: uid, slot_date: selectedDate, hour: h }));
-    const { error } = await supabase.from('court_reservations').insert(rows);
+    const result = await startCourtPayment({
+      court: { id: court!.id, hourly_price: court!.hourly_price },
+      uid,
+      slotDate: selectedDate,
+      hours: [...picked],
+    });
     setBooking(false);
-    if (error) {
-      Alert.alert(
-        '예약 실패',
-        /duplicate|unique/i.test(error.message) ? '방금 다른 분이 예약한 시간이 있어요. 다시 선택해주세요.' : error.message,
-      );
+    if (!result.ok) {
+      if (result.reason === 'slot') Alert.alert('예약 실패', '방금 다른 분이 예약한 시간이 있어요. 다시 선택해주세요.');
+      else if (result.reason === 'error') Alert.alert('결제 실패', result.message ?? '잠시 후 다시 시도해주세요.');
+      // 'canceled'(사용자가 결제창 닫음)는 조용히 넘어감
     } else {
-      Alert.alert('예약 완료', `${selectedDate}\n${[...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ')} 예약됐어요.`);
+      const hoursText = [...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ');
+      Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`);
       setPicked([]);
     }
     loadReservations(selectedDate);
@@ -211,7 +216,13 @@ export default function CourtDetail() {
 
       <View style={[styles.actionBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
         <Button
-          title={picked.length > 0 ? `${picked.length}시간 예약하기${total > 0 ? ` · ${total.toLocaleString()}원` : ''}` : '시간을 선택하세요'}
+          title={
+            picked.length === 0
+              ? '시간을 선택하세요'
+              : total > 0
+                ? `${total.toLocaleString()}원 결제하기`
+                : `${picked.length}시간 예약하기`
+          }
           onPress={reserve}
           disabled={picked.length === 0}
           loading={booking}
