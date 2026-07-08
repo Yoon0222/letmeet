@@ -78,6 +78,7 @@ export type Court = {
   region: string;
   address: string;
   description: string;
+  phone: string;
   indoor: boolean;
   hourly_price: number;
   open_hour: number;
@@ -89,6 +90,13 @@ export type Court = {
   court_units: CourtUnit[];
   amenities: string[];
   lessons: boolean;
+  created_at: string;
+};
+
+/** 코트 영업일(오픈일) — 관리자가 연 날짜만 예약 가능 */
+export type CourtOpenDay = {
+  court_id: string;
+  day: string; // YYYY-MM-DD
   created_at: string;
 };
 
@@ -184,6 +192,12 @@ export interface Database {
         Row: Court;
         Insert: Write<Court> & { name: string };
         Update: Write<Court>;
+        Relationships: [];
+      };
+      court_open_days: {
+        Row: CourtOpenDay;
+        Insert: { court_id: string; day: string };
+        Update: Write<CourtOpenDay>;
         Relationships: [];
       };
     };

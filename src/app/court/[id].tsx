@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MonthCalendar } from '@/components/month-calendar';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
@@ -12,7 +13,6 @@ import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { supabase } from '@/lib/supabase';
 import type { Court, CourtReservation } from '@/lib/types';
 
-const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function CourtDetail() {
@@ -24,6 +24,7 @@ export default function CourtDetail() {
   const [court, setCourt] = useState<Court | null>(null);
   const [reservations, setReservations] = useState<CourtReservation[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
+  const [openDays, setOpenDays] = useState<string[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
   const [nowMs, setNowMs] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -31,18 +32,21 @@ export default function CourtDetail() {
 
   useEffect(() => {
     if (!id) return;
-    supabase
-      .from('courts')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
-      .then(({ data }) => {
-        const now = Date.now();
-        setCourt(data ?? null);
-        setNowMs(now);
-        setSelectedDate(ymd(new Date(now)));
-        setLoading(false);
-      });
+    (async () => {
+      const now = Date.now();
+      const today = ymd(new Date(now));
+      const [courtRes, openRes] = await Promise.all([
+        supabase.from('courts').select('*').eq('id', id).maybeSingle(),
+        // 오늘 이후 오픈일만 (운영자가 연 날짜)
+        supabase.from('court_open_days').select('day').eq('court_id', id).gte('day', today).order('day', { ascending: true }),
+      ]);
+      const openList = (openRes.data ?? []).map((r) => r.day);
+      setCourt(courtRes.data ?? null);
+      setNowMs(now);
+      setOpenDays(openList);
+      setSelectedDate(openList[0] ?? ''); // 가장 가까운 오픈일 (없으면 빈값)
+      setLoading(false);
+    })();
   }, [id]);
 
   const loadReservations = useCallback(
@@ -79,13 +83,9 @@ export default function CourtDetail() {
     );
   }
 
-  // 다음 7일
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(nowMs);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-  const dayLabel = (d: Date, i: number) => (i === 0 ? '오늘' : i === 1 ? '내일' : `${d.getMonth() + 1}.${d.getDate()}(${DOW[d.getDay()]})`);
+  // 오픈일(달력) — 운영자가 연 날짜만 선택 가능
+  const todayYmd = ymd(new Date(nowMs));
+  const openDaySet = new Set(openDays);
 
   // 시설 정보 (면/바닥, 편의시설)
   const units = Array.isArray(court.court_units) ? court.court_units : [];
@@ -170,32 +170,34 @@ export default function CourtDetail() {
 
         {court.description ? <Text style={[styles.desc, { color: theme.textSecondary }]}>{court.description}</Text> : null}
 
-        {/* 날짜 */}
+        {/* 날짜 (월별 달력 · 운영자가 연 날짜만 선택 가능) */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>날짜</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-          {days.map((d, i) => {
-            const key = ymd(d);
-            const active = key === selectedDate;
-            return (
-              <Pressable
-                key={key}
-                onPress={() => {
-                  setSelectedDate(key);
-                  setPicked([]);
-                }}
-                style={[styles.dateChip, { backgroundColor: active ? theme.primary : theme.backgroundElement }]}>
-                <Text style={[styles.dateText, { color: active ? '#fff' : theme.textSecondary }]}>{dayLabel(d, i)}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {openDays.length === 0 ? (
+          <View style={[styles.noDays, { backgroundColor: theme.backgroundElement }]}>
+            <Ionicons name="calendar-outline" size={22} color={theme.textSecondary} />
+            <Text style={[styles.noDaysText, { color: theme.textSecondary }]}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 영업일을 열면 예약할 수 있어요.</Text>
+          </View>
+        ) : (
+          <MonthCalendar
+            todayYmd={todayYmd}
+            selected={selectedDate || null}
+            onSelectDay={(d) => {
+              setSelectedDate(d);
+              setPicked([]);
+            }}
+            enabledDays={openDaySet}
+            markedDays={openDaySet}
+          />
+        )}
 
         {/* 시간 슬롯 */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>시간 선택</Text>
-        {reservations.some((r) => r.user_id === uid) ? (
-          <Text style={[styles.hint, { color: theme.textSecondary }]}>내 예약을 누르면 취소할 수 있어요.</Text>
-        ) : null}
-        <View style={styles.slotWrap}>
+        {selectedDate ? (
+          <>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>시간 선택</Text>
+            {reservations.some((r) => r.user_id === uid) ? (
+              <Text style={[styles.hint, { color: theme.textSecondary }]}>내 예약을 누르면 취소할 수 있어요.</Text>
+            ) : null}
+            <View style={styles.slotWrap}>
           {hours.map((h) => {
             const r = reservedByHour.get(h);
             const mine = !!r && r.user_id === uid;
@@ -217,7 +219,9 @@ export default function CourtDetail() {
               </Pressable>
             );
           })}
-        </View>
+            </View>
+          </>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.actionBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
@@ -254,9 +258,8 @@ const styles = StyleSheet.create({
   desc: { fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
   hint: { fontSize: 12, marginTop: -6 },
-  dateRow: { gap: 8, paddingBottom: 4 },
-  dateChip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999 },
-  dateText: { fontSize: 14, fontWeight: '700' },
+  noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: Spacing.three },
+  noDaysText: { fontSize: 13, lineHeight: 19, flex: 1 },
   slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slot: { width: 72, borderWidth: 1, borderRadius: 12, paddingVertical: 8, alignItems: 'center', gap: 2 },
   slotHour: { fontSize: 15, fontWeight: '800' },

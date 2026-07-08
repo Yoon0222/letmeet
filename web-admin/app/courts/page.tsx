@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { MonthCalendar } from '@/components/month-calendar';
 import { Protected } from '@/components/protected';
 import { AMENITIES, SURFACES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { supabase } from '@/lib/supabase';
@@ -10,6 +11,11 @@ import { useRole } from '@/lib/use-role';
 import { useSession } from '@/lib/use-session';
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500';
+const pad = (n: number) => String(n).padStart(2, '0');
+const ymdToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -73,6 +79,7 @@ function CourtsInner() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoStatus, setGeoStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [unitCount, setUnitCount] = useState(4);
+  const [openDays, setOpenDays] = useState<Set<string>>(new Set()); // 편집 중 코트의 오픈일
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,10 +113,37 @@ function CourtsInner() {
     setForm(EMPTY);
     setError('');
     setGeoStatus(null);
+    setOpenDays(new Set());
+  }
+
+  async function loadOpenDays(courtId: string) {
+    const { data } = await supabase.from('court_open_days').select('day').eq('court_id', courtId);
+    setOpenDays(new Set((data ?? []).map((r) => r.day)));
+  }
+
+  // 영업일 열기/닫기 (즉시 저장)
+  async function toggleOpenDay(day: string) {
+    if (!editingId) return;
+    const isOpen = openDays.has(day);
+    // 낙관적 업데이트
+    setOpenDays((prev) => {
+      const next = new Set(prev);
+      if (isOpen) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+    const { error: err } = isOpen
+      ? await supabase.from('court_open_days').delete().eq('court_id', editingId).eq('day', day)
+      : await supabase.from('court_open_days').insert({ court_id: editingId, day });
+    if (err) {
+      alert('영업일 저장 실패: ' + err.message);
+      loadOpenDays(editingId); // 롤백
+    }
   }
 
   function startEdit(c: Court) {
     setEditingId(c.id);
+    loadOpenDays(c.id);
     setForm({
       name: c.name,
       region: c.region,
@@ -394,6 +428,18 @@ function CourtsInner() {
             <input type="checkbox" checked={form.lessons} onChange={(e) => set('lessons', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
             <span className="text-sm font-medium text-slate-700">레슨 가능</span>
           </label>
+
+          {/* 영업일(오픈일) — 사용자에겐 여기서 연 날짜만 예약 가능일로 보인다 */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-slate-700">영업일 (오픈일) · {openDays.size}일 열림</span>
+            {editingId ? (
+              <MonthCalendar activeDays={openDays} onToggle={toggleOpenDay} todayYmd={ymdToday()} />
+            ) : (
+              <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                코트를 먼저 등록·저장한 뒤, 수정 화면에서 영업일을 열 수 있어요.
+              </p>
+            )}
+          </div>
 
           <Field label="소개 (선택)">
             <textarea className={`${inputCls} min-h-20`} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="시설 소개, 이용 안내 등" maxLength={300} />
