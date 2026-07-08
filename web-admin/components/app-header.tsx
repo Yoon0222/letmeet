@@ -29,6 +29,11 @@ export function AppHeader() {
             <Link href="/tournaments" className="text-slate-600 hover:text-slate-900">
               대회
             </Link>
+            {(role === 'super_admin' || role === 'court_manager') && (
+              <Link href="/courts" className="text-slate-600 hover:text-slate-900">
+                코트
+              </Link>
+            )}
             {role === 'super_admin' && (
               <Link href="/users" className="text-slate-600 hover:text-slate-900">
                 사용자

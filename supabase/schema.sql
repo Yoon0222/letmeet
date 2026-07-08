@@ -329,6 +329,7 @@ create table if not exists public.tournament_entries (
   partner_name  text,                              -- 복식 파트너 이름(표시용 스냅샷)
   partner_id    uuid references public.profiles(id) on delete set null, -- 복식 파트너(회원 연결)
   seed          int,                               -- 대진 시드(추후)
+  checked_in_at timestamptz,                       -- 출전 신고(당일 체크인) 시각
   created_at    timestamptz not null default now(),
   primary key (tournament_id, user_id)
 );
@@ -444,6 +445,160 @@ create policy "matches_write_organizer" on public.tournament_matches
   );
 
 -- ============================================================
+-- 코트 예약 (0018) — 예약 가능한 코트 시설 + 시간(1시간) 단위 슬롯 예약
+-- ============================================================
+create table if not exists public.courts (
+  id           uuid primary key default uuid_generate_v4(),
+  name         text not null,
+  region       text not null default '',
+  address      text not null default '',
+  description  text not null default '',
+  indoor       boolean not null default true,
+  hourly_price int not null default 0 check (hourly_price >= 0),
+  open_hour    int not null default 6,
+  close_hour   int not null default 22,
+  image_url    text,
+  owner_id     uuid references public.profiles(id) on delete set null,
+  latitude     double precision,
+  longitude    double precision,
+  court_units  jsonb not null default '[]'::jsonb,   -- [{name, surface}] 면별 바닥
+  amenities    text[] not null default '{}'::text[], -- 편의시설 키(shower/parking…)
+  lessons      boolean not null default false,        -- 레슨 가능 여부
+  images       text[] not null default '{}'::text[], -- 코트 사진 URL 배열
+  auto_open_days int not null default 0 check (auto_open_days >= 0 and auto_open_days <= 60), -- 예약 자동 오픈 롤링 기간(일). 0=수동만
+  created_at   timestamptz not null default now(),
+  constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
+);
+create index if not exists courts_region_idx on public.courts (region);
+create index if not exists courts_geo_idx on public.courts (latitude, longitude)
+  where latitude is not null and longitude is not null;
+alter table public.courts enable row level security;
+drop policy if exists "courts_facility_select" on public.courts;
+create policy "courts_facility_select" on public.courts for select using (true);
+drop policy if exists "courts_facility_write" on public.courts;
+-- 쓰기: 최고관리자는 전체, 코트관리자는 자기 코트(owner_id=본인)만
+create policy "courts_facility_write" on public.courts
+  for all using (public.my_role() = 'super_admin' or auth.uid() = owner_id)
+  with check (public.my_role() = 'super_admin' or auth.uid() = owner_id);
+
+create table if not exists public.court_reservations (
+  id         uuid primary key default uuid_generate_v4(),
+  court_id   uuid not null references public.courts(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  court_unit text not null default '',                        -- 면(코트) 이름. '' = 시설 단위
+  slot_date  date not null,
+  hour       int not null check (hour >= 0 and hour <= 23),
+  status     text not null default 'reserved',
+  created_at timestamptz not null default now()
+);
+create index if not exists court_reservations_court_date_idx on public.court_reservations (court_id, slot_date);
+create index if not exists court_reservations_user_idx on public.court_reservations (user_id);
+-- 중복 방지: (코트, 면, 날짜, 시각) 단위
+create unique index if not exists court_reservations_slot_uniq
+  on public.court_reservations (court_id, court_unit, slot_date, hour) where status = 'reserved';
+alter table public.court_reservations enable row level security;
+drop policy if exists "reservations_select" on public.court_reservations;
+create policy "reservations_select" on public.court_reservations for select using (true);
+drop policy if exists "reservations_insert_self" on public.court_reservations;
+create policy "reservations_insert_self" on public.court_reservations
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "reservations_update_self" on public.court_reservations;
+create policy "reservations_update_self" on public.court_reservations
+  for update using (auth.uid() = user_id);
+drop policy if exists "reservations_delete_self" on public.court_reservations;
+create policy "reservations_delete_self" on public.court_reservations
+  for delete using (auth.uid() = user_id);
+
+-- 코트 예약 가능일(오픈일) — 0024. 관리자가 연 날짜만 사용자에게 노출.
+create table if not exists public.court_open_days (
+  court_id   uuid not null references public.courts(id) on delete cascade,
+  day        date not null,
+  created_at timestamptz not null default now(),
+  primary key (court_id, day)
+);
+create index if not exists court_open_days_court_idx on public.court_open_days (court_id, day);
+alter table public.court_open_days enable row level security;
+drop policy if exists "open_days_select" on public.court_open_days;
+create policy "open_days_select" on public.court_open_days for select using (true);
+drop policy if exists "open_days_write" on public.court_open_days;
+create policy "open_days_write" on public.court_open_days
+  for all using (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id))
+  with check (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id));
+
+-- 코트 예약 결제(court_payments) — 0026. 주문 1건 = 슬롯 N개 결제.
+create table if not exists public.court_payments (
+  id           uuid primary key default uuid_generate_v4(),
+  order_id     text not null unique,
+  user_id      uuid not null references public.profiles(id) on delete cascade,
+  court_id     uuid not null references public.courts(id) on delete cascade,
+  court_unit   text not null default '',
+  slot_date    date not null,
+  hours        int[] not null default '{}',
+  amount       int not null default 0,
+  status       text not null default 'pending' check (status in ('pending','paid','failed','canceled','refunded')),
+  provider     text not null default 'portone',
+  provider_tx  text,
+  created_at   timestamptz not null default now(),
+  paid_at      timestamptz
+);
+create index if not exists court_payments_user_idx on public.court_payments (user_id, created_at desc);
+create index if not exists court_payments_status_idx on public.court_payments (status, created_at);
+alter table public.court_payments enable row level security;
+drop policy if exists "payments_select" on public.court_payments;
+create policy "payments_select" on public.court_payments
+  for select using (
+    auth.uid() = user_id or public.my_role() = 'super_admin'
+    or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id)
+  );
+drop policy if exists "payments_insert_self" on public.court_payments;
+create policy "payments_insert_self" on public.court_payments for insert with check (auth.uid() = user_id);
+drop policy if exists "payments_update_self" on public.court_payments;
+create policy "payments_update_self" on public.court_payments for update using (auth.uid() = user_id);
+
+alter table public.court_reservations add column if not exists payment_id uuid references public.court_payments(id) on delete set null;
+create index if not exists court_reservations_payment_idx on public.court_reservations (payment_id);
+
+-- 코트 연대관(정기 대관) — 0027. 매주 반복 예약 차단 시간대. [start_hour, end_hour)
+create table if not exists public.court_blocks (
+  id         uuid primary key default uuid_generate_v4(),
+  court_id   uuid not null references public.courts(id) on delete cascade,
+  weekday    int not null check (weekday between 0 and 6),
+  start_hour int not null check (start_hour between 0 and 23),
+  end_hour   int not null check (end_hour between 1 and 24),
+  label      text not null default '',
+  created_at timestamptz not null default now(),
+  constraint court_blocks_range_chk check (start_hour < end_hour)
+);
+create index if not exists court_blocks_court_idx on public.court_blocks (court_id);
+alter table public.court_blocks enable row level security;
+drop policy if exists "blocks_select" on public.court_blocks;
+create policy "blocks_select" on public.court_blocks for select using (true);
+drop policy if exists "blocks_write" on public.court_blocks;
+create policy "blocks_write" on public.court_blocks
+  for all using (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id))
+  with check (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id));
+
+-- 연대관 시간대 예약 차단(서버 강제)
+create or replace function public.enforce_court_block()
+returns trigger language plpgsql as $$
+begin
+  if exists (
+    select 1 from public.court_blocks b
+    where b.court_id = new.court_id
+      and b.weekday = extract(dow from new.slot_date)::int
+      and new.hour >= b.start_hour and new.hour < b.end_hour
+  ) then
+    raise exception '연대관(정기 대관) 시간대는 예약할 수 없습니다.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists court_reservations_block_check on public.court_reservations;
+create trigger court_reservations_block_check
+  before insert on public.court_reservations
+  for each row execute function public.enforce_court_block();
+
+-- ============================================================
 -- 감사 로그(audit log) — 0009
 -- 주요 행위(승인/거절/생성/수정/권한변경)를 트리거로 자동 기록.
 -- ============================================================
@@ -538,6 +693,17 @@ create policy "avatars_update_own" on storage.objects
 drop policy if exists "avatars_delete_own" on storage.objects;
 create policy "avatars_delete_own" on storage.objects
   for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 코트 사진 Storage — 0028. court-images 버킷(공개), 쓰기는 코트관리자/최고관리자.
+insert into storage.buckets (id, name, public) values ('court-images', 'court-images', true) on conflict (id) do nothing;
+drop policy if exists "court_images_read" on storage.objects;
+create policy "court_images_read" on storage.objects for select using (bucket_id = 'court-images');
+drop policy if exists "court_images_insert" on storage.objects;
+create policy "court_images_insert" on storage.objects
+  for insert to authenticated with check (bucket_id = 'court-images' and public.my_role() in ('court_manager', 'super_admin'));
+drop policy if exists "court_images_delete" on storage.objects;
+create policy "court_images_delete" on storage.objects
+  for delete to authenticated using (bucket_id = 'court-images' and public.my_role() in ('court_manager', 'super_admin'));
 
 -- ============================================================
 -- 회원 탈퇴 (계정 삭제) — 0012

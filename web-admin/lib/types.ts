@@ -68,6 +68,50 @@ export type TournamentCourt = {
   created_at: string;
 };
 
+// 코트 예약 시설(대회와 무관한 상시 예약 코트)
+/** 면(코트) 1개 — 이름 + 바닥 종류 */
+export type CourtUnit = { name: string; surface: string };
+
+export type Court = {
+  id: string;
+  name: string;
+  region: string;
+  address: string;
+  description: string;
+  indoor: boolean;
+  hourly_price: number;
+  open_hour: number;
+  close_hour: number;
+  image_url: string | null;
+  owner_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  court_units: CourtUnit[];
+  amenities: string[];
+  lessons: boolean;
+  images: string[]; // 코트 사진 URL 배열
+  auto_open_days: number; // 예약 자동 오픈 롤링 기간(일). 0=수동만
+  created_at: string;
+};
+
+/** 코트 예약 가능일(오픈일) — 관리자가 연 날짜만 예약 가능 */
+export type CourtOpenDay = {
+  court_id: string;
+  day: string; // YYYY-MM-DD
+  created_at: string;
+};
+
+/** 코트 연대관(정기 대관) — 매주 반복 예약 차단 시간대 [start_hour, end_hour) */
+export type CourtBlock = {
+  id: string;
+  court_id: string;
+  weekday: number; // 0=일 ~ 6=토
+  start_hour: number;
+  end_hour: number;
+  label: string;
+  created_at: string;
+};
+
 export type TournamentWithCounts = Tournament & {
   organizer_nickname: string;
   organizer_avatar_url: string | null;
@@ -82,6 +126,7 @@ export type TournamentEntry = {
   partner_name: string | null;
   partner_id: string | null;
   seed: number | null;
+  checked_in_at: string | null;
   created_at: string;
 };
 
@@ -153,6 +198,24 @@ export interface Database {
         Row: AuditLog;
         Insert: Write<AuditLog>;
         Update: Write<AuditLog>;
+        Relationships: [];
+      };
+      courts: {
+        Row: Court;
+        Insert: Write<Court> & { name: string };
+        Update: Write<Court>;
+        Relationships: [];
+      };
+      court_open_days: {
+        Row: CourtOpenDay;
+        Insert: { court_id: string; day: string };
+        Update: Write<CourtOpenDay>;
+        Relationships: [];
+      };
+      court_blocks: {
+        Row: CourtBlock;
+        Insert: { court_id: string; weekday: number; start_hour: number; end_hour: number } & Write<CourtBlock>;
+        Update: Write<CourtBlock>;
         Relationships: [];
       };
     };

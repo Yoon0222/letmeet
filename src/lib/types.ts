@@ -140,6 +140,7 @@ export type TournamentEntry = {
   partner_name: string | null;
   partner_id: string | null;
   seed: number | null;
+  checked_in_at: string | null;
   created_at: string;
 };
 
@@ -182,6 +183,88 @@ export type TournamentCourt = {
   indoor: boolean;
   sort: number;
   created_at: string;
+};
+
+// ---- 코트 예약 (courts / court_reservations) ----
+/** 면(코트) 1개 — 이름 + 바닥 종류 */
+export type CourtUnit = { name: string; surface: string };
+
+export type Court = {
+  id: string;
+  name: string;
+  region: string;
+  address: string;
+  description: string;
+  indoor: boolean;
+  hourly_price: number;
+  open_hour: number;
+  close_hour: number;
+  image_url: string | null;
+  owner_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  court_units: CourtUnit[];
+  amenities: string[];
+  lessons: boolean;
+  images: string[]; // 코트 사진 URL 배열
+  auto_open_days: number; // 예약 자동 오픈 롤링 기간(일). 0=수동만
+  created_at: string;
+};
+
+/** 코트 예약 가능일 — 관리자가 연 날짜만 예약 가능 */
+export type CourtOpenDay = {
+  court_id: string;
+  day: string; // YYYY-MM-DD
+  created_at: string;
+};
+
+/** 코트 연대관(정기 대관) — 매주 반복 예약 차단 시간대 [start_hour, end_hour) */
+export type CourtBlock = {
+  id: string;
+  court_id: string;
+  weekday: number; // 0=일 ~ 6=토
+  start_hour: number;
+  end_hour: number;
+  label: string;
+  created_at: string;
+};
+
+export type ReservationStatus = 'reserved' | 'cancelled';
+
+export type CourtReservation = {
+  id: string;
+  court_id: string;
+  user_id: string;
+  court_unit: string; // 면(코트) 이름. '' = 시설 단위
+  slot_date: string; // YYYY-MM-DD
+  hour: number;
+  status: ReservationStatus;
+  payment_id: string | null; // null = 무료/구제도(결제 없이 확정)
+  created_at: string;
+};
+
+// ---- 코트 예약 결제 (court_payments) ----
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'canceled' | 'refunded';
+
+export type CourtPayment = {
+  id: string;
+  order_id: string;
+  user_id: string;
+  court_id: string;
+  court_unit: string;
+  slot_date: string;
+  hours: number[];
+  amount: number;
+  status: PaymentStatus;
+  provider: string; // portone | toss | mock
+  provider_tx: string | null;
+  created_at: string;
+  paid_at: string | null;
+};
+
+/** 예약 + 코트 (내 예약 조인 결과) */
+export type CourtReservationWithCourt = CourtReservation & {
+  courts: Pick<Court, 'id' | 'name' | 'region' | 'indoor' | 'hourly_price'>;
 };
 
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
@@ -251,6 +334,36 @@ export interface Database {
         Row: TournamentCourt;
         Insert: WriteDefaults<TournamentCourt> & { tournament_id: string; name: string };
         Update: WriteDefaults<TournamentCourt>;
+        Relationships: [];
+      };
+      courts: {
+        Row: Court;
+        Insert: WriteDefaults<Court> & { name: string };
+        Update: WriteDefaults<Court>;
+        Relationships: [];
+      };
+      court_reservations: {
+        Row: CourtReservation;
+        Insert: { court_id: string; user_id: string; slot_date: string; hour: number } & WriteDefaults<CourtReservation>;
+        Update: WriteDefaults<CourtReservation>;
+        Relationships: [];
+      };
+      court_open_days: {
+        Row: CourtOpenDay;
+        Insert: { court_id: string; day: string };
+        Update: WriteDefaults<CourtOpenDay>;
+        Relationships: [];
+      };
+      court_payments: {
+        Row: CourtPayment;
+        Insert: { order_id: string; user_id: string; court_id: string; slot_date: string } & WriteDefaults<CourtPayment>;
+        Update: WriteDefaults<CourtPayment>;
+        Relationships: [];
+      };
+      court_blocks: {
+        Row: CourtBlock;
+        Insert: { court_id: string; weekday: number; start_hour: number; end_hour: number } & WriteDefaults<CourtBlock>;
+        Update: WriteDefaults<CourtBlock>;
         Relationships: [];
       };
     };

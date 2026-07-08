@@ -21,7 +21,7 @@ const ENTRY_STYLE: Record<string, string> = {
 export default function EntriesTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, entries, courts, loading, reload, query } = useTournament();
+  const { t, entries, matches, courts, loading, reload, query } = useTournament();
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
@@ -49,6 +49,23 @@ export default function EntriesTab() {
     reload();
   }
 
+  // 불참(노쇼) 처리: 이 선수의 예선 경기만 삭제 → 같은 조 나머지끼리 경기(대체 승격 없음)
+  async function noShow(userId: string, nickname: string) {
+    if (
+      !confirm(
+        `${nickname} 님을 불참 처리할까요?\n이 선수의 예선 경기가 삭제되고, 같은 조 나머지 선수끼리 경기를 치릅니다. (다른 조에서 대체 승격 없음)`,
+      )
+    )
+      return;
+    await supabase
+      .from('tournament_matches')
+      .delete()
+      .eq('tournament_id', id)
+      .eq('phase', 'group')
+      .or(`entry1_id.eq.${userId},entry2_id.eq.${userId}`);
+    reload();
+  }
+
   return (
     <div>
       {courts.length > 0 && (
@@ -67,7 +84,14 @@ export default function EntriesTab() {
         </div>
       )}
 
-      <h2 className="text-lg font-medium">참가 신청 {visibleEntries.length}건</h2>
+      <h2 className="text-lg font-medium">
+        참가 신청 {visibleEntries.length}건
+        {(() => {
+          const appr = entries.filter((e) => e.status === 'approved');
+          const inCnt = appr.filter((e) => e.checked_in_at).length;
+          return inCnt > 0 ? <span className="ml-2 text-sm font-normal text-emerald-600">출전 {inCnt}/{appr.length}</span> : null;
+        })()}
+      </h2>
       {visibleEntries.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">아직 신청이 없습니다.</p>
       ) : (
@@ -100,6 +124,9 @@ export default function EntriesTab() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ENTRY_STYLE[e.status]}`}>
                       {statusText(e)}
                     </span>
+                    {e.checked_in_at && (
+                      <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">✓ 출전</span>
+                    )}
                   </td>
                   {isOrganizer && (
                     <td className="px-4 py-2">
@@ -110,6 +137,13 @@ export default function EntriesTab() {
                         {e.status !== 'rejected' && (
                           <button onClick={() => setEntryStatus(e.user_id, 'rejected')} className="text-red-600 hover:underline">거절</button>
                         )}
+                        {e.status === 'approved' &&
+                          !e.checked_in_at &&
+                          matches.some((m) => m.phase === 'group' && (m.entry1_id === e.user_id || m.entry2_id === e.user_id)) && (
+                            <button onClick={() => noShow(e.user_id, e.profiles?.nickname ?? '선수')} className="text-amber-600 hover:underline">
+                              불참
+                            </button>
+                          )}
                       </div>
                     </td>
                   )}

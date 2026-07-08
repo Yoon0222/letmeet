@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
@@ -12,7 +12,18 @@ import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMeetupTime, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { ClubWithCounts, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
+import type { ClubWithCounts, MeetupWithCounts } from '@/lib/types';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const SCHED_CARD_W = 210;
+
+type UpcomingItem = { key: string; type: 'tournament' | 'meetup' | 'court'; title: string; subtitle: string; at: number; route: string };
+
+function schedVisual(type: UpcomingItem['type'], theme: ReturnType<typeof useTheme>) {
+  if (type === 'tournament') return { icon: 'trophy' as const, label: '대회', tint: 'rgba(18,185,129,0.12)', color: theme.primary };
+  if (type === 'meetup') return { icon: 'flash' as const, label: '번개모임', tint: 'rgba(245,166,35,0.15)', color: theme.accent };
+  return { icon: 'location' as const, label: '코트 예약', tint: 'rgba(45,127,249,0.14)', color: '#2D7FF9' }; // court
+}
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -20,8 +31,7 @@ export default function HomeScreen() {
   const { session, profile } = useAuth();
   const uid = session?.user.id;
 
-  const [nextMeetup, setNextMeetup] = useState<MeetupWithCounts | null>(null);
-  const [nextTournament, setNextTournament] = useState<TournamentWithCounts | null>(null);
+  const [upcoming, setUpcoming] = useState<UpcomingItem[]>([]);
   const [recommended, setRecommended] = useState<MeetupWithCounts[]>([]);
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,16 +40,15 @@ export default function HomeScreen() {
   const myRegion = profile?.region ?? '';
 
   const load = useCallback(async () => {
-    const nowIso = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-    // 내가 참여 중인 다음 모임
-    let next: MeetupWithCounts | null = null;
-    let nextT: TournamentWithCounts | null = null;
+    // 다가오는 내 일정 = 대회 + 번개모임 + 코트예약 통합(시간순)
+    const items: UpcomingItem[] = [];
     if (uid) {
-      const { data: parts } = await supabase
-        .from('meetup_participants')
-        .select('meetup_id')
-        .eq('user_id', uid);
+      // 참여 중인 다가오는 모임
+      const { data: parts } = await supabase.from('meetup_participants').select('meetup_id').eq('user_id', uid);
       const ids = (parts ?? []).map((p) => p.meetup_id);
       if (ids.length > 0) {
         const { data } = await supabase
@@ -49,11 +58,13 @@ export default function HomeScreen() {
           .eq('status', 'open')
           .gte('start_time', nowIso)
           .order('start_time', { ascending: true })
-          .limit(1);
-        next = data?.[0] ?? null;
+          .limit(5);
+        (data ?? []).forEach((m) =>
+          items.push({ key: `m${m.id}`, type: 'meetup', title: m.title, subtitle: `${formatMeetupTime(m.start_time)} · ${m.location_name}`, at: new Date(m.start_time).getTime(), route: `/meetup/${m.id}` }),
+        );
       }
 
-      // 내가 신청했거나 파트너로 등록된 다음 대회
+      // 신청/파트너 등록된 다가오는 대회
       const { data: ents } = await supabase
         .from('tournament_entries')
         .select('tournament_id')
@@ -68,33 +79,68 @@ export default function HomeScreen() {
           .gte('start_at', nowIso)
           .neq('status', 'cancelled')
           .order('start_at', { ascending: true })
-          .limit(1);
-        nextT = data?.[0] ?? null;
+          .limit(5);
+        (data ?? []).forEach((t) =>
+          items.push({ key: `t${t.id}`, type: 'tournament', title: t.title, subtitle: `${formatMeetupTime(t.start_at)} · ${t.venue || '장소 미정'}`, at: new Date(t.start_at).getTime(), route: `/tournament/${t.id}` }),
+        );
       }
-    }
-    setNextMeetup(next);
-    setNextTournament(nextT);
 
-    // 근처 추천 모임 (다가오는 오픈 모임)
-    const { data: recs } = await supabase
+      // 다가오는 코트 예약 (코트+날짜 그룹)
+      const { data: resvData } = await supabase
+        .from('court_reservations')
+        .select('court_id, slot_date, hour, courts(name)')
+        .eq('user_id', uid)
+        .eq('status', 'reserved')
+        .gte('slot_date', todayStr);
+      const resv = (resvData ?? []) as unknown as { court_id: string; slot_date: string; hour: number; courts: { name: string } | null }[];
+      const groups = new Map<string, { courtId: string; name: string; date: string; hours: number[] }>();
+      resv.forEach((r) => {
+        const k = `${r.court_id}|${r.slot_date}`;
+        const g = groups.get(k) ?? { courtId: r.court_id, name: r.courts?.name ?? '코트', date: r.slot_date, hours: [] };
+        g.hours.push(r.hour);
+        groups.set(k, g);
+      });
+      const curH = now.getHours();
+      groups.forEach((g) => {
+        g.hours.sort((a, b) => a - b);
+        const maxH = g.hours[g.hours.length - 1];
+        if (g.date === todayStr && maxH < curH) return; // 오늘 이미 지난 예약 제외
+        const [y, mo, d] = g.date.split('-').map(Number);
+        const hourText = g.hours.length > 1 ? `${g.hours[0]}~${maxH + 1}시` : `${g.hours[0]}시`;
+        items.push({ key: `c${g.courtId}${g.date}`, type: 'court', title: g.name, subtitle: `${mo}월 ${d}일 · ${hourText}`, at: new Date(y, mo - 1, d, g.hours[0]).getTime(), route: `/court/${g.courtId}` });
+      });
+    }
+    items.sort((a, b) => a.at - b.at);
+    setUpcoming(items.slice(0, 4));
+
+    // 근처 추천 모임 = 내 지역(시/도) 기준 다가오는 오픈 모임
+    const regionPrefix = myRegion.trim().split(/\s+/)[0]; // 예: '서울 강남구' → '서울'
+    let recQuery = supabase
       .from('meetups_with_counts')
       .select('*')
       .eq('status', 'open')
       .gte('start_time', nowIso)
       .order('start_time', { ascending: true })
-      .limit(5);
-    setRecommended((recs ?? []).filter((m) => m.id !== next?.id).slice(0, 3));
+      .limit(10);
+    if (regionPrefix) recQuery = recQuery.ilike('region', `${regionPrefix}%`); // 지역 미설정이면 전체
+    const { data: recs } = await recQuery;
+    // 이미 '내 일정'에 뜨는 모임은 추천에서 제외
+    const upcomingMeetupIds = new Set(items.filter((i) => i.type === 'meetup').map((i) => i.key.slice(1)));
+    setRecommended((recs ?? []).filter((m) => !upcomingMeetupIds.has(m.id)).slice(0, 3));
 
-    // 추천 클럽 (멤버 많은 순)
-    const { data: cs } = await supabase
+    // 추천 클럽: 회원 많은순 → 동일 시 최근순. 클럽 3개 이상이면 회원 10명↑만 노출. 최대 3개
+    const { data: cs, count: clubCount } = await supabase
       .from('clubs_with_counts')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('member_count', { ascending: false })
-      .limit(3);
-    setClubs(cs ?? []);
+      .order('created_at', { ascending: false })
+      .limit(20);
+    let clubList = cs ?? [];
+    if ((clubCount ?? clubList.length) >= 3) clubList = clubList.filter((c) => c.member_count >= 10);
+    setClubs(clubList.slice(0, 3));
 
     setRefreshing(false);
-  }, [uid]);
+  }, [uid, myRegion]);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,7 +148,7 @@ export default function HomeScreen() {
     }, [load]),
   );
 
-  const hasSchedule = !!nextMeetup || !!nextTournament;
+  const hasSchedule = upcoming.length > 0;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -158,46 +204,55 @@ export default function HomeScreen() {
           />
         </View>
         <Pressable
-          onPress={() => Alert.alert('코트 예약', '곧 오픈될 기능이에요. 조금만 기다려 주세요!')}
+          onPress={() => router.push('/court')}
           style={[styles.courtTile, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="location-outline" size={26} color={theme.tabIconDefault} />
+          <Ionicons name="location-outline" size={26} color={theme.primary} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.courtTitle, { color: theme.text }]}>코트 예약</Text>
             <Text style={[styles.courtDesc, { color: theme.textSecondary }]}>가까운 코트 찾고 예약</Text>
           </View>
-          <View style={[styles.soon, { backgroundColor: 'rgba(245,166,35,0.2)' }]}>
-            <Text style={[styles.soonText, { color: theme.accent }]}>곧 오픈</Text>
-          </View>
+          <Pressable
+            onPress={() => router.push('/court/reservations')}
+            hitSlop={6}
+            style={[styles.myResvBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="calendar-outline" size={14} color={theme.primary} />
+            <Text style={[styles.myResvText, { color: theme.text }]}>내 예약</Text>
+          </Pressable>
         </Pressable>
 
         {/* 3. 다가오는 내 일정 */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>다가오는 내 일정</Text>
         {hasSchedule ? (
-          <View style={[styles.listCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            {nextTournament && (
-              <ScheduleRow
-                icon="trophy"
-                tint="rgba(18,185,129,0.12)"
-                color={theme.primary}
-                title={nextTournament.title}
-                subtitle={`${formatMeetupTime(nextTournament.start_at)} · ${nextTournament.venue || '장소 미정'}`}
-                onPress={() => router.push(`/tournament/${nextTournament.id}`)}
-                theme={theme}
-                border={!!nextMeetup}
-              />
-            )}
-            {nextMeetup && (
-              <ScheduleRow
-                icon="flash"
-                tint="rgba(245,166,35,0.15)"
-                color={theme.accent}
-                title={nextMeetup.title}
-                subtitle={`${formatMeetupTime(nextMeetup.start_time)} · ${nextMeetup.location_name}`}
-                onPress={() => router.push(`/meetup/${nextMeetup.id}`)}
-                theme={theme}
-              />
-            )}
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.carouselWrap}
+            contentContainerStyle={styles.carousel}
+            snapToInterval={SCHED_CARD_W + Spacing.three}
+            decelerationRate="fast">
+            {upcoming.map((item) => {
+              const v = schedVisual(item.type, theme);
+              return (
+                <Pressable
+                  key={item.key}
+                  onPress={() => router.push(item.route as never)}
+                  style={({ pressed }) => [styles.schedCard, { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 }]}>
+                  <View style={styles.schedCardTop}>
+                    <View style={[styles.schedCardIcon, { backgroundColor: v.tint }]}>
+                      <Ionicons name={v.icon} size={16} color={v.color} />
+                    </View>
+                    <Text style={[styles.schedCardType, { color: v.color }]}>{v.label}</Text>
+                  </View>
+                  <Text style={[styles.schedCardTitle, { color: theme.text }]} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.schedCardSub, { color: theme.textSecondary }]} numberOfLines={2}>
+                    {item.subtitle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         ) : (
           <Pressable
             onPress={() => router.push('/(tabs)/matches')}
@@ -206,7 +261,7 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>예정된 일정이 없어요</Text>
               <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                번개 모임이나 대회에 참가해보세요
+                코트 예약, 번개 모임, 대회에 참여해보세요
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
@@ -273,45 +328,6 @@ function Pillar({
   );
 }
 
-function ScheduleRow({
-  icon,
-  tint,
-  color,
-  title,
-  subtitle,
-  onPress,
-  theme,
-  border = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  tint: string;
-  color: string;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-  border?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.schedRow, border && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
-      <View style={[styles.schedIcon, { backgroundColor: tint }]}>
-        <Ionicons name={icon} size={18} color={color} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.schedTitle, { color: theme.text }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={[styles.schedSub, { color: theme.textSecondary }]} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.tabIconDefault} />
-    </Pressable>
-  );
-}
-
 function SectionHeader({
   title,
   onMore,
@@ -350,13 +366,18 @@ const styles = StyleSheet.create({
   },
   courtTitle: { fontSize: 16, fontWeight: '700' },
   courtDesc: { fontSize: 12, marginTop: 2 },
+  myResvBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  myResvText: { fontSize: 13, fontWeight: '700' },
   soon: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   soonText: { fontSize: 11, fontWeight: '800' },
-  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  schedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.three },
-  schedIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  schedTitle: { fontSize: 15, fontWeight: '700' },
-  schedSub: { fontSize: 12, marginTop: 2 },
+  carouselWrap: { marginHorizontal: -Spacing.four },
+  carousel: { gap: Spacing.three, paddingHorizontal: Spacing.four },
+  schedCard: { width: SCHED_CARD_W, borderWidth: 1, borderRadius: 16, padding: Spacing.three, gap: 6 },
+  schedCardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  schedCardIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  schedCardType: { fontSize: 12, fontWeight: '700' },
+  schedCardTitle: { fontSize: 15, fontWeight: '700' },
+  schedCardSub: { fontSize: 12, lineHeight: 17 },
   sectionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
