@@ -16,6 +16,24 @@ const ymdToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+const addDays = (ymd: string, n: number) => {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+};
+// 오늘부터 n일 자동 오픈 윈도우
+const autoOpenSet = (n: number) => {
+  const t = ymdToday();
+  const s = new Set<string>();
+  for (let i = 0; i < n; i++) s.add(addDays(t, i));
+  return s;
+};
+const AUTO_OPTIONS = [
+  { v: 0, label: '자동 오픈 안 함 (수동 지정)' },
+  { v: 7, label: '1주 (7일)' },
+  { v: 14, label: '2주 (14일)' },
+  { v: 30, label: '1개월 (30일)' },
+];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -43,6 +61,7 @@ type Form = {
   court_units: CourtUnit[];
   amenities: string[];
   lessons: boolean;
+  auto_open_days: number;
 };
 
 const EMPTY: Form = {
@@ -60,6 +79,7 @@ const EMPTY: Form = {
   court_units: [],
   amenities: [],
   lessons: false,
+  auto_open_days: 0,
 };
 
 function CourtsInner() {
@@ -159,6 +179,7 @@ function CourtsInner() {
       court_units: Array.isArray(c.court_units) ? c.court_units : [],
       amenities: Array.isArray(c.amenities) ? c.amenities : [],
       lessons: !!c.lessons,
+      auto_open_days: c.auto_open_days ?? 0,
     });
     setError('');
     setGeoStatus(c.latitude != null ? { ok: true, msg: '저장된 좌표가 있어요.' } : null);
@@ -232,6 +253,7 @@ function CourtsInner() {
       court_units: form.court_units,
       amenities: form.amenities,
       lessons: form.lessons,
+      auto_open_days: form.auto_open_days,
     };
     // owner_id 는 최고관리자만 지정/변경(코트관리자는 자기 코트 소유권 못 바꿈)
     const payload = isSuper ? { ...base, owner_id: form.owner_id } : base;
@@ -429,14 +451,24 @@ function CourtsInner() {
             <span className="text-sm font-medium text-slate-700">레슨 가능</span>
           </label>
 
-          {/* 예약 가능일 — 사용자에겐 여기서 연 날짜만 예약 가능일로 보인다 */}
+          {/* 예약 가능일 — 자동 오픈(롤링) + 수동 추가일 */}
           <div>
-            <span className="mb-1 block text-sm font-medium text-slate-700">예약 가능일 · {openDays.size}일 열림</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">예약 자동 오픈</span>
+            <select className={inputCls} value={form.auto_open_days} onChange={(e) => set('auto_open_days', Number(e.target.value))}>
+              {AUTO_OPTIONS.map((o) => (
+                <option key={o.v} value={o.v}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-400">오늘부터 선택한 기간이 항상 자동으로 예약 오픈돼요(날짜가 지나면 다음날 자동 오픈). 저장해야 적용됩니다.</p>
+
+            <span className="mb-1 mt-4 block text-sm font-medium text-slate-700">추가 예약일 (자동 오픈 외 특정일) · 수동 {openDays.size}일</span>
             {editingId ? (
-              <MonthCalendar activeDays={openDays} onToggle={toggleOpenDay} todayYmd={ymdToday()} />
+              <MonthCalendar activeDays={openDays} onToggle={toggleOpenDay} todayYmd={ymdToday()} autoDays={autoOpenSet(form.auto_open_days)} />
             ) : (
               <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                코트를 먼저 등록·저장한 뒤, 수정 화면에서 예약 가능일을 열 수 있어요.
+                코트를 먼저 등록·저장한 뒤, 수정 화면에서 특정일을 추가로 열 수 있어요.
               </p>
             )}
           </div>

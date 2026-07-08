@@ -41,10 +41,12 @@ export default function CourtDetail() {
         supabase.from('court_open_days').select('day').eq('court_id', id).gte('day', today).order('day', { ascending: true }),
       ]);
       const openList = (openRes.data ?? []).map((r) => r.day);
+      const autoN = courtRes.data?.auto_open_days ?? 0;
       setCourt(courtRes.data ?? null);
       setNowMs(now);
       setOpenDays(openList);
-      setSelectedDate(openList[0] ?? ''); // 가장 가까운 오픈일 (없으면 빈값)
+      // 자동 오픈이 있으면 오늘이 가장 가까운 예약일, 없으면 가장 이른 수동 오픈일
+      setSelectedDate(autoN > 0 ? today : (openList[0] ?? ''));
       setLoading(false);
     })();
   }, [id]);
@@ -83,9 +85,15 @@ export default function CourtDetail() {
     );
   }
 
-  // 오픈일(달력) — 운영자가 연 날짜만 선택 가능
+  // 예약 가능일(달력) = 수동 오픈일 ∪ 자동 오픈 윈도우(오늘부터 auto_open_days일)
   const todayYmd = ymd(new Date(nowMs));
   const openDaySet = new Set(openDays);
+  for (let i = 0; i < (court.auto_open_days ?? 0); i++) {
+    const d = new Date(nowMs);
+    d.setDate(d.getDate() + i);
+    openDaySet.add(ymd(d));
+  }
+  const hasOpenDays = openDaySet.size > 0;
 
   // 시설 정보 (면/바닥, 편의시설)
   const units = Array.isArray(court.court_units) ? court.court_units : [];
@@ -172,7 +180,7 @@ export default function CourtDetail() {
 
         {/* 날짜 (월별 달력 · 운영자가 연 날짜만 선택 가능) */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>날짜</Text>
-        {openDays.length === 0 ? (
+        {!hasOpenDays ? (
           <View style={[styles.noDays, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="calendar-outline" size={22} color={theme.textSecondary} />
             <Text style={[styles.noDaysText, { color: theme.textSecondary }]}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 예약일을 열면 예약할 수 있어요.</Text>

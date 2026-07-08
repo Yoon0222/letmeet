@@ -464,6 +464,7 @@ create table if not exists public.courts (
   court_units  jsonb not null default '[]'::jsonb,   -- [{name, surface}] 면별 바닥
   amenities    text[] not null default '{}'::text[], -- 편의시설 키(shower/parking…)
   lessons      boolean not null default false,        -- 레슨 가능 여부
+  auto_open_days int not null default 0 check (auto_open_days >= 0 and auto_open_days <= 60), -- 예약 자동 오픈 롤링 기간(일). 0=수동만
   created_at   timestamptz not null default now(),
   constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
 );

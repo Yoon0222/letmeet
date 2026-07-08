@@ -7,17 +7,19 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const toYmd = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 
 type Props = {
-  /** 오픈된 날짜 집합(YYYY-MM-DD) */
+  /** 수동으로 연 날짜 집합(YYYY-MM-DD) — 클릭으로 토글 */
   activeDays: Set<string>;
   /** 날짜 클릭 → 오픈/닫기 토글 */
   onToggle: (ymd: string) => void;
   /** 오늘(YYYY-MM-DD) — 과거는 비활성 */
   todayYmd: string;
+  /** 자동 오픈된 날짜(롤링 윈도우) — 표시만(토글 불가) */
+  autoDays?: Set<string>;
   /** 초기 표시 월(YYYY-MM-DD). 기본 오늘 */
   initialMonth?: string;
 };
 
-export function MonthCalendar({ activeDays, onToggle, todayYmd, initialMonth }: Props) {
+export function MonthCalendar({ activeDays, onToggle, todayYmd, autoDays, initialMonth }: Props) {
   const base = (initialMonth ?? todayYmd).split('-').map(Number);
   const [view, setView] = useState<{ y: number; m: number }>({ y: base[0], m: base[1] - 1 });
 
@@ -60,18 +62,22 @@ export function MonthCalendar({ activeDays, onToggle, todayYmd, initialMonth }: 
           const key = toYmd(view.y, view.m, d);
           const past = key < todayYmd;
           const open = activeDays.has(key);
+          const auto = !open && (autoDays?.has(key) ?? false);
           return (
             <button
               key={key}
               type="button"
-              disabled={past}
+              disabled={past || auto}
+              title={auto ? '자동 오픈됨' : undefined}
               onClick={() => onToggle(key)}
               className={`aspect-square rounded-lg text-sm transition ${
                 past
                   ? 'cursor-not-allowed text-slate-300'
                   : open
                     ? 'bg-emerald-500 font-semibold text-white hover:bg-emerald-600'
-                    : 'text-slate-700 hover:bg-emerald-50'
+                    : auto
+                      ? 'cursor-default bg-emerald-100 font-medium text-emerald-700'
+                      : 'text-slate-700 hover:bg-emerald-50'
               }`}
             >
               {d}
@@ -79,7 +85,9 @@ export function MonthCalendar({ activeDays, onToggle, todayYmd, initialMonth }: 
           );
         })}
       </div>
-      <p className="mt-2 text-xs text-slate-400">날짜를 클릭해 예약 가능일을 열고 닫아요. 초록색이 열린 날입니다.</p>
+      <p className="mt-2 text-xs text-slate-400">
+        진한 초록 = 수동으로 연 날(클릭해 열고 닫기){autoDays && autoDays.size > 0 ? ' · 연한 초록 = 자동 오픈' : ''}
+      </p>
     </div>
   );
 }
