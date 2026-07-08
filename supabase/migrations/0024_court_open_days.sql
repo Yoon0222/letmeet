@@ -1,4 +1,4 @@
--- 0024: 코트 영업일(오픈일)
+-- 0024: 코트 예약 가능일(오픈일)
 -- 코트관리자(owner)/최고관리자가 연 날짜만 사용자에게 예약 가능일로 노출된다.
 create table if not exists public.court_open_days (
   court_id   uuid not null references public.courts(id) on delete cascade,

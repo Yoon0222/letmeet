@@ -209,7 +209,7 @@ export type Court = {
   created_at: string;
 };
 
-/** 코트 영업일(오픈일) — 관리자가 연 날짜만 예약 가능 */
+/** 코트 예약 가능일 — 관리자가 연 날짜만 예약 가능 */
 export type CourtOpenDay = {
   court_id: string;
   day: string; // YYYY-MM-DD

@@ -121,7 +121,7 @@ function CourtsInner() {
     setOpenDays(new Set((data ?? []).map((r) => r.day)));
   }
 
-  // 영업일 열기/닫기 (즉시 저장)
+  // 예약 가능일 열기/닫기 (즉시 저장)
   async function toggleOpenDay(day: string) {
     if (!editingId) return;
     const isOpen = openDays.has(day);
@@ -136,7 +136,7 @@ function CourtsInner() {
       ? await supabase.from('court_open_days').delete().eq('court_id', editingId).eq('day', day)
       : await supabase.from('court_open_days').insert({ court_id: editingId, day });
     if (err) {
-      alert('영업일 저장 실패: ' + err.message);
+      alert('예약 가능일 저장 실패: ' + err.message);
       loadOpenDays(editingId); // 롤백
     }
   }
@@ -429,14 +429,14 @@ function CourtsInner() {
             <span className="text-sm font-medium text-slate-700">레슨 가능</span>
           </label>
 
-          {/* 영업일(오픈일) — 사용자에겐 여기서 연 날짜만 예약 가능일로 보인다 */}
+          {/* 예약 가능일 — 사용자에겐 여기서 연 날짜만 예약 가능일로 보인다 */}
           <div>
-            <span className="mb-1 block text-sm font-medium text-slate-700">영업일 (오픈일) · {openDays.size}일 열림</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">예약 가능일 · {openDays.size}일 열림</span>
             {editingId ? (
               <MonthCalendar activeDays={openDays} onToggle={toggleOpenDay} todayYmd={ymdToday()} />
             ) : (
               <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                코트를 먼저 등록·저장한 뒤, 수정 화면에서 영업일을 열 수 있어요.
+                코트를 먼저 등록·저장한 뒤, 수정 화면에서 예약 가능일을 열 수 있어요.
               </p>
             )}
           </div>

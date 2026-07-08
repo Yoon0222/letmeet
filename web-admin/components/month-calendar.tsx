@@ -79,7 +79,7 @@ export function MonthCalendar({ activeDays, onToggle, todayYmd, initialMonth }: 
           );
         })}
       </div>
-      <p className="mt-2 text-xs text-slate-400">날짜를 클릭해 영업일을 열고 닫아요. 초록색이 오픈된 날입니다.</p>
+      <p className="mt-2 text-xs text-slate-400">날짜를 클릭해 예약 가능일을 열고 닫아요. 초록색이 열린 날입니다.</p>
     </div>
   );
 }

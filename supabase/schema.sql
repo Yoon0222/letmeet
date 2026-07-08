@@ -505,7 +505,7 @@ drop policy if exists "reservations_delete_self" on public.court_reservations;
 create policy "reservations_delete_self" on public.court_reservations
   for delete using (auth.uid() = user_id);
 
--- 코트 영업일(오픈일) — 0024. 관리자가 연 날짜만 사용자에게 예약 가능일로 노출.
+-- 코트 예약 가능일(오픈일) — 0024. 관리자가 연 날짜만 사용자에게 노출.
 create table if not exists public.court_open_days (
   court_id   uuid not null references public.courts(id) on delete cascade,
   day        date not null,

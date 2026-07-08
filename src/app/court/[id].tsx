@@ -175,7 +175,7 @@ export default function CourtDetail() {
         {openDays.length === 0 ? (
           <View style={[styles.noDays, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="calendar-outline" size={22} color={theme.textSecondary} />
-            <Text style={[styles.noDaysText, { color: theme.textSecondary }]}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 영업일을 열면 예약할 수 있어요.</Text>
+            <Text style={[styles.noDaysText, { color: theme.textSecondary }]}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 예약일을 열면 예약할 수 있어요.</Text>
           </View>
         ) : (
           <MonthCalendar
