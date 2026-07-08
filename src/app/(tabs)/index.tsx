@@ -125,13 +125,16 @@ export default function HomeScreen() {
     const upcomingMeetupIds = new Set(items.filter((i) => i.type === 'meetup').map((i) => i.key.slice(1)));
     setRecommended((recs ?? []).filter((m) => !upcomingMeetupIds.has(m.id)).slice(0, 3));
 
-    // 추천 클럽 (멤버 많은 순)
-    const { data: cs } = await supabase
+    // 추천 클럽: 회원 많은순 → 동일 시 최근순. 클럽 3개 이상이면 회원 10명↑만 노출. 최대 3개
+    const { data: cs, count: clubCount } = await supabase
       .from('clubs_with_counts')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('member_count', { ascending: false })
-      .limit(3);
-    setClubs(cs ?? []);
+      .order('created_at', { ascending: false })
+      .limit(20);
+    let clubList = cs ?? [];
+    if ((clubCount ?? clubList.length) >= 3) clubList = clubList.filter((c) => c.member_count >= 10);
+    setClubs(clubList.slice(0, 3));
 
     setRefreshing(false);
   }, [uid]);
