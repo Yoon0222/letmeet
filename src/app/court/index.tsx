@@ -177,6 +177,7 @@ export default function CourtListScreen() {
         <CourtMap
           courts={searching ? visible.map((v) => v.court) : rows}
           center={myLoc ? { latitude: myLoc.lat, longitude: myLoc.lng } : undefined}
+          focus={searching ? q : ''}
           onSelect={(id) => router.push(`/court/${id}`)}
         />
       ) : (
