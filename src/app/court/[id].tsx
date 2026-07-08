@@ -224,7 +224,7 @@ export default function CourtDetail() {
         {court.description ? <Text style={[styles.desc, { color: theme.textSecondary }]}>{court.description}</Text> : null}
 
         {/* 날짜 (월별 달력 · 운영자가 연 날짜만 선택 가능) */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>날짜</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>날짜 선택</Text>
         {!hasOpenDays ? (
           <View style={[styles.noDays, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="calendar-outline" size={22} color={theme.textSecondary} />
