@@ -29,6 +29,7 @@ export default function CourtDetail() {
   const [openDays, setOpenDays] = useState<string[]>([]);
   const [blocks, setBlocks] = useState<CourtBlock[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
+  const [anchor, setAnchor] = useState<number | null>(null); // 연속선택 시작점
   const [nowMs, setNowMs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
@@ -123,7 +124,37 @@ export default function CourtDetail() {
   });
 
   // 예약창에서는 선택/예약만. 취소·변경은 '내 예약' 화면에서.
-  const toggle = (h: number) => setPicked((p) => (p.includes(h) ? p.filter((x) => x !== h) : [...p, h]));
+  const isAvailable = (h: number) => !reservedByHour.has(h) && !blockedHours.has(h) && !(isToday && h < curHour);
+
+  // 시작 시각 탭 → 종료 시각 탭 = 연속 구간 예약. (중간에 예약불가 있으면 새로 시작)
+  function onSlotPress(h: number) {
+    if (anchor == null) {
+      setAnchor(h);
+      setPicked([h]);
+      return;
+    }
+    if (h === anchor && picked.length === 1) {
+      setAnchor(null);
+      setPicked([]);
+      return;
+    }
+    const lo = Math.min(anchor, h);
+    const hi = Math.max(anchor, h);
+    const range: number[] = [];
+    let ok = true;
+    for (let x = lo; x <= hi; x++) {
+      if (!isAvailable(x)) {
+        ok = false;
+        break;
+      }
+      range.push(x);
+    }
+    if (ok) setPicked(range);
+    else {
+      setAnchor(h);
+      setPicked([h]);
+    }
+  }
 
   async function reserve() {
     if (!uid || picked.length === 0) return;
@@ -142,6 +173,7 @@ export default function CourtDetail() {
     } else {
       const hoursText = [...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ');
       setPicked([]);
+      setAnchor(null);
       Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`, [
         { text: '계속 예약', style: 'cancel' },
         { text: '내 예약 보기', onPress: () => router.push('/court/reservations') },
@@ -200,6 +232,7 @@ export default function CourtDetail() {
             onSelectDay={(d) => {
               setSelectedDate(d);
               setPicked([]);
+              setAnchor(null);
             }}
             enabledDays={openDaySet}
             markedDays={openDaySet}
@@ -210,6 +243,7 @@ export default function CourtDetail() {
         {selectedDate ? (
           <>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>시간 선택</Text>
+            <Text style={[styles.rangeHint, { color: theme.textSecondary }]}>시작 시간을 누르고 종료 시간을 누르면 연속으로 선택돼요.</Text>
             <View style={styles.slotWrap}>
           {hours.map((h) => {
             const r = reservedByHour.get(h);
@@ -226,7 +260,7 @@ export default function CourtDetail() {
               <Pressable
                 key={h}
                 disabled={disabled}
-                onPress={() => toggle(h)}
+                onPress={() => onSlotPress(h)}
                 style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past || blocked ? 0.5 : 1 }]}>
                 <Text style={[styles.slotHour, { color: fg }]}>{h}시</Text>
                 <Text style={[styles.slotState, { color: fg }]}>{blocked ? '대관' : mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
@@ -280,6 +314,7 @@ const styles = StyleSheet.create({
   amenityText: { fontSize: 13, fontWeight: '600' },
   desc: { fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
+  rangeHint: { fontSize: 12, marginTop: -4 },
   noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: Spacing.three },
   noDaysText: { fontSize: 13, lineHeight: 19, flex: 1 },
   slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

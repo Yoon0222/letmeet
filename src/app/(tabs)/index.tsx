@@ -165,7 +165,13 @@ export default function HomeScreen() {
             <Text style={[styles.courtTitle, { color: theme.text }]}>코트 예약</Text>
             <Text style={[styles.courtDesc, { color: theme.textSecondary }]}>가까운 코트 찾고 예약</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+          <Pressable
+            onPress={() => router.push('/court/reservations')}
+            hitSlop={6}
+            style={[styles.myResvBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="calendar-outline" size={14} color={theme.primary} />
+            <Text style={[styles.myResvText, { color: theme.text }]}>내 예약</Text>
+          </Pressable>
         </Pressable>
 
         {/* 3. 다가오는 내 일정 */}
@@ -348,6 +354,8 @@ const styles = StyleSheet.create({
   },
   courtTitle: { fontSize: 16, fontWeight: '700' },
   courtDesc: { fontSize: 12, marginTop: 2 },
+  myResvBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  myResvText: { fontSize: 13, fontWeight: '700' },
   soon: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   soonText: { fontSize: 11, fontWeight: '800' },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
