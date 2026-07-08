@@ -21,7 +21,7 @@ try {
   Location = null;
 }
 
-const RADIUS_KM = 5;
+const RADIUS_KM = 20;
 
 export default function CourtListScreen() {
   const theme = useTheme();
@@ -87,7 +87,7 @@ export default function CourtListScreen() {
     };
   }, []);
 
-  // 거리 계산 + 필터 (검색 중이면 전체 대상, 아니면 5km 반경)
+  // 거리 계산 + 필터 (검색 중이면 전체 대상, 아니면 RADIUS_KM 반경)
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
   const withDist = rows.map((c) => ({
@@ -173,7 +173,7 @@ export default function CourtListScreen() {
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : mode === 'map' ? (
-        // 지도는 공간 탐색용 — 5km 제한 없이 전부(검색 중이면 검색결과)
+        // 지도는 공간 탐색용 — 반경 제한 없이 전부(검색 중이면 검색결과)
         <CourtMap
           courts={searching ? visible.map((v) => v.court) : rows}
           center={myLoc ? { latitude: myLoc.lat, longitude: myLoc.lng } : undefined}
@@ -232,7 +232,7 @@ export default function CourtListScreen() {
             <View style={styles.empty}>
               <Ionicons name={searching ? 'search' : 'location-outline'} size={44} color={theme.tabIconDefault} />
               <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                {rows.length === 0 ? '등록된 코트가 없어요' : searching ? '검색 결과가 없어요' : '주변 5km에 코트가 없어요'}
+                {rows.length === 0 ? '등록된 코트가 없어요' : searching ? '검색 결과가 없어요' : `주변 ${RADIUS_KM}km에 코트가 없어요`}
               </Text>
               <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
                 {rows.length === 0 ? '코트가 등록되면 여기에 표시됩니다.' : searching ? '다른 지역명으로 검색해보세요.' : '지역·코트 이름으로 검색하면 더 넓게 찾을 수 있어요.'}
