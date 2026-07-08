@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import CourtMap from '@/components/court-map';
@@ -185,6 +185,13 @@ export default function CourtListScreen() {
             <Pressable
               onPress={() => router.push(`/court/${court.id}`)}
               style={({ pressed }) => [styles.card, { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 }]}>
+              {court.images?.[0] ? (
+                <Image source={{ uri: court.images[0] }} style={[styles.thumb, { backgroundColor: theme.backgroundElement }]} />
+              ) : (
+                <View style={[styles.thumb, styles.thumbEmpty, { backgroundColor: theme.backgroundElement }]}>
+                  <Ionicons name="tennisball-outline" size={22} color={theme.tabIconDefault} />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <View style={styles.nameRow}>
                   <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
@@ -246,6 +253,8 @@ const styles = StyleSheet.create({
   list: { padding: Spacing.four, paddingTop: Spacing.two, gap: Spacing.three, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, padding: Spacing.three },
+  thumb: { width: 64, height: 64, borderRadius: 12 },
+  thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 17, fontWeight: '700', flexShrink: 1 },
   distPill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },

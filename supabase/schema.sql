@@ -464,6 +464,7 @@ create table if not exists public.courts (
   court_units  jsonb not null default '[]'::jsonb,   -- [{name, surface}] 면별 바닥
   amenities    text[] not null default '{}'::text[], -- 편의시설 키(shower/parking…)
   lessons      boolean not null default false,        -- 레슨 가능 여부
+  images       text[] not null default '{}'::text[], -- 코트 사진 URL 배열
   auto_open_days int not null default 0 check (auto_open_days >= 0 and auto_open_days <= 60), -- 예약 자동 오픈 롤링 기간(일). 0=수동만
   created_at   timestamptz not null default now(),
   constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
@@ -689,6 +690,17 @@ create policy "avatars_update_own" on storage.objects
 drop policy if exists "avatars_delete_own" on storage.objects;
 create policy "avatars_delete_own" on storage.objects
   for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 코트 사진 Storage — 0028. court-images 버킷(공개), 쓰기는 코트관리자/최고관리자.
+insert into storage.buckets (id, name, public) values ('court-images', 'court-images', true) on conflict (id) do nothing;
+drop policy if exists "court_images_read" on storage.objects;
+create policy "court_images_read" on storage.objects for select using (bucket_id = 'court-images');
+drop policy if exists "court_images_insert" on storage.objects;
+create policy "court_images_insert" on storage.objects
+  for insert to authenticated with check (bucket_id = 'court-images' and public.my_role() in ('court_manager', 'super_admin'));
+drop policy if exists "court_images_delete" on storage.objects;
+create policy "court_images_delete" on storage.objects
+  for delete to authenticated using (bucket_id = 'court-images' and public.my_role() in ('court_manager', 'super_admin'));
 
 -- ============================================================
 -- 회원 탈퇴 (계정 삭제) — 0012

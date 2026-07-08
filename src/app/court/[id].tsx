@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MonthCalendar } from '@/components/month-calendar';
@@ -18,6 +18,7 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 export default function CourtDetail() {
   const theme = useTheme();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const uid = session?.user.id;
@@ -103,6 +104,7 @@ export default function CourtDetail() {
   // 시설 정보 (면/바닥, 편의시설)
   const units = Array.isArray(court.court_units) ? court.court_units : [];
   const amenities = Array.isArray(court.amenities) ? court.amenities : [];
+  const images = Array.isArray(court.images) ? court.images : [];
   const surfaces = [...new Set(units.map((u) => surfaceLabel(u.surface)))];
   const unitText = `${units.length}면${surfaces.length ? ` · ${surfaces.join(', ')}` : ''}`;
 
@@ -139,8 +141,11 @@ export default function CourtDetail() {
       // 'canceled'(사용자가 결제창 닫음)는 조용히 넘어감
     } else {
       const hoursText = [...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ');
-      Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`);
       setPicked([]);
+      Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`, [
+        { text: '계속 예약', style: 'cancel' },
+        { text: '내 예약 보기', onPress: () => router.push('/court/reservations') },
+      ]);
     }
     loadReservations(selectedDate);
   }
@@ -151,6 +156,13 @@ export default function CourtDetail() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
       <Stack.Screen options={{ title: court.name }} />
       <ScrollView contentContainerStyle={styles.content}>
+        {images.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery} style={styles.galleryWrap}>
+            {images.map((url) => (
+              <Image key={url} source={{ uri: url }} style={[styles.galleryImg, { backgroundColor: theme.backgroundElement }]} />
+            ))}
+          </ScrollView>
+        ) : null}
         <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Info icon="location-outline" text={`${court.region || '지역 미설정'}${court.address ? ` · ${court.address}` : ''}`} theme={theme} />
           <Info icon="home-outline" text={court.indoor ? '실내 코트' : '실외 코트'} theme={theme} />
@@ -257,6 +269,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
+  galleryWrap: { marginHorizontal: -Spacing.four },
+  gallery: { gap: 8, paddingHorizontal: Spacing.four },
+  galleryImg: { width: 280, height: 170, borderRadius: 14 },
   infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: 15, fontWeight: '500', flex: 1 },

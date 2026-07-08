@@ -89,6 +89,7 @@ export type Court = {
   court_units: CourtUnit[];
   amenities: string[];
   lessons: boolean;
+  images: string[]; // 코트 사진 URL 배열
   auto_open_days: number; // 예약 자동 오픈 롤링 기간(일). 0=수동만
   created_at: string;
 };

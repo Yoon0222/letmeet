@@ -64,6 +64,7 @@ type Form = {
   amenities: string[];
   lessons: boolean;
   auto_open_days: number;
+  images: string[];
 };
 
 const EMPTY: Form = {
@@ -82,6 +83,7 @@ const EMPTY: Form = {
   amenities: [],
   lessons: false,
   auto_open_days: 0,
+  images: [],
 };
 
 function CourtsInner() {
@@ -104,6 +106,7 @@ function CourtsInner() {
   const [openDays, setOpenDays] = useState<Set<string>>(new Set()); // 편집 중 코트의 오픈일
   const [blocks, setBlocks] = useState<CourtBlock[]>([]); // 연대관(정기 대관)
   const [blk, setBlk] = useState({ weekday: 2, start: 19, end: 21, label: '' }); // 새 연대관 입력
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -226,6 +229,7 @@ function CourtsInner() {
       amenities: Array.isArray(c.amenities) ? c.amenities : [],
       lessons: !!c.lessons,
       auto_open_days: c.auto_open_days ?? 0,
+      images: Array.isArray(c.images) ? c.images : [],
     });
     setError('');
     setGeoStatus(c.latitude != null ? { ok: true, msg: '저장된 좌표가 있어요.' } : null);
@@ -256,6 +260,26 @@ function CourtsInner() {
   }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  // 코트 사진 업로드/삭제 (Storage court-images)
+  async function uploadImages(files: FileList) {
+    if (files.length === 0) return;
+    setUploading(true);
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${editingId ?? 'new'}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from('court-images').upload(path, file, { upsert: false });
+      if (upErr) {
+        alert('사진 업로드 실패: ' + upErr.message);
+        continue;
+      }
+      urls.push(supabase.storage.from('court-images').getPublicUrl(path).data.publicUrl);
+    }
+    setForm((f) => ({ ...f, images: [...f.images, ...urls] }));
+    setUploading(false);
+  }
+  const removeImage = (url: string) => setForm((f) => ({ ...f, images: f.images.filter((u) => u !== url) }));
 
   // 면(코트) 편집
   const genUnits = () => {
@@ -300,6 +324,7 @@ function CourtsInner() {
       amenities: form.amenities,
       lessons: form.lessons,
       auto_open_days: form.auto_open_days,
+      images: form.images,
     };
     // owner_id 는 최고관리자만 지정/변경(코트관리자는 자기 코트 소유권 못 바꿈)
     const payload = isSuper ? { ...base, owner_id: form.owner_id } : base;
@@ -571,6 +596,31 @@ function CourtsInner() {
                 코트를 먼저 등록·저장한 뒤, 수정 화면에서 연대관을 설정할 수 있어요.
               </p>
             )}
+          </div>
+
+          {/* 코트 사진 (여러 장) */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-slate-700">코트 사진</span>
+            <div className="flex flex-wrap gap-2">
+              {form.images.map((url) => (
+                <div key={url} className="relative h-24 w-32 overflow-hidden rounded-lg border border-slate-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="코트 사진" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(url)}
+                    className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/50 text-xs text-white hover:bg-black/70"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <label className="flex h-24 w-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 text-xs text-slate-500 hover:bg-slate-50">
+                {uploading ? '업로드 중…' : '+ 사진 추가'}
+                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => e.target.files && uploadImages(e.target.files)} />
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">여러 장 등록 가능. 첫 사진이 목록·상세의 대표 이미지로 쓰여요.</p>
           </div>
 
           <Field label="소개 (선택)">
