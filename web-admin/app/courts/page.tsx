@@ -32,6 +32,7 @@ type Form = {
   name: string;
   region: string;
   address: string;
+  phone: string;
   indoor: boolean;
   hourly_price: number;
   open_hour: number;
@@ -49,6 +50,7 @@ const EMPTY: Form = {
   name: '',
   region: '',
   address: '',
+  phone: '',
   indoor: true,
   hourly_price: 0,
   open_hour: 6,
@@ -148,6 +150,7 @@ function CourtsInner() {
       name: c.name,
       region: c.region,
       address: c.address,
+      phone: c.phone ?? '',
       indoor: c.indoor,
       hourly_price: c.hourly_price,
       open_hour: c.open_hour,
@@ -222,6 +225,7 @@ function CourtsInner() {
       name: form.name.trim(),
       region: form.region.trim(),
       address: form.address.trim(),
+      phone: form.phone.trim(),
       indoor: form.indoor,
       hourly_price: form.hourly_price,
       open_hour: form.open_hour,
@@ -296,9 +300,14 @@ function CourtsInner() {
               <input className={inputCls} value={form.region} onChange={(e) => set('region', e.target.value)} placeholder="서울 용산" />
             </Field>
           </div>
-          <Field label="주소">
-            <input className={inputCls} value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="용산구 이촌로 100" />
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="주소">
+              <input className={inputCls} value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="용산구 이촌로 100" />
+            </Field>
+            <Field label="연락처 (선택)">
+              <input className={inputCls} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="02-123-4567" />
+            </Field>
+          </div>
 
           {/* 위치(좌표) */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
