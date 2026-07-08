@@ -159,6 +159,24 @@ export type AuditLogWithActor = AuditLog & {
   actor: Pick<EntryProfile, 'id' | 'nickname'> | null;
 };
 
+// 신고(moderation)
+export type ReportStatus = 'open' | 'reviewed' | 'dismissed';
+export type Report = {
+  id: string;
+  reporter_id: string;
+  target_type: 'meetup' | 'club' | 'profile' | 'tournament';
+  target_id: string;
+  target_user_id: string | null;
+  reason: string;
+  detail: string;
+  status: ReportStatus;
+  created_at: string;
+};
+export type ReportWithNames = Report & {
+  reporter: Pick<EntryProfile, 'id' | 'nickname'> | null;
+  target_user: Pick<EntryProfile, 'id' | 'nickname'> | null;
+};
+
 type Write<T> = Partial<T>;
 
 export interface Database {
@@ -216,6 +234,12 @@ export interface Database {
         Row: CourtBlock;
         Insert: { court_id: string; weekday: number; start_hour: number; end_hour: number } & Write<CourtBlock>;
         Update: Write<CourtBlock>;
+        Relationships: [];
+      };
+      reports: {
+        Row: Report;
+        Insert: Write<Report>;
+        Update: Write<Report>;
         Relationships: [];
       };
     };

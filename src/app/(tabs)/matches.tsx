@@ -15,7 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { getBlockedIds } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
 
@@ -23,27 +25,33 @@ import type { MeetupWithCounts } from '@/lib/types';
 export default function MatchesScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { session } = useAuth();
+  const uid = session?.user.id;
   const [meetups, setMeetups] = useState<MeetupWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [region, setRegion] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('meetups_with_counts')
-      .select('*')
-      .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-      .order('start_time', { ascending: true })
-      .limit(100);
+    const [{ data, error }, blocked] = await Promise.all([
+      supabase
+        .from('meetups_with_counts')
+        .select('*')
+        .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+        .order('start_time', { ascending: true })
+        .limit(100),
+      uid ? getBlockedIds(uid) : Promise.resolve([]),
+    ]);
     if (error) {
       console.warn('[matches] load error', error.message);
       setMeetups([]);
     } else {
-      setMeetups(data ?? []);
+      const blockedSet = new Set(blocked);
+      setMeetups((data ?? []).filter((m) => !blockedSet.has(m.host_id))); // 차단한 사용자 모임 숨김
     }
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ReportBlock } from '@/components/report-block';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,8 +55,14 @@ export default function MeetupDetail() {
   const closed = meetup?.status !== 'open';
 
   useEffect(() => {
-    navigation.setOptions({ title: meetup?.title ?? '모임 상세' });
-  }, [navigation, meetup?.title]);
+    navigation.setOptions({
+      title: meetup?.title ?? '모임 상세',
+      headerRight:
+        meetup && !isHost
+          ? () => <ReportBlock targetType="meetup" targetId={meetup.id} targetUserId={meetup.host_id} targetLabel={meetup.title} onBlocked={() => router.back()} />
+          : undefined,
+    });
+  }, [navigation, meetup, isHost, router]);
 
   async function join() {
     if (!uid || !id) return;

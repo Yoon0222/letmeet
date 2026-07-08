@@ -267,6 +267,28 @@ export type CourtReservationWithCourt = CourtReservation & {
   courts: Pick<Court, 'id' | 'name' | 'region' | 'indoor' | 'hourly_price'>;
 };
 
+// ---- 신고·차단 (moderation) ----
+export type ReportTargetType = 'meetup' | 'club' | 'profile' | 'tournament';
+export type ReportStatus = 'open' | 'reviewed' | 'dismissed';
+
+export type UserBlock = {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+};
+
+export type Report = {
+  id: string;
+  reporter_id: string;
+  target_type: ReportTargetType;
+  target_id: string;
+  target_user_id: string | null;
+  reason: string;
+  detail: string;
+  status: ReportStatus;
+  created_at: string;
+};
+
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
 type WriteDefaults<T> = Partial<T>;
 
@@ -364,6 +386,18 @@ export interface Database {
         Row: CourtBlock;
         Insert: { court_id: string; weekday: number; start_hour: number; end_hour: number } & WriteDefaults<CourtBlock>;
         Update: WriteDefaults<CourtBlock>;
+        Relationships: [];
+      };
+      user_blocks: {
+        Row: UserBlock;
+        Insert: { blocker_id: string; blocked_id: string };
+        Update: WriteDefaults<UserBlock>;
+        Relationships: [];
+      };
+      reports: {
+        Row: Report;
+        Insert: { reporter_id: string; target_type: ReportTargetType; target_id: string; reason: string } & WriteDefaults<Report>;
+        Update: WriteDefaults<Report>;
         Relationships: [];
       };
     };

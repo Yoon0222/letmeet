@@ -14,32 +14,36 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { getBlockedIds } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 import type { ClubWithCounts } from '@/lib/types';
 
 export default function ClubsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { session } = useAuth();
+  const uid = session?.user.id;
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('clubs_with_counts')
-      .select('*')
-      .order('member_count', { ascending: false })
-      .limit(100);
+    const [{ data, error }, blocked] = await Promise.all([
+      supabase.from('clubs_with_counts').select('*').order('member_count', { ascending: false }).limit(100),
+      uid ? getBlockedIds(uid) : Promise.resolve([]),
+    ]);
     if (error) {
       console.warn('[clubs] load error', error.message);
       setClubs([]);
     } else {
-      setClubs(data ?? []);
+      const blockedSet = new Set(blocked);
+      setClubs((data ?? []).filter((c) => !blockedSet.has(c.owner_id))); // 차단한 사용자 클럽 숨김
     }
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {

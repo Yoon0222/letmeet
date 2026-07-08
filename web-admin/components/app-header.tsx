@@ -39,6 +39,9 @@ export function AppHeader() {
                 사용자
               </Link>
             )}
+            <Link href="/reports" className="text-slate-600 hover:text-slate-900">
+              신고
+            </Link>
             {role === 'super_admin' && (
               <Link href="/audit" className="text-slate-600 hover:text-slate-900">
                 감사로그

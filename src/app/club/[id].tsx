@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { ReportBlock } from '@/components/report-block';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
@@ -52,8 +53,14 @@ export default function ClubDetail() {
   const joined = members.some((m) => m.user_id === uid);
 
   useEffect(() => {
-    navigation.setOptions({ title: club?.name ?? '클럽' });
-  }, [navigation, club?.name]);
+    navigation.setOptions({
+      title: club?.name ?? '클럽',
+      headerRight:
+        club && !isOwner
+          ? () => <ReportBlock targetType="club" targetId={club.id} targetUserId={club.owner_id} targetLabel={club.name} onBlocked={() => router.back()} />
+          : undefined,
+    });
+  }, [navigation, club, isOwner, router]);
 
   async function join() {
     if (!uid || !id) return;
