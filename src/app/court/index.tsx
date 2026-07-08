@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -11,6 +10,16 @@ import { useTheme } from '@/hooks/use-theme';
 import { distanceKm, formatDistance, type LatLng } from '@/lib/geo';
 import { supabase } from '@/lib/supabase';
 import type { Court } from '@/lib/types';
+
+// expo-location 은 네이티브 모듈이라 구 개발 빌드엔 없을 수 있음.
+// 없으면 크래시 대신 null → 위치 없이 '전체 + 검색' 폴백.
+let Location: typeof import('expo-location') | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Location = require('expo-location');
+} catch {
+  Location = null;
+}
 
 const RADIUS_KM = 5;
 
@@ -46,15 +55,20 @@ export default function CourtListScreen() {
   // 현재 위치 (한 번). 권한 거부/실패/시간초과 시 '전체 + 검색' 폴백.
   useEffect(() => {
     let cancelled = false;
+    const loc = Location;
     (async () => {
+      if (!loc) {
+        setLocState('off');
+        return;
+      }
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await loc.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           if (!cancelled) setLocState('off');
           return;
         }
         const pos = await Promise.race([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          loc.getCurrentPositionAsync({ accuracy: loc.Accuracy.Balanced }),
           new Promise<null>((res) => setTimeout(() => res(null), 8000)),
         ]);
         if (cancelled) return;
