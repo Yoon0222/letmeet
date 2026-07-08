@@ -7,6 +7,7 @@ import type { Court } from '@/lib/types';
 export type CourtMapProps = {
   courts: Court[];
   onSelect: (id: string) => void;
+  center?: { latitude: number; longitude: number };
 };
 
 // 웹/기본 폴백 — 네이티브 지도 SDK 는 앱(iOS/Android)에서만 렌더된다.

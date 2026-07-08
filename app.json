@@ -44,6 +44,12 @@
           "photosPermission": "프로필 사진을 올리기 위해 사진 접근 권한이 필요합니다."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "가까운 코트를 찾기 위해 현재 위치가 필요합니다."
+        }
+      ],
       "@mj-studio/react-native-naver-map",
       "expo-build-properties"
     ],
