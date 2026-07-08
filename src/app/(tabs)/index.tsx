@@ -15,13 +15,14 @@ import { supabase } from '@/lib/supabase';
 import type { ClubWithCounts, MeetupWithCounts } from '@/lib/types';
 
 const pad = (n: number) => String(n).padStart(2, '0');
+const SCHED_CARD_W = 210;
 
 type UpcomingItem = { key: string; type: 'tournament' | 'meetup' | 'court'; title: string; subtitle: string; at: number; route: string };
 
 function schedVisual(type: UpcomingItem['type'], theme: ReturnType<typeof useTheme>) {
-  if (type === 'tournament') return { icon: 'trophy' as const, tint: 'rgba(18,185,129,0.12)', color: theme.primary };
-  if (type === 'meetup') return { icon: 'flash' as const, tint: 'rgba(245,166,35,0.15)', color: theme.accent };
-  return { icon: 'location' as const, tint: 'rgba(45,127,249,0.14)', color: '#2D7FF9' }; // court
+  if (type === 'tournament') return { icon: 'trophy' as const, label: '대회', tint: 'rgba(18,185,129,0.12)', color: theme.primary };
+  if (type === 'meetup') return { icon: 'flash' as const, label: '번개모임', tint: 'rgba(245,166,35,0.15)', color: theme.accent };
+  return { icon: 'location' as const, label: '코트 예약', tint: 'rgba(45,127,249,0.14)', color: '#2D7FF9' }; // court
 }
 
 export default function HomeScreen() {
@@ -216,24 +217,36 @@ export default function HomeScreen() {
         {/* 3. 다가오는 내 일정 */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>다가오는 내 일정</Text>
         {hasSchedule ? (
-          <View style={[styles.listCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            {upcoming.map((item, i) => {
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.carouselWrap}
+            contentContainerStyle={styles.carousel}
+            snapToInterval={SCHED_CARD_W + Spacing.three}
+            decelerationRate="fast">
+            {upcoming.map((item) => {
               const v = schedVisual(item.type, theme);
               return (
-                <ScheduleRow
+                <Pressable
                   key={item.key}
-                  icon={v.icon}
-                  tint={v.tint}
-                  color={v.color}
-                  title={item.title}
-                  subtitle={item.subtitle}
                   onPress={() => router.push(item.route as never)}
-                  theme={theme}
-                  border={i < upcoming.length - 1}
-                />
+                  style={({ pressed }) => [styles.schedCard, { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 }]}>
+                  <View style={styles.schedCardTop}>
+                    <View style={[styles.schedCardIcon, { backgroundColor: v.tint }]}>
+                      <Ionicons name={v.icon} size={16} color={v.color} />
+                    </View>
+                    <Text style={[styles.schedCardType, { color: v.color }]}>{v.label}</Text>
+                  </View>
+                  <Text style={[styles.schedCardTitle, { color: theme.text }]} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.schedCardSub, { color: theme.textSecondary }]} numberOfLines={2}>
+                    {item.subtitle}
+                  </Text>
+                </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         ) : (
           <Pressable
             onPress={() => router.push('/(tabs)/matches')}
@@ -309,45 +322,6 @@ function Pillar({
   );
 }
 
-function ScheduleRow({
-  icon,
-  tint,
-  color,
-  title,
-  subtitle,
-  onPress,
-  theme,
-  border = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  tint: string;
-  color: string;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-  border?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.schedRow, border && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
-      <View style={[styles.schedIcon, { backgroundColor: tint }]}>
-        <Ionicons name={icon} size={18} color={color} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.schedTitle, { color: theme.text }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={[styles.schedSub, { color: theme.textSecondary }]} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.tabIconDefault} />
-    </Pressable>
-  );
-}
-
 function SectionHeader({
   title,
   onMore,
@@ -390,11 +364,14 @@ const styles = StyleSheet.create({
   myResvText: { fontSize: 13, fontWeight: '700' },
   soon: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   soonText: { fontSize: 11, fontWeight: '800' },
-  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  schedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.three },
-  schedIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  schedTitle: { fontSize: 15, fontWeight: '700' },
-  schedSub: { fontSize: 12, marginTop: 2 },
+  carouselWrap: { marginHorizontal: -Spacing.four },
+  carousel: { gap: Spacing.three, paddingHorizontal: Spacing.four },
+  schedCard: { width: SCHED_CARD_W, borderWidth: 1, borderRadius: 16, padding: Spacing.three, gap: 6 },
+  schedCardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  schedCardIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  schedCardType: { fontSize: 12, fontWeight: '700' },
+  schedCardTitle: { fontSize: 15, fontWeight: '700' },
+  schedCardSub: { fontSize: 12, lineHeight: 17 },
   sectionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
