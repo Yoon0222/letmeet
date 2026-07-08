@@ -12,7 +12,17 @@ import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMeetupTime, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { ClubWithCounts, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
+import type { ClubWithCounts, MeetupWithCounts } from '@/lib/types';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+type UpcomingItem = { key: string; type: 'tournament' | 'meetup' | 'court'; title: string; subtitle: string; at: number; route: string };
+
+function schedVisual(type: UpcomingItem['type'], theme: ReturnType<typeof useTheme>) {
+  if (type === 'tournament') return { icon: 'trophy' as const, tint: 'rgba(18,185,129,0.12)', color: theme.primary };
+  if (type === 'meetup') return { icon: 'flash' as const, tint: 'rgba(245,166,35,0.15)', color: theme.accent };
+  return { icon: 'location' as const, tint: 'rgba(45,127,249,0.14)', color: '#2D7FF9' }; // court
+}
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -20,8 +30,7 @@ export default function HomeScreen() {
   const { session, profile } = useAuth();
   const uid = session?.user.id;
 
-  const [nextMeetup, setNextMeetup] = useState<MeetupWithCounts | null>(null);
-  const [nextTournament, setNextTournament] = useState<TournamentWithCounts | null>(null);
+  const [upcoming, setUpcoming] = useState<UpcomingItem[]>([]);
   const [recommended, setRecommended] = useState<MeetupWithCounts[]>([]);
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,16 +39,15 @@ export default function HomeScreen() {
   const myRegion = profile?.region ?? '';
 
   const load = useCallback(async () => {
-    const nowIso = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-    // 내가 참여 중인 다음 모임
-    let next: MeetupWithCounts | null = null;
-    let nextT: TournamentWithCounts | null = null;
+    // 다가오는 내 일정 = 대회 + 번개모임 + 코트예약 통합(시간순)
+    const items: UpcomingItem[] = [];
     if (uid) {
-      const { data: parts } = await supabase
-        .from('meetup_participants')
-        .select('meetup_id')
-        .eq('user_id', uid);
+      // 참여 중인 다가오는 모임
+      const { data: parts } = await supabase.from('meetup_participants').select('meetup_id').eq('user_id', uid);
       const ids = (parts ?? []).map((p) => p.meetup_id);
       if (ids.length > 0) {
         const { data } = await supabase
@@ -49,11 +57,13 @@ export default function HomeScreen() {
           .eq('status', 'open')
           .gte('start_time', nowIso)
           .order('start_time', { ascending: true })
-          .limit(1);
-        next = data?.[0] ?? null;
+          .limit(5);
+        (data ?? []).forEach((m) =>
+          items.push({ key: `m${m.id}`, type: 'meetup', title: m.title, subtitle: `${formatMeetupTime(m.start_time)} · ${m.location_name}`, at: new Date(m.start_time).getTime(), route: `/meetup/${m.id}` }),
+        );
       }
 
-      // 내가 신청했거나 파트너로 등록된 다음 대회
+      // 신청/파트너 등록된 다가오는 대회
       const { data: ents } = await supabase
         .from('tournament_entries')
         .select('tournament_id')
@@ -68,12 +78,39 @@ export default function HomeScreen() {
           .gte('start_at', nowIso)
           .neq('status', 'cancelled')
           .order('start_at', { ascending: true })
-          .limit(1);
-        nextT = data?.[0] ?? null;
+          .limit(5);
+        (data ?? []).forEach((t) =>
+          items.push({ key: `t${t.id}`, type: 'tournament', title: t.title, subtitle: `${formatMeetupTime(t.start_at)} · ${t.venue || '장소 미정'}`, at: new Date(t.start_at).getTime(), route: `/tournament/${t.id}` }),
+        );
       }
+
+      // 다가오는 코트 예약 (코트+날짜 그룹)
+      const { data: resvData } = await supabase
+        .from('court_reservations')
+        .select('court_id, slot_date, hour, courts(name)')
+        .eq('user_id', uid)
+        .eq('status', 'reserved')
+        .gte('slot_date', todayStr);
+      const resv = (resvData ?? []) as unknown as { court_id: string; slot_date: string; hour: number; courts: { name: string } | null }[];
+      const groups = new Map<string, { courtId: string; name: string; date: string; hours: number[] }>();
+      resv.forEach((r) => {
+        const k = `${r.court_id}|${r.slot_date}`;
+        const g = groups.get(k) ?? { courtId: r.court_id, name: r.courts?.name ?? '코트', date: r.slot_date, hours: [] };
+        g.hours.push(r.hour);
+        groups.set(k, g);
+      });
+      const curH = now.getHours();
+      groups.forEach((g) => {
+        g.hours.sort((a, b) => a - b);
+        const maxH = g.hours[g.hours.length - 1];
+        if (g.date === todayStr && maxH < curH) return; // 오늘 이미 지난 예약 제외
+        const [y, mo, d] = g.date.split('-').map(Number);
+        const hourText = g.hours.length > 1 ? `${g.hours[0]}~${maxH + 1}시` : `${g.hours[0]}시`;
+        items.push({ key: `c${g.courtId}${g.date}`, type: 'court', title: g.name, subtitle: `${mo}월 ${d}일 · ${hourText}`, at: new Date(y, mo - 1, d, g.hours[0]).getTime(), route: `/court/${g.courtId}` });
+      });
     }
-    setNextMeetup(next);
-    setNextTournament(nextT);
+    items.sort((a, b) => a.at - b.at);
+    setUpcoming(items.slice(0, 4));
 
     // 근처 추천 모임 (다가오는 오픈 모임)
     const { data: recs } = await supabase
@@ -83,7 +120,9 @@ export default function HomeScreen() {
       .gte('start_time', nowIso)
       .order('start_time', { ascending: true })
       .limit(5);
-    setRecommended((recs ?? []).filter((m) => m.id !== next?.id).slice(0, 3));
+    // 이미 '내 일정'에 뜨는 모임은 추천에서 제외
+    const upcomingMeetupIds = new Set(items.filter((i) => i.type === 'meetup').map((i) => i.key.slice(1)));
+    setRecommended((recs ?? []).filter((m) => !upcomingMeetupIds.has(m.id)).slice(0, 3));
 
     // 추천 클럽 (멤버 많은 순)
     const { data: cs } = await supabase
@@ -102,7 +141,7 @@ export default function HomeScreen() {
     }, [load]),
   );
 
-  const hasSchedule = !!nextMeetup || !!nextTournament;
+  const hasSchedule = upcoming.length > 0;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -178,29 +217,22 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>다가오는 내 일정</Text>
         {hasSchedule ? (
           <View style={[styles.listCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            {nextTournament && (
-              <ScheduleRow
-                icon="trophy"
-                tint="rgba(18,185,129,0.12)"
-                color={theme.primary}
-                title={nextTournament.title}
-                subtitle={`${formatMeetupTime(nextTournament.start_at)} · ${nextTournament.venue || '장소 미정'}`}
-                onPress={() => router.push(`/tournament/${nextTournament.id}`)}
-                theme={theme}
-                border={!!nextMeetup}
-              />
-            )}
-            {nextMeetup && (
-              <ScheduleRow
-                icon="flash"
-                tint="rgba(245,166,35,0.15)"
-                color={theme.accent}
-                title={nextMeetup.title}
-                subtitle={`${formatMeetupTime(nextMeetup.start_time)} · ${nextMeetup.location_name}`}
-                onPress={() => router.push(`/meetup/${nextMeetup.id}`)}
-                theme={theme}
-              />
-            )}
+            {upcoming.map((item, i) => {
+              const v = schedVisual(item.type, theme);
+              return (
+                <ScheduleRow
+                  key={item.key}
+                  icon={v.icon}
+                  tint={v.tint}
+                  color={v.color}
+                  title={item.title}
+                  subtitle={item.subtitle}
+                  onPress={() => router.push(item.route as never)}
+                  theme={theme}
+                  border={i < upcoming.length - 1}
+                />
+              );
+            })}
           </View>
         ) : (
           <Pressable
@@ -210,7 +242,7 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>예정된 일정이 없어요</Text>
               <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                번개 모임이나 대회에 참가해보세요
+                코트 예약, 번개 모임, 대회에 참여해보세요
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
