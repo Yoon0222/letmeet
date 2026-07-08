@@ -31,13 +31,14 @@ export async function startCourtPayment(args: {
   uid: string;
   slotDate: string;
   hours: number[];
+  courtUnit: string;
 }): Promise<PayResult> {
-  const { court, uid, slotDate, hours } = args;
+  const { court, uid, slotDate, hours, courtUnit } = args;
   const amount = hours.length * court.hourly_price;
 
   // 무료 코트: 결제 없이 바로 예약
   if (amount <= 0) {
-    const { error } = await supabase.from('court_reservations').insert(hours.map((h) => ({ court_id: court.id, user_id: uid, slot_date: slotDate, hour: h })));
+    const { error } = await supabase.from('court_reservations').insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h })));
     if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? 'slot' : 'error', message: error.message };
     return { ok: true, free: true };
   }
@@ -46,7 +47,7 @@ export async function startCourtPayment(args: {
   const orderId = `ord_${uid.slice(0, 8)}_${Date.now()}`;
   const { data: pay, error: payErr } = await supabase
     .from('court_payments')
-    .insert({ order_id: orderId, user_id: uid, court_id: court.id, slot_date: slotDate, hours, amount, provider: PROVIDER })
+    .insert({ order_id: orderId, user_id: uid, court_id: court.id, court_unit: courtUnit, slot_date: slotDate, hours, amount, provider: PROVIDER })
     .select('id')
     .single();
   if (payErr || !pay) return { ok: false, reason: 'error', message: payErr?.message };
@@ -54,7 +55,7 @@ export async function startCourtPayment(args: {
   // 2) 슬롯 홀드(예약 행 생성 + 주문 연결). 중복이면 이미 예약된 슬롯.
   const { error: resErr } = await supabase
     .from('court_reservations')
-    .insert(hours.map((h) => ({ court_id: court.id, user_id: uid, slot_date: slotDate, hour: h, payment_id: pay.id })));
+    .insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h, payment_id: pay.id })));
   if (resErr) {
     await supabase.from('court_payments').update({ status: 'failed' }).eq('id', pay.id);
     return { ok: false, reason: /duplicate|unique/i.test(resErr.message) ? 'slot' : 'error', message: resErr.message };

@@ -235,6 +235,7 @@ export type CourtReservation = {
   id: string;
   court_id: string;
   user_id: string;
+  court_unit: string; // 면(코트) 이름. '' = 시설 단위
   slot_date: string; // YYYY-MM-DD
   hour: number;
   status: ReservationStatus;
@@ -250,6 +251,7 @@ export type CourtPayment = {
   order_id: string;
   user_id: string;
   court_id: string;
+  court_unit: string;
   slot_date: string;
   hours: number[];
   amount: number;

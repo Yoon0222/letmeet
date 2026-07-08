@@ -28,6 +28,7 @@ export default function CourtDetail() {
   const [selectedDate, setSelectedDate] = useState('');
   const [openDays, setOpenDays] = useState<string[]>([]);
   const [blocks, setBlocks] = useState<CourtBlock[]>([]);
+  const [selectedUnit, setSelectedUnit] = useState(''); // 선택한 면(코트) 이름. '' = 시설 단위
   const [picked, setPicked] = useState<number[]>([]);
   const [anchor, setAnchor] = useState<number | null>(null); // 연속선택 시작점
   const [nowMs, setNowMs] = useState(0);
@@ -48,10 +49,12 @@ export default function CourtDetail() {
       ]);
       const openList = (openRes.data ?? []).map((r) => r.day);
       const autoN = courtRes.data?.auto_open_days ?? 0;
+      const unitList = Array.isArray(courtRes.data?.court_units) ? courtRes.data.court_units : [];
       setCourt(courtRes.data ?? null);
       setNowMs(now);
       setOpenDays(openList);
       setBlocks((blockRes.data as CourtBlock[]) ?? []);
+      setSelectedUnit(unitList[0]?.name ?? ''); // 첫 면 기본 선택
       // 자동 오픈이 있으면 오늘이 가장 가까운 예약일, 없으면 가장 이른 수동 오픈일
       setSelectedDate(autoN > 0 ? today : (openList[0] ?? ''));
       setLoading(false);
@@ -111,8 +114,9 @@ export default function CourtDetail() {
 
   // 시간 슬롯
   const hours = Array.from({ length: Math.max(0, court.close_hour - court.open_hour) }, (_, i) => court.open_hour + i);
+  // 선택한 면의 예약만 슬롯에 반영 (면별 독립 예약)
   const reservedByHour = new Map<number, CourtReservation>();
-  reservations.forEach((r) => reservedByHour.set(r.hour, r));
+  reservations.filter((r) => r.court_unit === selectedUnit).forEach((r) => reservedByHour.set(r.hour, r));
   const isToday = selectedDate === ymd(new Date(nowMs));
   const curHour = new Date(nowMs).getHours();
 
@@ -164,6 +168,7 @@ export default function CourtDetail() {
       uid,
       slotDate: selectedDate,
       hours: [...picked],
+      courtUnit: selectedUnit,
     });
     setBooking(false);
     if (!result.ok) {
@@ -238,6 +243,31 @@ export default function CourtDetail() {
             markedDays={openDaySet}
           />
         )}
+
+        {/* 코트(면) 선택 — 면이 여러 개면 */}
+        {selectedDate && units.length > 0 ? (
+          <>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>코트 선택</Text>
+            <View style={styles.unitRow}>
+              {units.map((u) => {
+                const active = u.name === selectedUnit;
+                return (
+                  <Pressable
+                    key={u.name}
+                    onPress={() => {
+                      setSelectedUnit(u.name);
+                      setPicked([]);
+                      setAnchor(null);
+                    }}
+                    style={[styles.unitChip, { backgroundColor: active ? theme.primary : theme.backgroundElement }]}>
+                    <Text style={[styles.unitName, { color: active ? '#fff' : theme.text }]}>{u.name}</Text>
+                    <Text style={[styles.unitSurface, { color: active ? '#fff' : theme.textSecondary }]}>{surfaceLabel(u.surface)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
 
         {/* 시간 슬롯 */}
         {selectedDate ? (
@@ -315,6 +345,10 @@ const styles = StyleSheet.create({
   desc: { fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
   rangeHint: { fontSize: 12, marginTop: -4 },
+  unitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  unitChip: { minWidth: 64, alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
+  unitName: { fontSize: 15, fontWeight: '800' },
+  unitSurface: { fontSize: 11, fontWeight: '600' },
   noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: Spacing.three },
   noDaysText: { fontSize: 13, lineHeight: 19, flex: 1 },
   slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

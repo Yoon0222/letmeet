@@ -485,6 +485,7 @@ create table if not exists public.court_reservations (
   id         uuid primary key default uuid_generate_v4(),
   court_id   uuid not null references public.courts(id) on delete cascade,
   user_id    uuid not null references public.profiles(id) on delete cascade,
+  court_unit text not null default '',                        -- 면(코트) 이름. '' = 시설 단위
   slot_date  date not null,
   hour       int not null check (hour >= 0 and hour <= 23),
   status     text not null default 'reserved',
@@ -492,8 +493,9 @@ create table if not exists public.court_reservations (
 );
 create index if not exists court_reservations_court_date_idx on public.court_reservations (court_id, slot_date);
 create index if not exists court_reservations_user_idx on public.court_reservations (user_id);
+-- 중복 방지: (코트, 면, 날짜, 시각) 단위
 create unique index if not exists court_reservations_slot_uniq
-  on public.court_reservations (court_id, slot_date, hour) where status = 'reserved';
+  on public.court_reservations (court_id, court_unit, slot_date, hour) where status = 'reserved';
 alter table public.court_reservations enable row level security;
 drop policy if exists "reservations_select" on public.court_reservations;
 create policy "reservations_select" on public.court_reservations for select using (true);
@@ -529,6 +531,7 @@ create table if not exists public.court_payments (
   order_id     text not null unique,
   user_id      uuid not null references public.profiles(id) on delete cascade,
   court_id     uuid not null references public.courts(id) on delete cascade,
+  court_unit   text not null default '',
   slot_date    date not null,
   hours        int[] not null default '{}',
   amount       int not null default 0,

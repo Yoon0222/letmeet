@@ -23,6 +23,7 @@ type Group = {
   key: string;
   courtId: string;
   courtName: string;
+  unit: string;
   region: string;
   date: string;
   hours: number[];
@@ -65,10 +66,10 @@ export default function MyReservationsScreen() {
   const curHour = new Date(nowMs).getHours();
   const map = new Map<string, Group>();
   for (const r of rows) {
-    const k = `${r.court_id}|${r.slot_date}`;
+    const k = `${r.court_id}|${r.court_unit}|${r.slot_date}`;
     let g = map.get(k);
     if (!g) {
-      g = { key: k, courtId: r.court_id, courtName: r.courts?.name ?? '코트', region: r.courts?.region ?? '', date: r.slot_date, hours: [], price: r.courts?.hourly_price ?? 0, ids: [], past: false };
+      g = { key: k, courtId: r.court_id, courtName: r.courts?.name ?? '코트', unit: r.court_unit ?? '', region: r.courts?.region ?? '', date: r.slot_date, hours: [], price: r.courts?.hourly_price ?? 0, ids: [], past: false };
       map.set(k, g);
     }
     g.hours.push(r.hour);
@@ -104,6 +105,7 @@ export default function MyReservationsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.courtName, { color: theme.text }]} numberOfLines={1}>
             {g.courtName}
+            {g.unit ? <Text style={{ color: theme.primary }}> · {g.unit}</Text> : null}
           </Text>
           <Text style={[styles.meta, { color: theme.textSecondary }]}>{g.region || '지역 미설정'}</Text>
         </View>
