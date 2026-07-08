@@ -92,8 +92,11 @@ function CourtsInner() {
 
   useEffect(() => {
     if (role == null) return;
-    load();
-    loadManagers();
+    const t = setTimeout(() => {
+      load();
+      loadManagers();
+    }, 0);
+    return () => clearTimeout(t);
   }, [role, load, loadManagers]);
 
   const ownerName = (id: string | null) => (id ? managers.find((m) => m.id === id)?.nickname ?? (id === myId ? '나' : '지정됨') : '미지정');
