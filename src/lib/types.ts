@@ -186,6 +186,9 @@ export type TournamentCourt = {
 };
 
 // ---- 코트 예약 (courts / court_reservations) ----
+/** 면(코트) 1개 — 이름 + 바닥 종류 */
+export type CourtUnit = { name: string; surface: string };
+
 export type Court = {
   id: string;
   name: string;
@@ -200,6 +203,9 @@ export type Court = {
   owner_id: string | null;
   latitude: number | null;
   longitude: number | null;
+  court_units: CourtUnit[];
+  amenities: string[];
+  lessons: boolean;
   created_at: string;
 };
 

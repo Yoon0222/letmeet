@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { supabase } from '@/lib/supabase';
 import type { Court, CourtReservation } from '@/lib/types';
 
@@ -86,6 +87,12 @@ export default function CourtDetail() {
   });
   const dayLabel = (d: Date, i: number) => (i === 0 ? '오늘' : i === 1 ? '내일' : `${d.getMonth() + 1}.${d.getDate()}(${DOW[d.getDay()]})`);
 
+  // 시설 정보 (면/바닥, 편의시설)
+  const units = Array.isArray(court.court_units) ? court.court_units : [];
+  const amenities = Array.isArray(court.amenities) ? court.amenities : [];
+  const surfaces = [...new Set(units.map((u) => surfaceLabel(u.surface)))];
+  const unitText = `${units.length}면${surfaces.length ? ` · ${surfaces.join(', ')}` : ''}`;
+
   // 시간 슬롯
   const hours = Array.from({ length: Math.max(0, court.close_hour - court.open_hour) }, (_, i) => court.open_hour + i);
   const reservedByHour = new Map<number, CourtReservation>();
@@ -145,7 +152,22 @@ export default function CourtDetail() {
           <Info icon="home-outline" text={court.indoor ? '실내 코트' : '실외 코트'} theme={theme} />
           <Info icon="time-outline" text={`운영 ${court.open_hour}시 – ${court.close_hour}시`} theme={theme} />
           <Info icon="cash-outline" text={court.hourly_price > 0 ? `시간당 ${court.hourly_price.toLocaleString()}원` : '무료'} theme={theme} />
+          {units.length > 0 ? <Info icon="grid-outline" text={unitText} theme={theme} /> : null}
+          {court.lessons ? <Info icon="school-outline" text="레슨 가능" theme={theme} /> : null}
         </View>
+
+        {amenities.length > 0 ? (
+          <View style={styles.amenityRow}>
+            {amenities.map((a) => (
+              <View key={a} style={[styles.amenityChip, { backgroundColor: theme.backgroundElement }]}>
+                <Text style={[styles.amenityText, { color: theme.text }]}>
+                  {AMENITIES.find((x) => x.key === a)?.emoji ?? ''} {amenityLabel(a)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {court.description ? <Text style={[styles.desc, { color: theme.textSecondary }]}>{court.description}</Text> : null}
 
         {/* 날짜 */}
@@ -226,6 +248,9 @@ const styles = StyleSheet.create({
   infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  amenityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  amenityChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  amenityText: { fontSize: 13, fontWeight: '600' },
   desc: { fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
   hint: { fontSize: 12, marginTop: -6 },

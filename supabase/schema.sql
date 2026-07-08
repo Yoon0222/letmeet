@@ -461,6 +461,9 @@ create table if not exists public.courts (
   owner_id     uuid references public.profiles(id) on delete set null,
   latitude     double precision,
   longitude    double precision,
+  court_units  jsonb not null default '[]'::jsonb,   -- [{name, surface}] 면별 바닥
+  amenities    text[] not null default '{}'::text[], -- 편의시설 키(shower/parking…)
+  lessons      boolean not null default false,        -- 레슨 가능 여부
   created_at   timestamptz not null default now(),
   constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
 );
@@ -471,9 +474,10 @@ alter table public.courts enable row level security;
 drop policy if exists "courts_facility_select" on public.courts;
 create policy "courts_facility_select" on public.courts for select using (true);
 drop policy if exists "courts_facility_write" on public.courts;
+-- 쓰기: 최고관리자는 전체, 코트관리자는 자기 코트(owner_id=본인)만
 create policy "courts_facility_write" on public.courts
-  for all using (public.my_role() in ('court_manager', 'super_admin') or auth.uid() = owner_id)
-  with check (public.my_role() in ('court_manager', 'super_admin') or auth.uid() = owner_id);
+  for all using (public.my_role() = 'super_admin' or auth.uid() = owner_id)
+  with check (public.my_role() = 'super_admin' or auth.uid() = owner_id);
 
 create table if not exists public.court_reservations (
   id         uuid primary key default uuid_generate_v4(),
