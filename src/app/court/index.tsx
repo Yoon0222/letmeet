@@ -105,7 +105,16 @@ export default function CourtListScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
-      <Stack.Screen options={{ title: '코트 예약' }} />
+      <Stack.Screen
+        options={{
+          title: '코트 예약',
+          headerRight: () => (
+            <Pressable onPress={() => router.push('/court/reservations')} hitSlop={8}>
+              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 15 }}>내 예약</Text>
+            </Pressable>
+          ),
+        }}
+      />
 
       {!loading && rows.length > 0 ? (
         <View style={styles.header}>

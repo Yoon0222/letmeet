@@ -66,6 +66,7 @@ function RootNavigator() {
       <Stack.Screen name="club/[id]" options={{ headerShown: true, title: '클럽' }} />
       <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
       <Stack.Screen name="court/index" options={{ headerShown: true, title: '코트 예약' }} />
+      <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />
       <Stack.Screen name="court/[id]" options={{ headerShown: true, title: '코트' }} />
       <Stack.Screen
         name="profile/edit"

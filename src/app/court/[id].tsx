@@ -108,28 +108,8 @@ export default function CourtDetail() {
   const isToday = selectedDate === ymd(new Date(nowMs));
   const curHour = new Date(nowMs).getHours();
 
+  // 예약창에서는 선택/예약만. 취소·변경은 '내 예약' 화면에서.
   const toggle = (h: number) => setPicked((p) => (p.includes(h) ? p.filter((x) => x !== h) : [...p, h]));
-
-  // 슬롯 탭: 내 예약이면 취소, 아니면 선택 토글
-  function onSlotPress(h: number) {
-    const r = reservedByHour.get(h);
-    if (r && r.user_id === uid) {
-      Alert.alert('예약 취소', `${h}시 예약을 취소할까요?`, [
-        { text: '닫기', style: 'cancel' },
-        {
-          text: '취소하기',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.from('court_reservations').delete().eq('id', r.id);
-            if (error) Alert.alert('취소 실패', error.message);
-            else loadReservations(selectedDate);
-          },
-        },
-      ]);
-      return;
-    }
-    toggle(h);
-  }
 
   async function reserve() {
     if (!uid || picked.length === 0) return;
@@ -202,17 +182,14 @@ export default function CourtDetail() {
         {selectedDate ? (
           <>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>시간 선택</Text>
-            {reservations.some((r) => r.user_id === uid) ? (
-              <Text style={[styles.hint, { color: theme.textSecondary }]}>내 예약을 누르면 취소할 수 있어요.</Text>
-            ) : null}
             <View style={styles.slotWrap}>
           {hours.map((h) => {
             const r = reservedByHour.get(h);
             const mine = !!r && r.user_id === uid;
             const past = isToday && h < curHour;
             const sel = picked.includes(h);
-            // 타인 예약·지난 시간만 잠금. 내 예약은 눌러서 취소 가능.
-            const disabled = (!!r && !mine) || past;
+            // 예약된 슬롯(내 것 포함)·지난 시간은 선택 불가. 취소는 '내 예약' 화면에서.
+            const disabled = !!r || past;
             const bg = sel ? theme.primary : mine ? theme.backgroundElement : r ? theme.backgroundElement : theme.card;
             const fg = sel ? '#fff' : mine ? theme.accent : r || past ? theme.textSecondary : theme.text;
             const borderColor = sel ? theme.primary : mine ? theme.accent : theme.border;
@@ -220,7 +197,7 @@ export default function CourtDetail() {
               <Pressable
                 key={h}
                 disabled={disabled}
-                onPress={() => onSlotPress(h)}
+                onPress={() => toggle(h)}
                 style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past ? 0.4 : 1 }]}>
                 <Text style={[styles.slotHour, { color: fg }]}>{h}시</Text>
                 <Text style={[styles.slotState, { color: fg }]}>{mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
@@ -265,7 +242,6 @@ const styles = StyleSheet.create({
   amenityText: { fontSize: 13, fontWeight: '600' },
   desc: { fontSize: 15, lineHeight: 22 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
-  hint: { fontSize: 12, marginTop: -6 },
   noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: Spacing.three },
   noDaysText: { fontSize: 13, lineHeight: 19, flex: 1 },
   slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
