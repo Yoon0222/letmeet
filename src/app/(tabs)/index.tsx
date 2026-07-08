@@ -113,14 +113,17 @@ export default function HomeScreen() {
     items.sort((a, b) => a.at - b.at);
     setUpcoming(items.slice(0, 4));
 
-    // 근처 추천 모임 (다가오는 오픈 모임)
-    const { data: recs } = await supabase
+    // 근처 추천 모임 = 내 지역(시/도) 기준 다가오는 오픈 모임
+    const regionPrefix = myRegion.trim().split(/\s+/)[0]; // 예: '서울 강남구' → '서울'
+    let recQuery = supabase
       .from('meetups_with_counts')
       .select('*')
       .eq('status', 'open')
       .gte('start_time', nowIso)
       .order('start_time', { ascending: true })
-      .limit(5);
+      .limit(10);
+    if (regionPrefix) recQuery = recQuery.ilike('region', `${regionPrefix}%`); // 지역 미설정이면 전체
+    const { data: recs } = await recQuery;
     // 이미 '내 일정'에 뜨는 모임은 추천에서 제외
     const upcomingMeetupIds = new Set(items.filter((i) => i.type === 'meetup').map((i) => i.key.slice(1)));
     setRecommended((recs ?? []).filter((m) => !upcomingMeetupIds.has(m.id)).slice(0, 3));
@@ -137,7 +140,7 @@ export default function HomeScreen() {
     setClubs(clubList.slice(0, 3));
 
     setRefreshing(false);
-  }, [uid]);
+  }, [uid, myRegion]);
 
   useFocusEffect(
     useCallback(() => {
