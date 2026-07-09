@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import CourtMap from '@/components/court-map';
+import { CourtCard } from '@/components/court-card';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { distanceKm, formatDistance, type LatLng } from '@/lib/geo';
+import { distanceKm, type LatLng } from '@/lib/geo';
 import { supabase } from '@/lib/supabase';
 import type { Court } from '@/lib/types';
 
@@ -120,13 +121,13 @@ export default function CourtListScreen() {
           : '위치 권한이 꺼져 있어요. 전체 코트예요 — 지역으로 검색해보세요.';
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen
         options={{
           title: '코트 예약',
           headerRight: () => (
             <Pressable onPress={() => router.push('/court/reservations')} hitSlop={8}>
-              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 15 }}>내 예약</Text>
+              <Text style={styles.headerLink}>내 예약</Text>
             </Pressable>
           ),
         }}
@@ -136,35 +137,35 @@ export default function CourtListScreen() {
         <View style={styles.header}>
           <View style={styles.topRow}>
             {/* 검색 */}
-            <View style={[styles.search, { backgroundColor: theme.backgroundElement }]}>
-              <Ionicons name="search" size={16} color={theme.textSecondary} />
+            <View style={styles.search}>
+              <Ionicons name="search" size={16} color="#6B7280" />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 placeholder="지역·코트 이름 검색"
-                placeholderTextColor={theme.textSecondary}
-                style={[styles.searchInput, { color: theme.text }]}
+                placeholderTextColor="#9CA3AF"
+                style={styles.searchInput}
                 returnKeyType="search"
               />
               {query.length > 0 ? (
                 <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                  <Ionicons name="close-circle" size={16} color={theme.textSecondary} />
+                  <Ionicons name="close-circle" size={16} color="#9CA3AF" />
                 </Pressable>
               ) : null}
             </View>
             {/* 목록/지도 토글 */}
-            <View style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
+            <View style={styles.toggle}>
               {(['list', 'map'] as const).map((m) => {
                 const active = mode === m;
                 return (
-                  <Pressable key={m} onPress={() => setMode(m)} style={[styles.toggleBtn, active && { backgroundColor: theme.card }]}>
-                    <Ionicons name={m === 'list' ? 'list' : 'map'} size={16} color={active ? theme.primary : theme.textSecondary} />
+                  <Pressable key={m} onPress={() => setMode(m)} style={[styles.toggleBtn, active && styles.toggleBtnActive]}>
+                    <Ionicons name={m === 'list' ? 'list' : 'map'} size={16} color={active ? '#16C784' : '#6B7280'} />
                   </Pressable>
                 );
               })}
             </View>
           </View>
-          <Text style={[styles.status, { color: theme.textSecondary }]}>{statusText}</Text>
+          <Text style={styles.status}>{statusText}</Text>
         </View>
       ) : null}
 
@@ -186,37 +187,7 @@ export default function CourtListScreen() {
           keyExtractor={({ court }) => court.id}
           contentContainerStyle={styles.list}
           renderItem={({ item: { court, dist } }) => (
-            <Pressable
-              onPress={() => router.push(`/court/${court.id}`)}
-              style={({ pressed }) => [styles.card, { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 }]}>
-              {court.images?.[0] ? (
-                <Image source={{ uri: court.images[0] }} style={[styles.thumb, { backgroundColor: theme.backgroundElement }]} />
-              ) : (
-                <View style={[styles.thumb, styles.thumbEmpty, { backgroundColor: theme.backgroundElement }]}>
-                  <Ionicons name="tennisball-outline" size={22} color={theme.tabIconDefault} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <View style={styles.nameRow}>
-                  <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
-                    {court.name}
-                  </Text>
-                  {dist != null ? (
-                    <View style={[styles.distPill, { backgroundColor: theme.backgroundElement }]}>
-                      <Ionicons name="location" size={11} color={theme.primary} />
-                      <Text style={[styles.distText, { color: theme.primary }]}>{formatDistance(dist)}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={[styles.meta, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {court.region || '지역 미설정'} · {court.indoor ? '실내' : '실외'} · {court.open_hour}–{court.close_hour}시
-                </Text>
-                <Text style={[styles.price, { color: theme.primary }]}>
-                  {court.hourly_price > 0 ? `시간당 ${court.hourly_price.toLocaleString()}원` : '무료'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-            </Pressable>
+            <CourtCard court={court} dist={dist} onPress={() => router.push(`/court/${court.id}`)} />
           )}
           refreshControl={
             <RefreshControl
@@ -230,11 +201,11 @@ export default function CourtListScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name={searching ? 'search' : 'location-outline'} size={44} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              <Ionicons name={searching ? 'search' : 'location-outline'} size={44} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>
                 {rows.length === 0 ? '등록된 코트가 없어요' : searching ? '검색 결과가 없어요' : `주변 ${RADIUS_KM}km에 코트가 없어요`}
               </Text>
-              <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
+              <Text style={styles.emptyBody}>
                 {rows.length === 0 ? '코트가 등록되면 여기에 표시됩니다.' : searching ? '다른 지역명으로 검색해보세요.' : '지역·코트 이름으로 검색하면 더 넓게 찾을 수 있어요.'}
               </Text>
             </View>
@@ -246,26 +217,40 @@ export default function CourtListScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  headerLink: { color: '#16C784', fontWeight: '700', fontSize: 15 },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.two, gap: 8 },
   topRow: { flexDirection: 'row', gap: 8 },
-  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, paddingHorizontal: 12, height: 40 },
-  searchInput: { flex: 1, fontSize: 15, padding: 0 },
-  toggle: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 2 },
-  toggleBtn: { alignItems: 'center', justifyContent: 'center', width: 38, height: 34, borderRadius: 8 },
-  status: { fontSize: 13 },
+  search: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchInput: { flex: 1, fontSize: 15, padding: 0, color: '#111827' },
+  toggle: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 3,
+    gap: 2,
+  },
+  toggleBtn: { alignItems: 'center', justifyContent: 'center', width: 38, height: 36, borderRadius: 9 },
+  toggleBtnActive: { backgroundColor: '#F0FDF4' },
+  status: { fontSize: 13, color: '#6B7280' },
   list: { padding: Spacing.four, paddingTop: Spacing.two, gap: Spacing.three, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, padding: Spacing.three },
-  thumb: { width: 64, height: 64, borderRadius: 12 },
-  thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { fontSize: 17, fontWeight: '700', flexShrink: 1 },
-  distPill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
-  distText: { fontSize: 12, fontWeight: '700' },
-  meta: { fontSize: 13, marginTop: 3 },
-  price: { fontSize: 14, fontWeight: '700', marginTop: 6 },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80, paddingHorizontal: Spacing.four },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyBody: { fontSize: 14, textAlign: 'center' },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  emptyBody: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
 });
