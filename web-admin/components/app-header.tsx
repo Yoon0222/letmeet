@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useRole } from '@/lib/use-role';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +11,9 @@ export function AppHeader() {
   const { session } = useSession();
   const { role } = useRole();
   const router = useRouter();
+  const pathname = usePathname();
+
+  if (pathname === '/landing') return null;
 
   async function logout() {
     await supabase.auth.signOut();

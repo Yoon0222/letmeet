@@ -6,16 +6,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
 import { ProfileSummaryCard } from '@/components/profile-summary-card';
+import { AppCard } from '@/components/ui/app-card';
 import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { useI18n } from '@/contexts/i18n';
 import { confirmDestructive } from '@/lib/confirm';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { t, language, languages, languageLabels, setLanguage } = useI18n();
   const { session, profile, signOut, deleteAccount } = useAuth();
   const [myMeetups, setMyMeetups] = useState<MeetupWithCounts[]>([]);
   const [deleting, setDeleting] = useState(false);
@@ -47,7 +50,12 @@ export default function ProfileScreen() {
   );
 
   function confirmSignOut() {
-    confirmDestructive('로그아웃', '정말 로그아웃하시겠어요?', '로그아웃', () => signOut());
+    confirmDestructive(
+      t('profile.signOutTitle'),
+      t('profile.signOutBody'),
+      t('profile.signOut'),
+      () => signOut(),
+    );
   }
 
   async function doDelete() {
@@ -55,7 +63,7 @@ export default function ProfileScreen() {
     try {
       await deleteAccount();
     } catch (e) {
-      Alert.alert('탈퇴 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      Alert.alert(t('profile.deleteFailed'), e instanceof Error ? e.message : t('auth.errors.fallback'));
     } finally {
       setDeleting(false);
     }
@@ -63,9 +71,9 @@ export default function ProfileScreen() {
 
   function confirmDelete() {
     confirmDestructive(
-      '회원 탈퇴',
-      '정말 탈퇴하시겠어요? 계정과 참여 기록이 삭제되며 되돌릴 수 없습니다.',
-      '탈퇴하기',
+      t('profile.deleteTitle'),
+      t('profile.deleteBody'),
+      t('profile.deleteAccount'),
       doDelete,
     );
   }
@@ -75,21 +83,43 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <AppHeader title="내정보" rightIcon="create-outline" onRightPress={() => router.push('/profile/edit')} />
+        <AppHeader title={t('profile.title')} rightIcon="create-outline" onRightPress={() => router.push('/profile/edit')} />
 
         <ProfileSummaryCard profile={profile} meetupCount={myMeetups.length} />
+
+        <AppCard disabled style={styles.languageCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.languageTitle}>{t('profile.language')}</Text>
+            <Text style={styles.languageHint}>{t('profile.languageHint')}</Text>
+          </View>
+          <View style={styles.languageOptions}>
+            {languages.map((item) => {
+              const active = item === language;
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => setLanguage(item)}
+                  style={[styles.languageButton, active && styles.languageButtonActive]}>
+                  <Text style={[styles.languageText, active && styles.languageTextActive]}>
+                    {languageLabels[item]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </AppCard>
 
         {needsSetup && (
           <Pressable onPress={() => router.push('/profile/edit')} style={styles.setupBanner}>
             <Ionicons name="information-circle-outline" size={20} color="#16C784" />
-            <Text style={styles.setupText}>프로필을 완성하면 나에게 맞는 모임을 더 잘 추천받을 수 있어요.</Text>
+            <Text style={styles.setupText}>{t('profile.completeProfile')}</Text>
             <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </Pressable>
         )}
 
-        <Text style={styles.sectionTitle}>내 모임</Text>
+        <Text style={styles.sectionTitle}>{t('profile.myMeetups')}</Text>
         {myMeetups.length === 0 ? (
-          <Text style={styles.emptyMeetup}>아직 참여한 모임이 없어요. 모임 탭에서 찾아보세요.</Text>
+          <Text style={styles.emptyMeetup}>{t('profile.emptyMeetups')}</Text>
         ) : (
           <View style={{ gap: Spacing.three }}>
             {myMeetups.map((m) => (
@@ -98,10 +128,10 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <Button title="로그아웃" variant="outline" onPress={confirmSignOut} style={{ marginTop: Spacing.four }} />
+        <Button title={t('profile.signOut')} variant="outline" onPress={confirmSignOut} style={{ marginTop: Spacing.four }} />
         <Text style={styles.email}>{session?.user.email}</Text>
         <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
-          <Text style={styles.deleteText}>{deleting ? '탈퇴 처리 중...' : '회원 탈퇴'}</Text>
+          <Text style={styles.deleteText}>{deleting ? t('profile.deleting') : t('profile.deleteAccount')}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -111,6 +141,26 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  languageCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  languageTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  languageHint: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+  languageOptions: { flexDirection: 'row', gap: 8 },
+  languageButton: {
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: '#F6F7F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageButtonActive: { backgroundColor: '#16C784' },
+  languageText: { fontSize: 13, fontWeight: '800', color: '#6B7280' },
+  languageTextActive: { color: '#FFFFFF' },
   setupBanner: {
     flexDirection: 'row',
     alignItems: 'center',
