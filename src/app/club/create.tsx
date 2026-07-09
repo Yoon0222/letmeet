@@ -7,11 +7,9 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
-import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 
 export default function CreateClub() {
-  const theme = useTheme();
   const router = useRouter();
   const { session } = useAuth();
   const { show, hide } = useLoading();
@@ -50,7 +48,7 @@ export default function CreateClub() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TextField
@@ -60,12 +58,7 @@ export default function CreateClub() {
           placeholder="예: 송파 피클볼 클럽"
           maxLength={30}
         />
-        <TextField
-          label="활동 지역"
-          value={region}
-          onChangeText={setRegion}
-          placeholder="예: 서울 송파구"
-        />
+        <TextField label="활동 지역" value={region} onChangeText={setRegion} placeholder="예: 서울 송파구" />
         <TextField
           label="소개 (선택)"
           value={description}
@@ -82,5 +75,6 @@ export default function CreateClub() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
 });

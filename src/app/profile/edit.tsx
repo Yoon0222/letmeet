@@ -19,13 +19,11 @@ import { TextField } from '@/components/ui/text-field';
 import { PEANUT_AVATARS, peanutFromUrl, peanutUrl } from '@/constants/avatars';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { useTheme } from '@/hooks/use-theme';
 import { skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { PLAY_STYLE_LABELS, type PlayStyle } from '@/lib/types';
 
 export default function EditProfile() {
-  const theme = useTheme();
   const router = useRouter();
   const { session, profile, refreshProfile } = useAuth();
 
@@ -142,23 +140,23 @@ export default function EditProfile() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarWrap}>
           <Pressable onPress={pickAvatar} disabled={uploading}>
             <Avatar nickname={nickname || '?'} uri={avatarUrl} size={96} />
-            <View style={[styles.avatarBadge, { backgroundColor: theme.primary, borderColor: theme.background }]}>
+            <View style={styles.avatarBadge}>
               <Ionicons name="camera" size={16} color="#fff" />
             </View>
           </Pressable>
-          <Text onPress={pickAvatar} style={[styles.avatarText, { color: theme.primary }]}>
+          <Text onPress={pickAvatar} style={styles.avatarText}>
             {uploading ? '처리 중…' : '사진 올리기'}
           </Text>
         </View>
 
         <View style={styles.field}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>피넛 캐릭터 선택</Text>
+          <Text style={styles.label}>피넛 캐릭터 선택</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -170,7 +168,7 @@ export default function EditProfile() {
                 <Pressable
                   key={i}
                   onPress={() => choosePeanut(i)}
-                  style={[styles.peanutCell, { borderColor: selected ? theme.primary : theme.border }]}>
+                  style={[styles.peanutCell, { borderColor: selected ? '#16C784' : '#E5E7EB' }]}>
                   <Image source={src} style={styles.peanutImg} contentFit="cover" />
                 </Pressable>
               );
@@ -178,26 +176,20 @@ export default function EditProfile() {
           </ScrollView>
         </View>
 
-        <TextField
-          label="닉네임"
-          value={nickname}
-          onChangeText={setNickname}
-          maxLength={20}
-          placeholder="닉네임"
-        />
+        <TextField label="닉네임" value={nickname} onChangeText={setNickname} maxLength={20} placeholder="닉네임" />
 
         <View style={styles.field}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>실력 (DUPR 기준)</Text>
-          <View style={[styles.skillRow, { backgroundColor: theme.backgroundElement }]}>
+          <Text style={styles.label}>실력 (DUPR 기준)</Text>
+          <View style={styles.skillRow}>
             <Pressable onPress={() => adjustSkill(-0.5)} style={styles.stepBtn}>
-              <Text style={[styles.stepTxt, { color: theme.primary }]}>−</Text>
+              <Text style={styles.stepTxt}>−</Text>
             </Pressable>
             <View style={{ alignItems: 'center' }}>
-              <Text style={[styles.skillVal, { color: theme.text }]}>{skill.toFixed(1)}</Text>
-              <Text style={[styles.skillLbl, { color: theme.textSecondary }]}>{skillLabel(skill)}</Text>
+              <Text style={styles.skillVal}>{skill.toFixed(1)}</Text>
+              <Text style={styles.skillLbl}>{skillLabel(skill)}</Text>
             </View>
             <Pressable onPress={() => adjustSkill(0.5)} style={styles.stepBtn}>
-              <Text style={[styles.stepTxt, { color: theme.primary }]}>+</Text>
+              <Text style={styles.stepTxt}>+</Text>
             </Pressable>
           </View>
         </View>
@@ -211,7 +203,7 @@ export default function EditProfile() {
         />
 
         <View style={styles.field}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>플레이 스타일</Text>
+          <Text style={styles.label}>플레이 스타일</Text>
           <View style={styles.styleRow}>
             {(Object.keys(PLAY_STYLE_LABELS) as PlayStyle[]).map((s) => {
               const active = style === s;
@@ -219,13 +211,8 @@ export default function EditProfile() {
                 <Pressable
                   key={s}
                   onPress={() => setStyle(s)}
-                  style={[
-                    styles.styleBtn,
-                    {
-                      backgroundColor: active ? theme.primary : theme.backgroundElement,
-                    },
-                  ]}>
-                  <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '700' }}>
+                  style={[styles.styleBtn, active ? styles.styleBtnActive : styles.styleBtnIdle]}>
+                  <Text style={{ color: active ? '#fff' : '#6B7280', fontWeight: '700' }}>
                     {PLAY_STYLE_LABELS[s]}
                   </Text>
                 </Pressable>
@@ -260,6 +247,7 @@ export default function EditProfile() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
   avatarWrap: { alignItems: 'center', gap: 8, marginBottom: Spacing.two },
   avatarBadge: {
@@ -270,26 +258,34 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     borderWidth: 2,
+    backgroundColor: '#16C784',
+    borderColor: '#F6F7F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 14, fontWeight: '700', paddingVertical: 4, paddingHorizontal: 8 },
+  avatarText: { fontSize: 14, fontWeight: '700', color: '#16C784', paddingVertical: 4, paddingHorizontal: 8 },
   peanutCell: { borderWidth: 2, borderRadius: 30, padding: 2 },
   peanutImg: { width: 52, height: 52, borderRadius: 26 },
   field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', marginLeft: 2 },
+  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 2 },
   skillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
   },
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  stepTxt: { fontSize: 28, fontWeight: '800' },
-  skillVal: { fontSize: 26, fontWeight: '800' },
-  skillLbl: { fontSize: 12, fontWeight: '600' },
+  stepTxt: { fontSize: 28, fontWeight: '800', color: '#16C784' },
+  skillVal: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  skillLbl: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
   styleRow: { flexDirection: 'row', gap: 8 },
-  styleBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  styleBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderCurve: 'continuous', alignItems: 'center' },
+  styleBtnActive: { backgroundColor: '#16C784' },
+  styleBtnIdle: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
 });

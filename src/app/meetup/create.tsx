@@ -20,7 +20,6 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
-import { useTheme } from '@/hooks/use-theme';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 
@@ -31,7 +30,6 @@ function defaultStart(): Date {
 }
 
 export default function CreateMeetup() {
-  const theme = useTheme();
   const router = useRouter();
   const { session } = useAuth();
   const { show, hide } = useLoading();
@@ -115,7 +113,7 @@ export default function CreateMeetup() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TextField
@@ -125,26 +123,14 @@ export default function CreateMeetup() {
           placeholder="예: 평일 저녁 즐겜 복식"
           maxLength={40}
         />
-        <TextField
-          label="장소"
-          value={location}
-          onChangeText={setLocation}
-          placeholder="예: 올림픽공원 피클볼장"
-        />
-        <TextField
-          label="지역"
-          value={region}
-          onChangeText={setRegion}
-          placeholder="예: 서울 송파구"
-        />
+        <TextField label="장소" value={location} onChangeText={setLocation} placeholder="예: 올림픽공원 피클볼장" />
+        <TextField label="지역" value={region} onChangeText={setRegion} placeholder="예: 서울 송파구" />
 
         <View style={styles.field}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>날짜 · 시간</Text>
-          <Pressable
-            onPress={openPicker}
-            style={[styles.dateBtn, { backgroundColor: theme.backgroundElement }]}>
-            <Ionicons name="calendar-outline" size={20} color={theme.primary} />
-            <Text style={[styles.dateTxt, { color: theme.text }]}>{formatMeetupTime(start.toISOString())}</Text>
+          <Text style={styles.label}>날짜 · 시간</Text>
+          <Pressable onPress={openPicker} style={styles.dateBtn}>
+            <Ionicons name="calendar-outline" size={20} color="#16C784" />
+            <Text style={styles.dateTxt}>{formatMeetupTime(start.toISOString())}</Text>
           </Pressable>
           {Platform.OS === 'ios' && showIosPicker && (
             <DateTimePicker
@@ -158,32 +144,29 @@ export default function CreateMeetup() {
         </View>
 
         <View style={styles.field}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>정원</Text>
+          <Text style={styles.label}>정원</Text>
           <Stepper
             value={`${maxPlayers}명`}
             onMinus={() => setMaxPlayers((v) => Math.max(2, v - 1))}
             onPlus={() => setMaxPlayers((v) => Math.min(32, v + 1))}
-            theme={theme}
           />
         </View>
 
         <View style={styles.row2}>
           <View style={[styles.field, { flex: 1 }]}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>최소 실력</Text>
+            <Text style={styles.label}>최소 실력</Text>
             <Stepper
               value={skillMin.toFixed(1)}
               onMinus={() => adjust(setSkillMin as any, -0.5, 2, 8)}
               onPlus={() => adjust(setSkillMin as any, 0.5, 2, 8)}
-              theme={theme}
             />
           </View>
           <View style={[styles.field, { flex: 1 }]}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>최대 실력</Text>
+            <Text style={styles.label}>최대 실력</Text>
             <Stepper
               value={skillMax.toFixed(1)}
               onMinus={() => adjust(setSkillMax as any, -0.5, 2, 8)}
               onPlus={() => adjust(setSkillMax as any, 0.5, 2, 8)}
-              theme={theme}
             />
           </View>
         </View>
@@ -204,53 +187,52 @@ export default function CreateMeetup() {
   );
 }
 
-function Stepper({
-  value,
-  onMinus,
-  onPlus,
-  theme,
-}: {
-  value: string;
-  onMinus: () => void;
-  onPlus: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
+function Stepper({ value, onMinus, onPlus }: { value: string; onMinus: () => void; onPlus: () => void }) {
   return (
-    <View style={[styles.stepper, { backgroundColor: theme.backgroundElement }]}>
+    <View style={styles.stepper}>
       <Pressable onPress={onMinus} style={styles.stepBtn}>
-        <Text style={[styles.stepTxt, { color: theme.primary }]}>−</Text>
+        <Text style={styles.stepTxt}>−</Text>
       </Pressable>
-      <Text style={[styles.stepVal, { color: theme.text }]}>{value}</Text>
+      <Text style={styles.stepVal}>{value}</Text>
       <Pressable onPress={onPlus} style={styles.stepBtn}>
-        <Text style={[styles.stepTxt, { color: theme.primary }]}>+</Text>
+        <Text style={styles.stepTxt}>+</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
   field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', marginLeft: 2 },
+  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 2 },
   dateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: Spacing.three,
-    height: 50,
+    height: 52,
     borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  dateTxt: { fontSize: 16, fontWeight: '600' },
+  dateTxt: { fontSize: 16, fontWeight: '600', color: '#111827' },
   row2: { flexDirection: 'row', gap: Spacing.three },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: Spacing.two,
-    height: 50,
+    height: 52,
   },
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  stepTxt: { fontSize: 26, fontWeight: '800' },
-  stepVal: { fontSize: 17, fontWeight: '700' },
+  stepTxt: { fontSize: 26, fontWeight: '800', color: '#16C784' },
+  stepVal: { fontSize: 17, fontWeight: '700', color: '#111827' },
 });
