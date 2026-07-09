@@ -2,6 +2,11 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { LandingCountdown } from '@/components/landing-countdown';
+import { isConfigured, supabase } from '@/lib/supabase';
+
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: 'P!NUT | Play instant',
   description: '가까운 코트에서 피클볼 메이트, 번개 모임, 대회, 클럽을 찾는 커뮤니티 매칭 앱',
@@ -36,7 +41,32 @@ const downloadLinks = {
   android: '#download',
 };
 
-export default function LandingPage() {
+async function getLandingStats() {
+  if (!isConfigured) {
+    return {
+      members: '집계 준비중',
+      courts: '입점 준비중',
+    };
+  }
+
+  const [members, courts] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('courts').select('id', { count: 'exact', head: true }),
+  ]);
+
+  return {
+    members: members.error ? '집계 준비중' : `${members.count ?? 0}명`,
+    courts: courts.error ? '입점 준비중' : `${courts.count ?? 0}곳`,
+  };
+}
+
+export default async function LandingPage() {
+  const stats = await getLandingStats();
+  const communityStats = [
+    { label: '현재 회원수', value: stats.members, body: '함께 칠 피클볼 메이트' },
+    { label: '입점 코트수', value: stats.courts, body: '예약과 모임을 연결할 코트' },
+  ];
+
   return (
     <div className="relative left-1/2 -my-8 w-screen -translate-x-1/2 bg-[#F6F7F9] text-[#111827]">
       <section className="relative min-h-[92vh] overflow-hidden bg-[#111827] px-6 text-white">
@@ -61,7 +91,7 @@ export default function LandingPage() {
         </div>
 
         <nav className="relative z-10 mx-auto flex max-w-6xl items-center justify-between py-6">
-          <Link href="/landing" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-[18px] bg-[#16C784] text-lg font-black text-white">
               P!
             </span>
@@ -72,10 +102,15 @@ export default function LandingPage() {
             <a href="#instant" className="hover:text-white">INSTANT</a>
             <a href="#nut" className="hover:text-white">NUT</a>
             <a href="#download" className="hover:text-white">DOWNLOAD</a>
+            <a href="#contact" className="hover:text-white">CONTACT</a>
           </div>
         </nav>
 
-        <div className="relative z-10 mx-auto grid min-h-[calc(92vh-92px)] max-w-6xl items-center gap-10 pb-20 pt-10 lg:grid-cols-[1fr_420px]">
+        <div className="relative z-10 mx-auto max-w-6xl pt-4">
+          <LandingCountdown />
+        </div>
+
+        <div className="relative z-10 mx-auto grid min-h-[calc(92vh-220px)] max-w-6xl items-center gap-10 pb-20 pt-10 lg:grid-cols-[1fr_420px]">
           <div className="max-w-3xl">
             <p className="mb-5 text-sm font-extrabold uppercase tracking-[0.18em] text-[#16C784]">
               PLAY INSTANT. GO NUTS.
@@ -115,6 +150,7 @@ export default function LandingPage() {
                 둘러보기
               </a>
             </div>
+
           </div>
 
           <div className="relative mx-auto hidden w-full max-w-[420px] lg:block">
@@ -193,6 +229,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="bg-white px-6 pb-20">
+        <div className="mx-auto grid max-w-6xl gap-4 border-y border-[#E5E7EB] py-8 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#16C784]">COMMUNITY SIGNAL</p>
+            <p className="mt-2 text-xl font-extrabold text-[#111827]">피클볼을 바로 시작할 수 있는 연결이 쌓이고 있습니다</p>
+          </div>
+          {communityStats.map((item) => (
+            <div key={item.label} className="min-w-40 rounded-[18px] bg-[#F6F7F9] px-5 py-4">
+              <p className="text-sm font-bold text-[#6B7280]">{item.label}</p>
+              <p className="mt-2 text-3xl font-black text-[#111827]">{item.value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section id="play" className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
         <div className="max-w-2xl">
           <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#16C784]">PLAY</p>
@@ -252,6 +303,24 @@ export default function LandingPage() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="contact" className="bg-white px-6 py-20 sm:py-24">
+        <div className="mx-auto grid max-w-6xl gap-8 rounded-[18px] border border-[#E5E7EB] bg-[#F6F7F9] p-8 sm:p-12 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#16C784]">CONTACT</p>
+            <h2 className="mt-4 text-4xl font-black leading-tight sm:text-5xl">문의와 제휴 제안을 기다립니다</h2>
+            <p className="mt-5 max-w-2xl text-lg font-medium leading-8 text-[#6B7280]">
+              코트 입점, 대회 운영, 피클볼 커뮤니티 제휴, 앱 출시 관련 문의는 이메일로 연락해 주세요.
+            </p>
+          </div>
+          <a
+            href="mailto:troy.yoonsik.shin@gmail.com?subject=P!NUT%20문의"
+            className="inline-flex h-14 items-center justify-center rounded-2xl bg-[#111827] px-7 text-base font-extrabold text-white transition hover:bg-black"
+          >
+            troy.yoonsik.shin@gmail.com
+          </a>
         </div>
       </section>
     </div>

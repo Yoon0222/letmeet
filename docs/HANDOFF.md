@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-09 (Codex deployed landing to Vercel preview)
+Last updated: 2026-07-09 (Codex configured admin.pinut.org)
 
 ## Purpose
 
@@ -213,6 +213,321 @@ Follow-ups:
 - If the preview is approved, run `npx.cmd vercel deploy --prod` from `web-admin`.
 - Add a custom domain later if needed.
 - Replace landing download placeholder URLs with real App Store / Google Play URLs when available.
+
+### Codex -> Claude (2026-07-09, root renders landing)
+
+What changed:
+
+- Changed `web-admin/app/page.tsx` so `/` renders the same landing page as `/landing`.
+- Kept `/landing` available.
+- Updated the landing logo link from `/landing` to `/`.
+- Updated `AppHeader` so the admin header is hidden on both `/` and `/landing`.
+
+Why:
+
+- User asked for the root route to be the landing page.
+
+Files touched:
+
+- `web-admin/app/page.tsx`
+- `web-admin/app/landing/page.tsx`
+- `web-admin/components/app-header.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/`: first failed in sandbox because Google Fonts could not be fetched.
+- `npm.cmd run build` from `web-admin/` with approved network access: passed.
+- Build output includes both `/` and `/landing` as static routes.
+- `http://localhost:3000/`: HTTP 200.
+
+Follow-ups:
+
+- Redeploy Vercel if the deployed preview/production URL should also show the landing page at `/`.
+
+### Codex -> Claude (2026-07-09, root landing Vercel redeploy)
+
+What changed:
+
+- No source code changes in this step.
+- Redeployed `web-admin` to Vercel preview after changing `/` to render the landing page.
+
+Deployment:
+
+- Preview URL: `https://web-admin-e5zh7mp9w-troyyoonsikshin-2301s-projects.vercel.app`
+- Root landing URL: `https://web-admin-e5zh7mp9w-troyyoonsikshin-2301s-projects.vercel.app/`
+- Legacy landing URL: `https://web-admin-e5zh7mp9w-troyyoonsikshin-2301s-projects.vercel.app/landing`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/DYoNb4vPbRcAVCAxuua8po5SxKqD`
+
+Validation:
+
+- Vercel remote build passed.
+- Remote build output includes both `/` and `/landing` as static routes.
+- Preview root `/`: HTTP 200.
+- Preview `/landing`: HTTP 200.
+
+Follow-ups:
+
+- If this preview is approved, promote/redeploy to production with `npx.cmd vercel deploy --prod` from `web-admin`.
+
+### Codex -> Claude (2026-07-09, branch policy)
+
+Decision:
+
+- `pinut-v2.0` is the deployment branch.
+- `pinut-v2.0-dev` is the active development branch.
+
+Current state:
+
+- Current branch is already `pinut-v2.0-dev`.
+- `pinut-v2.0` also exists locally.
+- Do not switch to or edit directly on `pinut-v2.0` unless the user explicitly asks for deployment/release work.
+
+Validation:
+
+- `git branch --show-current`: `pinut-v2.0-dev`.
+- `git branch --list pinut-v2.0 pinut-v2.0-dev`: both branches exist.
+
+### Codex -> Claude (2026-07-09, root landing production deploy)
+
+What changed:
+
+- No source code changes in this step.
+- Temporarily switched from `pinut-v2.0-dev` to deployment branch `pinut-v2.0`.
+- Deployed `web-admin` to Vercel production.
+- Switched back to `pinut-v2.0-dev` after deployment.
+
+Deployment:
+
+- Production alias: `https://web-admin-gamma-seven.vercel.app`
+- Production deployment URL: `https://web-admin-q0him3ci0-troyyoonsikshin-2301s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/DYZrvu5WRTDP9QbJ8eZJFYGsaaeq`
+
+Validation:
+
+- Vercel remote build passed.
+- Remote build output includes both `/` and `/landing` as static routes.
+- `https://web-admin-gamma-seven.vercel.app/`: HTTP 200.
+- `https://web-admin-gamma-seven.vercel.app/landing`: HTTP 200.
+- Root HTML contains landing copy (`PLAY INSTANT`), confirming it is no longer the login page.
+
+Current branch after deployment:
+
+- `pinut-v2.0-dev`.
+
+### Codex -> Claude (2026-07-09, landing D-day stats and contact)
+
+What changed:
+
+- Added a landing D-day countdown for the 2026-07-17 launch goal.
+- Added landing community metric cards for current member count and onboarded court count.
+- Added a contact section with a mail link to `troy.yoonsik.shin@gmail.com`.
+- Added `CONTACT` to the landing navigation.
+
+Implementation notes:
+
+- New countdown component: `web-admin/components/landing-countdown.tsx`.
+- Landing stats try to read public Supabase counts from `profiles` and `courts`.
+- If Supabase environment values are missing or count queries fail, the landing shows safe fallback text instead of breaking.
+- `web-admin/app/landing/page.tsx` now uses `revalidate = 300` for periodic stat refresh.
+
+Files touched:
+
+- `web-admin/app/landing/page.tsx`
+- `web-admin/components/landing-countdown.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/`: first failed in sandbox because Google Fonts could not be fetched.
+- `npm.cmd run build` from `web-admin/` with approved network access: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- Local `http://localhost:3000/` HTML contains `D-DAY`, `현재 회원수`, `입점 코트수`, and `troy.yoonsik.shin@gmail.com`.
+
+Follow-ups:
+
+- Redeploy Vercel preview/production if these landing updates should go live.
+- Confirm whether the D-day target should remain `2026-07-17T00:00:00+09:00`.
+
+### Codex -> Claude (2026-07-09, landing D-day emphasis)
+
+What changed:
+
+- Moved the D-day countdown from the small hero metric grid to a large top hero banner directly under the landing nav.
+- Increased countdown typography and card size so visitors can see the launch goal immediately.
+- Kept current member count and onboarded court count as separate hero metric cards below the main CTA.
+
+Files touched:
+
+- `web-admin/app/landing/page.tsx`
+- `web-admin/components/landing-countdown.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/`: first failed in sandbox because Google Fonts could not be fetched.
+- `npm.cmd run build` from `web-admin/` with approved network access: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- Local `http://localhost:3000/` HTML contains `Launch D-day`, `2026.07.17`, `현재 회원수`, and `입점 코트수`.
+
+Follow-ups:
+
+- Redeploy Vercel preview/production if this D-day emphasis should go live.
+
+### Codex -> Claude (2026-07-09, landing countdown clock and stats placement)
+
+What changed:
+
+- Updated the landing countdown target to `2026-07-17T12:00:00+09:00`.
+- Countdown now displays days, hours, minutes, and seconds.
+- Countdown updates every second on the client.
+- Moved member/court metrics out of the hero card cluster and into a separate `COMMUNITY SIGNAL` band between download and play sections.
+
+Files touched:
+
+- `web-admin/app/landing/page.tsx`
+- `web-admin/components/landing-countdown.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/`: first failed in sandbox because Google Fonts could not be fetched.
+- `npm.cmd run build` from `web-admin/` with approved network access: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- Local `http://localhost:3000/` HTML contains `2026.07.17 12:00`, `DAYS`, `HOURS`, `MIN`, `SEC`, and `COMMUNITY SIGNAL`.
+
+Follow-ups:
+
+- Redeploy Vercel preview/production if this updated countdown should go live.
+
+### Codex -> Claude (2026-07-09, landing Supabase target check)
+
+What changed:
+
+- No source code changes.
+- Checked whether the landing stats are looking at the production Supabase project.
+
+Findings:
+
+- Local `web-admin/.env.local` and root `.env` both point to the same Supabase project ref: `pjfhxkvdjipvdmfsacie`.
+- `web-admin/lib/supabase.ts` reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Landing stats currently read public counts from `profiles` and `courts` using the anon key.
+- The landing stats do not write to the database.
+
+Risk / follow-up:
+
+- If `pjfhxkvdjipvdmfsacie` is production, local landing stats are reading production data.
+- If the landing should not read production data, replace live counts with static marketing numbers or create separate staging Supabase env values for `web-admin`.
+
+### Codex -> Claude (2026-07-09, Vercel production Supabase env)
+
+What changed:
+
+- Added Vercel Production environment variables for `web-admin`.
+- Redeployed Vercel production so production builds read the configured Supabase production env.
+- Temporarily switched to `pinut-v2.0` for production deploy, then switched back to `pinut-v2.0-dev`.
+
+Vercel env:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: set for Production.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: set for Production.
+- Vercel stores both as encrypted/sensitive values.
+
+Deployment:
+
+- Production alias: `https://web-admin-gamma-seven.vercel.app`
+- Production deployment URL: `https://web-admin-hd1u3oazm-troyyoonsikshin-2301s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/9MNJwhFNXQpzxJXdJFVdMzUhzdoQ`
+
+Validation:
+
+- `npx.cmd vercel env ls`: shows both Supabase env vars in Production.
+- Vercel remote production build passed.
+- Production root HTML contains `2026.07.17 12:00`, `DAYS`, `COMMUNITY SIGNAL`, and `troy.yoonsik.shin@gmail.com`.
+- Production `/landing`: HTTP 200.
+
+Current branch after deployment:
+
+- `pinut-v2.0-dev`.
+
+Note:
+
+- `git switch` output showed `.claude/settings.json` as modified, but Codex did not edit it in this step.
+
+### Codex -> Claude (2026-07-09, corrected production Supabase env)
+
+What changed:
+
+- Corrected Vercel Production Supabase env for `web-admin`.
+- User clarified the real production Supabase project ref is `jbvtdthtmrlndduqiikj`.
+- Removed the previously configured `pjfhxkvdjipvdmfsacie` values from Vercel Production env.
+- Added the production values from `eas.json` production profile to Vercel Production env.
+- Redeployed Vercel production from `pinut-v2.0`, then switched back to `pinut-v2.0-dev`.
+
+Production DB:
+
+- Project ref: `jbvtdthtmrlndduqiikj`.
+- Direct count check before redeploy: `profiles=1`, `courts=0`.
+
+Deployment:
+
+- Production alias: `https://web-admin-gamma-seven.vercel.app`
+- Production deployment URL: `https://web-admin-mh9t4ivsd-troyyoonsikshin-2301s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/6Lt8D166jc7HiEyKb46ziDpiBpfi`
+
+Validation:
+
+- Vercel remote production build passed.
+- Production root HTML contains `1명`, `0곳`, `2026.07.17 12:00`, and `troy.yoonsik.shin@gmail.com`.
+- Production `/landing`: HTTP 200.
+
+Decision:
+
+- Do not add the personal phone number to the public landing contact section.
+- Keep email-only contact for now: `troy.yoonsik.shin@gmail.com`.
+
+Current branch after deployment:
+
+- `pinut-v2.0-dev`.
+
+### Codex -> Claude (2026-07-09, admin.pinut.org setup)
+
+What changed:
+
+- Added `admin.pinut.org` to the Vercel `web-admin` project.
+- Added host-aware routing so `admin.pinut.org/` redirects to `/login`.
+- Used `web-admin/proxy.ts` instead of deprecated Next `middleware.ts`.
+- Deployed production from `pinut-v2.0`, then switched back to `pinut-v2.0-dev`.
+
+Implementation:
+
+- `web-admin/proxy.ts` checks `host === 'admin.pinut.org'` and `pathname === '/'`.
+- Matching requests receive a `307` redirect to `/login`.
+- `pinut.org` and normal project URLs keep the existing root landing behavior.
+
+Domain status:
+
+- `admin.pinut.org` is added to project `web-admin`.
+- `npx.cmd vercel domains verify admin.pinut.org`: configured correctly / verified.
+- Direct check: `https://admin.pinut.org/` returns `307 Location: /login`.
+- `pinut.org` was still in nameserver propagation from this environment during verification.
+
+Deployment:
+
+- Production deployment URL: `https://web-admin-8e1gecj8e-troyyoonsikshin-2301s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/HQKeiqvERe93rk2GpH7muLuxZrqC`
+- Production alias shown by Vercel: `https://pinut.org`
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/` with network access: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- Vercel remote production build passed.
+- Build output includes `Proxy (Middleware)`.
+
+Current branch after deployment:
+
+- `pinut-v2.0-dev`.
 
 ### Codex -> Claude (2026-07-09, mobile i18n first pass)
 
