@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-09 (Codex added web landing route)
+Last updated: 2026-07-09 (Codex deployed landing to Vercel preview)
 
 ## Purpose
 
@@ -53,6 +53,225 @@ Notes / follow-ups:
 
 - Browser screenshot automation failed because the node REPL kernel hit an `EPERM` while trying to access `C:\Users\SEPC\AppData`; no page code issue was observed.
 - Dev server was started with `npm.cmd run dev`; URL is `http://localhost:3000/landing`.
+
+### Codex -> Claude (2026-07-09, dev server restart)
+
+What changed:
+
+- No source code changes beyond this handoff entry.
+- Restarted the `web-admin` Next dev server because the user reported `http://localhost:3000/landing` was not running.
+
+Why:
+
+- Previous background server command did not persist reliably.
+- `Start-Process` failed in this environment with duplicate `Path/PATH` environment key errors.
+
+Validation:
+
+- Started Next via `Invoke-CimMethod Win32_Process.Create` after approval.
+- Server log: `web-admin/.next-dev.cim.log`.
+- `http://127.0.0.1:3000/landing`: HTTP 200.
+- `http://localhost:3000/landing`: HTTP 200.
+
+Follow-up:
+
+- If 3000 stops again, use the same direct Next command from `web-admin`:
+  `node .\node_modules\next\dist\bin\next dev --hostname 127.0.0.1 --port 3000`
+
+### Codex -> Claude (2026-07-09, landing brand expression)
+
+What changed:
+
+- Updated `web-admin/app/landing/page.tsx` copy and structure to explicitly express `PLAY / INSTANT / NUT`.
+- Hero now leads with `PLAY INSTANT. GO NUTS.` and `Play now, instantly.`
+- Added repeated brand pillars for PLAY, INSTANT, and NUT across hero, feature cards, and final community section.
+
+Why:
+
+- User asked to express "play / instant / nut" on the landing page.
+
+Files touched:
+
+- `web-admin/app/landing/page.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npx.cmd tsc --noEmit` from `web-admin/`: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- `http://localhost:3000/landing`: HTTP 200.
+
+### Codex -> Claude (2026-07-09, landing download CTA)
+
+What changed:
+
+- Changed the landing hero primary CTA from `/login` to `#download`.
+- Added a `DOWNLOAD` nav link.
+- Added a download section with App Store and Google Play button placeholders.
+- Added `downloadLinks` constants in `web-admin/app/landing/page.tsx`; replace these with real store URLs when available.
+
+Why:
+
+- User said the "시작하기" button should go to a download link, not admin login.
+
+Files touched:
+
+- `web-admin/app/landing/page.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npx.cmd tsc --noEmit` from `web-admin/`: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- `http://localhost:3000/landing`: HTTP 200.
+
+### Codex -> Claude (2026-07-09, landing work complete)
+
+Status:
+
+- Landing v1 is complete at `/landing`.
+- Keep this as the current approved landing direction unless the user asks for another visual pass.
+
+Final scope:
+
+- Separate web landing route: `web-admin/app/landing/page.tsx`.
+- Admin header is hidden on `/landing` via `web-admin/components/app-header.tsx`.
+- Brand message expresses `PLAY INSTANT. GO NUTS.`, with supporting `PLAY`, `INSTANT`, and `NUT` sections.
+- Primary hero CTA goes to `#download`.
+- Download section has App Store / Google Play placeholder buttons through the `downloadLinks` constants.
+
+Validation already run during landing work:
+
+- `npx.cmd tsc --noEmit` from `web-admin/`: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- `npm.cmd run build` from `web-admin/`: passed after approved network access for Google Fonts.
+- `http://localhost:3000/landing`: returned HTTP 200.
+
+Follow-ups:
+
+- Replace the placeholder download URLs with real App Store / Google Play links when available.
+- Add privacy/support/legal pages before store submission if App Store metadata needs public URLs.
+- Do not rework landing visuals unless the user explicitly requests it.
+
+### Codex -> Claude (2026-07-09, landing deployment readiness)
+
+What changed:
+
+- No source code changes.
+- Checked deployment readiness for the Next.js landing page in `web-admin`.
+
+Findings:
+
+- The landing page is part of the `web-admin` Next.js app, not the Expo mobile app.
+- EAS Hosting is better suited for Expo web exports; Vercel is the recommended deployment target for this Next.js landing/admin app.
+- `web-admin/.vercel` does not exist yet, so the Vercel project has not been linked from this machine.
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/`: first failed in the sandbox because Google Fonts could not be fetched.
+- `npm.cmd run build` from `web-admin/` with approved network access: passed.
+- Build output includes `/landing` as a static route.
+
+Blocked:
+
+- Vercel deploy was not executed because it would upload local project code to an external service and requires explicit user approval/account connection.
+
+Recommended next step:
+
+- If the user approves external deployment, run Vercel preview deploy from `web-admin`, then promote to production after checking the preview URL.
+
+### Codex -> Claude (2026-07-09, landing Vercel preview deploy)
+
+What changed:
+
+- No source code changes.
+- Linked `web-admin` to Vercel project `web-admin`.
+- Deployed the Next.js landing/admin app to Vercel.
+
+Deployment:
+
+- Preview URL: `https://web-admin-1mxfeyj43-troyyoonsikshin-2301s-projects.vercel.app`
+- Landing URL: `https://web-admin-1mxfeyj43-troyyoonsikshin-2301s-projects.vercel.app/landing`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/GxPsb3RnS5o1yAum3GhHBieQYGeS`
+- Project: `troyyoonsikshin-2301s-projects/web-admin`
+
+Validation:
+
+- Vercel remote build passed.
+- Remote build output includes `/landing` as a static route.
+- `https://web-admin-1mxfeyj43-troyyoonsikshin-2301s-projects.vercel.app/landing`: HTTP 200.
+
+Notes:
+
+- The first Vercel deploy created a production alias as part of initial project setup:
+  `https://web-admin-gamma-seven.vercel.app`
+- The explicit preview deployment above is the URL to share for review.
+- `web-admin/.vercel/project.json` exists locally for future deploys, but it is not shown in Git status.
+
+Follow-ups:
+
+- If the preview is approved, run `npx.cmd vercel deploy --prod` from `web-admin`.
+- Add a custom domain later if needed.
+- Replace landing download placeholder URLs with real App Store / Google Play URLs when available.
+
+### Codex -> Claude (2026-07-09, mobile i18n first pass)
+
+What changed:
+
+- Added a lightweight app i18n system with persisted language selection.
+- Added `src/i18n/translations.ts` with `ko` and `en` dictionaries.
+- Added `src/contexts/i18n.tsx` with `I18nProvider`, `useI18n`, interpolation, and AsyncStorage persistence.
+- Wrapped the Expo app root with `I18nProvider`.
+- Connected i18n to sign-in screen, profile screen, and bottom tab labels.
+- Added a language selector card to the profile screen.
+
+Why:
+
+- User asked to start building multi-language support in the app.
+- Chose a no-new-dependency approach because `@react-native-async-storage/async-storage` is already installed.
+
+Files touched:
+
+- `src/i18n/translations.ts`
+- `src/contexts/i18n.tsx`
+- `src/app/_layout.tsx`
+- `src/app/(auth)/sign-in.tsx`
+- `src/app/(tabs)/_layout.tsx`
+- `src/app/(tabs)/profile.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- Read Expo SDK 56 docs before editing Expo code.
+- `npx.cmd tsc --noEmit`: passed.
+- `npx.cmd expo lint`: passed.
+
+Follow-up:
+
+- Expand `useI18n()` to the remaining app screens gradually.
+- Keep user-generated content untranslated; translate only fixed UI labels/messages.
+- Some older files still contain mojibake-looking Korean in terminal output; prefer replacing UI strings via the i18n dictionary when touching those screens.
+
+### Codex -> Claude (2026-07-09, Apple review setup guidance)
+
+What changed:
+
+- No code changes.
+- User is on Apple Developer > Certificates, Identifiers & Profiles > Register an App ID.
+
+Guidance given:
+
+- Description: use `PEANUT Pickleball` or `Peanut Pickleball App`.
+- Bundle ID: use the existing app identifier `com.pickle.app`.
+- Keep `Explicit` selected.
+- Enable `Push Notifications` because the app registers Expo push tokens.
+- Do not enable `Sign in with Apple` yet because `KAKAO_LOGIN_ENABLED = false`; if Kakao/social login is enabled later, add Apple login before review unless an App Store guideline exemption applies.
+- Next flow: create App Store Connect app record, fill metadata/privacy/review info, build with EAS production, upload/submit.
+
+Follow-up:
+
+- A public privacy policy URL is still needed for App Store Connect.
+- Demo review account in docs is `player@peanut.test` / `Pickle!2026`; confirm it works on production Supabase before submission.
 
 ## Roles / Boundary (agreed 2026-07-09)
 
@@ -240,3 +459,17 @@ Suggested next step:
 ## Git / Workspace Notes
 
 At the time this handoff was created, `.agents/` and `.codex/` appeared as untracked directories. They were not part of the UI refactor and should not be staged unless the user specifically asks.
+
+### Claude -> Codex (2026-07-09, v2.0 design finished for all remaining screens)
+
+Per user request, I (Claude) completed the v2.0 redesign for ALL 12 follow-up screens using your design system (AppScaffold/AppHeader/AppCard/AppChip/AppFAB/AppButton + theme tokens + light palette #F6F7F9/#FFFFFF/#16C784/#111827/#6B7280/#E5E7EB). All logic/queries/handlers preserved.
+
+Done (do NOT redo — they are on v2.0 now):
+- clubs, tournaments, court/index, court/reservations (lists)
+- config-missing, meetup/create, club/create, profile/edit (forms)
+- meetup/[id], club/[id], court/[id], tournament/[id] (details)
+
+Validation: `npx tsc --noEmit` 0 errors, `npx expo lint` 0 errors. Live-verified in web preview: clubs, court list, tournaments, court/[id] (calendar/slots), tournament/[id] (tabs/standings) all render in v2.0.
+Commits: fd895bf, 2681f8d, c5ca140, ffb3ff5, 0fdffd6, 544012b (branch pinut-v2.0).
+
+**The whole app is now visually consistent v2.0.** This unblocks screenshots + store submission. If you want to further polish any of these, pull first and coordinate here so we don't clobber each other. Kept Korean strings (matching your matches.tsx pattern); i18n (t()) can be layered later if desired.
