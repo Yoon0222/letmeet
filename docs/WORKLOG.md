@@ -64,6 +64,36 @@
 
 ---
 
+## 2026-07-10
+
+### 운영/개발 DB 분리 완료 (#30)
+- 새 Supabase **운영 프로젝트**(서울 리전, ref `jbvtdthtmrlndduqiikj`) 생성 → `schema.sql` 1회 세팅(테이블 11/11 + avatars·court-images 버킷 + RLS/트리거). **데이터 없는 클린 상태.**
+- **운영 super_admin 부트스트랩**: signUp + SQL 승격 + 이메일확인 → 로그인·`my_role()`=super_admin 검증.
+- `eas.json`의 **production만 운영 DB** 사용. development·preview·로컬·web-admin은 개발 DB(`pjfhxkvdjipvdmfsacie`) 유지.
+
+### UI v2.0 전면 완성 (#35)
+- 코덱스(디자인)가 토큰·공용 컴포넌트(`src/theme/*`, `app-*`) + 핵심 6화면(로그인·회원가입·홈·매칭·프로필·탭바).
+- **Claude가 나머지 12화면 v2.0 적용** — 리스트4(클럽·대회·코트·내예약)·폼4(모임생성·클럽생성·프로필수정·설정안내)·상세4(모임·클럽·코트·대회). 코덱스 디자인 시스템 재사용 + **로직 100% 보존**(예약·연대관·결제·대진·복식파트너·차단필터 등). tsc/lint 0, 프리뷰 라이브 검증. 커밋 `fd895bf`~`544012b`.
+- **앱 전체 디자인 일관** 확보 → 스크린샷·심사 언블록.
+
+### 협업 체계 — 코덱스↔Claude
+- **역할 경계**: 코덱스=디자인(`components/ui`·`theme`·화면 비주얼) / Claude=로직(`contexts`·`lib`·`supabase`·데이터). `pinut-v2.0` 계열 브랜치 공유. 소통 창구 `docs/HANDOFF.md`.
+- **자동화**: `handoff` 스킬(세션 시작 시 HANDOFF 읽기 / 마무리 시 Claude→Codex 항목 쓰기) + **SessionStart 훅**(매 세션 시작에 HANDOFF 확인 리마인더 자동 주입). 커밋 `e0ed944`.
+- 코덱스: 웹 랜딩 페이지(`web-admin/app/landing`) + i18n(ko/en) 추가. ⚠️ `web-admin/proxy.ts`는 Next 미들웨어로 동작하려면 `middleware.ts`여야 함(미수정, 알림만).
+
+### main 통합 (전체 작업 반영)
+- `main`이 갈라져 있어(원격 dev PR 3건) → 로컬 main을 원격 최신으로 ff → **`pinut-v2.0-dev`(전체 작업) 병합**(충돌 0) → push. 코덱스 랜딩 마무리까지 포함(`4e641ae`).
+- 코드 외 산출물은 gitignore: 스크린샷 출력 폴더·`.codex/`·`.agents/`·`.next-dev.*.log`.
+
+### 출시 준비 — 안드로이드 우선
+- **v2.0 스크린샷 12장 재촬영**(puppeteer-core 헤드리스 크롬, 1290×2796). `Downloads/peanut-screenshots-final`.
+- **Google Play 개발자 신원 인증 완료**(개인, 한글 이름).
+- **안드로이드 프로덕션 AAB 빌드 시작**(EAS, `com.pinut.app`, versionCode→2, 운영 DB + 네이버 키). build id `40503615`.
+- ⚠️ **개인 계정 비공개 테스트 의무**(테스터 20명·14일) 가능성 → 확인 필요. iOS는 이 의무 없음(멤버십 활성).
+
+### 도메인
+- 커스텀 도메인 **`pinut.kr`**(가비아) → Vercel 연결 예정(네임서버 `ns1/ns2.vercel-dns.com`). 웹은 web-admin/랜딩.
+
 ## 2026-07-09
 
 ### 번들ID 브랜드 통일 — `com.pickle.app` → `com.pinut.app`
