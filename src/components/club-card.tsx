@@ -1,40 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { AppSpacing, Radius, Typography } from '@/theme';
 import type { ClubWithCounts } from '@/lib/types';
 
 export function ClubCard({ club, onPress }: { club: ClubWithCounts; onPress: () => void }) {
-  const theme = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 },
-      ]}>
-      <View style={[styles.icon, { backgroundColor: 'rgba(61,186,111,0.14)' }]}>
-        <Ionicons name="people" size={22} color={theme.primary} />
+    <AppCard onPress={onPress} style={styles.card}>
+      <View style={styles.cover}>
+        <Ionicons name="people-outline" size={24} color="#16C784" />
       </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
-          {club.name}
+      <View style={styles.body}>
+        <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {club.region || '지역 미설정'} · 멤버 {club.member_count}명
         </Text>
-        <View style={styles.metaRow}>
-          {club.region ? (
-            <Text style={[styles.meta, { color: theme.textSecondary }]} numberOfLines={1}>
-              {club.region}
-            </Text>
-          ) : null}
-          <View style={styles.dot} />
-          <Ionicons name="person-outline" size={13} color={theme.textSecondary} />
-          <Text style={[styles.meta, { color: theme.textSecondary }]}>멤버 {club.member_count}</Text>
-        </View>
       </View>
-      <Avatar nickname={club.owner_nickname} uri={club.owner_avatar_url} size={28} />
-    </Pressable>
+      <Avatar nickname={club.owner_nickname} uri={club.owner_avatar_url} size={34} />
+    </AppCard>
   );
 }
 
@@ -42,14 +27,18 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: Spacing.three,
-    borderRadius: 14,
-    borderWidth: 1,
+    gap: AppSpacing.sm,
   },
-  icon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 16, fontWeight: '700' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  meta: { fontSize: 13 },
-  dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#8A9099' },
+  cover: {
+    width: 52,
+    height: 52,
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { flex: 1, gap: 4 },
+  name: { ...Typography.body, fontWeight: '700', color: '#111827' },
+  meta: { ...Typography.caption, color: '#6B7280' },
 });

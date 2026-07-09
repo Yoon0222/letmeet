@@ -44,3 +44,7 @@ example
 
 # local env
 .env
+
+# agent tooling (Codex/Claude local configs — not part of the app)
+.codex/
+.agents/

@@ -17,10 +17,8 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
-import { useTheme } from '@/hooks/use-theme';
 
 export default function SignUp() {
-  const theme = useTheme();
   const router = useRouter();
   const { signUp, signIn } = useAuth();
   const { show, hide } = useLoading();
@@ -42,7 +40,6 @@ export default function SignUp() {
     show();
     try {
       await signUp(email.trim(), password, nickname.trim());
-      // 이메일 인증이 꺼져 있으면 바로 로그인 시도
       try {
         await signIn(email.trim(), password);
       } catch {
@@ -61,16 +58,14 @@ export default function SignUp() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View>
-            <Text style={[styles.title, { color: theme.text }]}>회원가입</Text>
-            <Text style={[styles.sub, { color: theme.textSecondary }]}>
-              피클볼 커뮤니티에 합류하세요
-            </Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>회원가입</Text>
+            <Text style={styles.sub}>피클볼 커뮤니티에 합류하세요</Text>
           </View>
 
           <View style={styles.form}>
@@ -97,7 +92,7 @@ export default function SignUp() {
               value={password}
               onChangeText={setPassword}
             />
-            <Button title="가입하기" onPress={onSubmit} loading={loading} style={{ marginTop: 4 }} />
+            <Button title="가입하기" onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
           </View>
 
           <Button title="로그인으로 돌아가기" variant="outline" onPress={() => router.back()} />
@@ -108,9 +103,10 @@ export default function SignUp() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { flexGrow: 1, padding: Spacing.four, justifyContent: 'center', gap: Spacing.four },
-  title: { fontSize: 28, fontWeight: '800' },
-  sub: { fontSize: 15, marginTop: 4 },
+  header: { gap: 8 },
+  title: { fontSize: 34, fontWeight: '800', color: '#111827' },
+  sub: { fontSize: 16, fontWeight: '500', color: '#6B7280' },
   form: { gap: Spacing.three },
 });

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,8 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radius } from '@/theme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'danger';
 
@@ -17,6 +17,7 @@ interface ButtonProps extends Omit<PressableProps, 'style'> {
   title: string;
   variant?: Variant;
   loading?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -24,24 +25,24 @@ export function Button({
   title,
   variant = 'primary',
   loading = false,
+  icon,
   disabled,
   style,
   ...rest
 }: ButtonProps) {
-  const theme = useTheme();
   const isDisabled = disabled || loading;
 
   const bg: Record<Variant, string> = {
-    primary: theme.primary,
-    secondary: theme.backgroundElement,
+    primary: '#16C784',
+    secondary: '#FFFFFF',
     outline: 'transparent',
-    danger: '#E5484D',
+    danger: '#FEE2E2',
   };
   const fg: Record<Variant, string> = {
-    primary: '#fff',
-    secondary: theme.text,
-    outline: theme.primary,
-    danger: '#fff',
+    primary: '#FFFFFF',
+    secondary: '#111827',
+    outline: '#111827',
+    danger: '#DC2626',
   };
 
   return (
@@ -50,14 +51,17 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: bg[variant], opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
-        variant === 'outline' && { borderWidth: 1.5, borderColor: theme.primary },
+        (variant === 'outline' || variant === 'secondary') && { borderWidth: 1, borderColor: '#E5E7EB' },
         style,
       ]}
       {...rest}>
       {loading ? (
         <ActivityIndicator color={fg[variant]} />
       ) : (
-        <Text style={[styles.label, { color: fg[variant] }]}>{title}</Text>
+        <>
+          {icon ? <Ionicons name={icon} size={18} color={fg[variant]} /> : null}
+          <Text style={[styles.label, { color: fg[variant] }]}>{title}</Text>
+        </>
       )}
     </Pressable>
   );
@@ -65,11 +69,14 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    height: 52,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: Radius.button,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    gap: 8,
   },
   label: {
     fontSize: 16,
