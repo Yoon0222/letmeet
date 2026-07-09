@@ -9,10 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.pickle.app"
+      "bundleIdentifier": "com.pinut.app"
     },
     "android": {
-      "package": "com.pickle.app",
+      "package": "com.pinut.app",
       "adaptiveIcon": {
         "backgroundColor": "#163C33",
         "foregroundImage": "./assets/images/android-icon-foreground.png"

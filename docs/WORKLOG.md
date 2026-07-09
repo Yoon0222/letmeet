@@ -66,6 +66,12 @@
 
 ## 2026-07-09
 
+### 번들ID 브랜드 통일 — `com.pickle.app` → `com.pinut.app`
+- **왜**: 브랜드(피넛/PINUT) 통일. 출시 전이라 스토어 앱 미생성 → 지금이 바꿀 타이밍.
+- **네이버 클라우드**: Maps Application 서비스환경에 `com.pinut.app`(iOS Bundle + Android 패키지) **등록 완료**(기존 `com.pickle.app`도 유지 — 개발 빌드 호환). Web 서비스 URL은 브라우저 지도 미사용이라 localhost 유지, 배포 후 도메인 추가 예정.
+- **코드**: `app.json`의 `bundleIdentifier`·`package` → `com.pinut.app`. **slug·scheme는 `pickleball` 유지**(EAS 프로젝트 연결·딥링크 안정). AGENTS.md·APPSTORE.md 갱신. (EAS projectId·네이버 Client ID·env 값은 불변.)
+- 로그인 로고도 앱 아이콘(땅콩) 이미지로 교체(`523e74d`).
+
 ### 안드로이드 실기기 — 네이버 지도 동작 확인 ✅
 - EAS 개발 빌드로 실기기 설치 → 코트 목록/지도 토글·마커·마커 탭→예약까지 실동작 확인. `@mj-studio/react-native-naver-map`(네이티브 모듈)이 실기기에서 정상 렌더됨을 최종 검증(그동안 "빌드 후 확인 대기" 항목이었음).
 
