@@ -48,3 +48,6 @@ example
 # agent tooling (Codex/Claude local configs — not part of the app)
 .codex/
 .agents/
+
+# Next.js dev server logs (Codex tooling)
+.next-dev.*.log
