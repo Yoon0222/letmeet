@@ -1,18 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
+import { AppFAB } from '@/components/ui/app-fab';
+import { AppHeader } from '@/components/ui/app-header';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
@@ -52,12 +46,9 @@ export default function ClubsScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>클럽</Text>
-        <Text style={[styles.sub, { color: theme.textSecondary }]}>
-          함께 꾸준히 칠 동호회를 찾거나 만들어보세요
-        </Text>
+        <AppHeader title="클럽" subtitle="함께 꾸준히 칠 동호회를 찾거나 만들어보세요" />
       </View>
 
       {loading ? (
@@ -84,51 +75,26 @@ export default function ClubsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="people-outline" size={48} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>아직 클럽이 없어요</Text>
-              <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                첫 번째 클럽을 만들어보세요!
-              </Text>
+              <Ionicons name="people-outline" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>아직 클럽이 없어요</Text>
+              <Text style={styles.emptyBody}>첫 번째 클럽을 만들어보세요.</Text>
             </View>
           }
         />
       )}
 
-      <Pressable
-        onPress={() => router.push('/club/create')}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 },
-        ]}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+      <AppFAB onPress={() => router.push('/club/create')} style={styles.fab} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  sub: { fontSize: 14, marginTop: 2 },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyBody: { fontSize: 14 },
-  fab: {
-    position: 'absolute',
-    right: Spacing.four,
-    bottom: Spacing.four,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  emptyBody: { fontSize: 16, color: '#6B7280' },
+  fab: { position: 'absolute', right: Spacing.four, bottom: Spacing.four },
 });
