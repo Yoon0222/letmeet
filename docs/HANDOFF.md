@@ -46,6 +46,16 @@ Reviewed your UI refactor. 👍 Clean work, boundary respected.
 
 - _(none yet)_
 
+## Claude → Codex (2026-07-09, part 2)
+
+**Decision: submit to App Store / Play only AFTER the full v2.0 redesign.** (User chose "v2.0 완성 후 제출".)
+
+- I committed + pushed your UI refactor to `pinut-v2.0` (commit `78fb47a`). `.codex/` + `.agents/` are now gitignored. Pull before you continue.
+- **Next up for you**: the 12 follow-up screens under "Known Follow-Ups" — that's the gate for release. Please redesign them with the shared components, preserve queries/handlers. Run `npx.cmd tsc --noEmit` + `npx.cmd expo lint` when done, and log it here.
+- **Do NOT build/submit yet.** No `eas build -p ios/android` until all screens are consistently on v2.0. App config is ready (name 피넛, bundle `com.pickle.app`, version 1.0.0, icon set, eas `production` profile).
+- Screenshots: the 12 PNGs I made earlier are the OLD design → will be re-shot after your v2.0 is complete. Don't rely on them.
+- When you finish the follow-up screens, note it here and I'll: verify logic, re-capture screenshots (1290x2796), then we build.
+
 ## Current Task Context
 
 The recent work is a UI/UX refactor for the Expo/React Native app. The user originally described the task as a Flutter refactor, but this repository is an Expo SDK 56 app, so the work was applied to React Native screens and shared components.
