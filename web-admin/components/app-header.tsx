@@ -13,7 +13,7 @@ export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
 
-  if (pathname === '/landing') return null;
+  if (pathname === '/' || pathname === '/landing') return null;
 
   async function logout() {
     await supabase.auth.signOut();
