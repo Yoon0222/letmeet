@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,9 +20,12 @@ import { TextField } from '@/components/ui/text-field';
 import { KAKAO_LOGIN_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { useI18n } from '@/contexts/i18n';
 import { useLoading } from '@/contexts/loading';
+import type { TranslationKey } from '@/i18n/translations';
 
 export default function SignIn() {
+  const { t } = useI18n();
   const { signIn, signInWithKakao } = useAuth();
   const { withLoading } = useLoading();
   const [email, setEmail] = useState('');
@@ -34,7 +38,7 @@ export default function SignIn() {
     try {
       await withLoading(signInWithKakao());
     } catch (e: any) {
-      Alert.alert('카카오 로그인 실패', translateError(e?.message));
+      Alert.alert(t('auth.kakaoFailed'), translateAuthError(e?.message, t));
     } finally {
       setKakaoLoading(false);
     }
@@ -42,14 +46,14 @@ export default function SignIn() {
 
   async function onSubmit() {
     if (!email || !password) {
-      Alert.alert('입력 확인', '이메일과 비밀번호를 입력해주세요.');
+      Alert.alert(t('auth.missingCredentialsTitle'), t('auth.missingCredentialsBody'));
       return;
     }
     setLoading(true);
     try {
       await withLoading(signIn(email.trim(), password));
     } catch (e: any) {
-      Alert.alert('로그인 실패', translateError(e?.message));
+      Alert.alert(t('auth.signInFailed'), translateAuthError(e?.message, t));
     } finally {
       setLoading(false);
     }
@@ -62,16 +66,18 @@ export default function SignIn() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.logo}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>P!</Text>
-            </View>
-            <Text style={styles.brand}>P!NUT</Text>
-            <Text style={styles.tagline}>가까운 피클볼 메이트를 찾아보세요</Text>
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.logoBadge}
+              resizeMode="cover"
+            />
+            <Text style={styles.brand}>{t('common.appName')}</Text>
+            <Text style={styles.tagline}>{t('auth.signInSubtitle')}</Text>
           </View>
 
           <View style={styles.form}>
             <TextField
-              label="이메일"
+              label={t('auth.email')}
               placeholder="you@example.com"
               autoCapitalize="none"
               keyboardType="email-address"
@@ -80,18 +86,18 @@ export default function SignIn() {
               onChangeText={setEmail}
             />
             <TextField
-              label="비밀번호"
-              placeholder="비밀번호"
+              label={t('auth.password')}
+              placeholder={t('auth.password')}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
             />
-            <Button title="로그인" onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
+            <Button title={t('auth.signIn')} onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
 
             <View style={styles.socialArea}>
               <View style={styles.divider}>
                 <View style={styles.line} />
-                <Text style={styles.dividerText}>또는</Text>
+                <Text style={styles.dividerText}>{t('auth.or')}</Text>
                 <View style={styles.line} />
               </View>
               <View style={styles.socialRow}>
@@ -104,9 +110,9 @@ export default function SignIn() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>아직 계정이 없으신가요? </Text>
+            <Text style={styles.footerText}>{t('auth.noAccount')} </Text>
             <Link href="/(auth)/sign-up" style={styles.link}>
-              회원가입
+              {t('auth.signUp')}
             </Link>
           </View>
         </ScrollView>
@@ -132,6 +138,18 @@ export function translateError(msg?: string): string {
   return msg;
 }
 
+function translateAuthError(
+  msg: string | undefined,
+  t: (key: TranslationKey) => string,
+): string {
+  if (!msg) return t('auth.errors.fallback');
+  if (/invalid login credentials/i.test(msg)) return t('auth.errors.invalidLogin');
+  if (/email not confirmed/i.test(msg)) return t('auth.errors.emailNotConfirmed');
+  if (/already registered/i.test(msg)) return t('auth.errors.alreadyRegistered');
+  if (/password should be at least/i.test(msg)) return t('auth.errors.shortPassword');
+  return msg;
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { flexGrow: 1, padding: Spacing.four, justifyContent: 'center', gap: Spacing.five },
@@ -141,11 +159,8 @@ const styles = StyleSheet.create({
     height: 82,
     borderRadius: 24,
     borderCurve: 'continuous',
-    backgroundColor: '#16C784',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  logoText: { fontSize: 34, fontWeight: '900', color: '#FFFFFF' },
   brand: { fontSize: 34, fontWeight: '900', color: '#111827' },
   tagline: { fontSize: 16, fontWeight: '500', color: '#6B7280' },
   form: { gap: Spacing.three },
