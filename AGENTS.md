@@ -9,7 +9,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 피클볼 슈퍼앱의 1단계 MVP. 가까운 코트에서 함께 칠 사람을 찾는 **커뮤니티 매칭**(번개 모임 + 플레이어 매칭) 모바일 앱이다.
 
 ## 브랜드
-- **이름: 피넛 (PEANUT)** — 앱 표시 이름은 "피넛". (내부 slug/scheme/bundleID 는 `pickleball` / `com.pickle.app` 유지 — 빌드·스토어·딥링크 안정성 때문에 건드리지 말 것)
+- **이름: 피넛 (PEANUT)** — 앱 표시 이름은 "피넛". **번들ID/패키지 = `com.pinut.app`** (2026-07-09 브랜드 통일로 `com.pickle.app`에서 교체, 네이버 지도 재등록 완료). **slug/scheme 는 `pickleball` 유지** — EAS 프로젝트 연결·딥링크 안정성 때문에 건드리지 말 것.
 - **브랜드 가치: Play · Engage · Achieve**
 - **슬로건: for sports nuts** (peanut ↔ nuts 워드플레이)
 - "피클볼"은 종목명이라 그대로 쓰고, **앱 브랜드 표기는 "피넛"** 으로 통일한다. (기존 "피클" 표기가 남아 있으면 피넛으로 교체)

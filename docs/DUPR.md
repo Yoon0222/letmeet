@@ -1,5 +1,37 @@
 # DUPR 연동 — 파트너 신청 가이드
 
+## 진행 상태 (2026-07-09 업데이트)
+- 1차 신청 메일 발송함 → **DUPR(Rebecca) 회신 도착.** 결론: **"플랫폼이 라이브·공개 상태여야 승인"**. 초기 컨셉·프로토타입·개발 중 툴은 안 받음.
+- 승인 조건 3가지: ① **Live, Operational Platform**(공개 접근·완전 작동) ② **Pickleball-Relevant**(대회/코트예약/리그/커뮤니티 — ✅ 우리 해당) ③ **Scalability & Community Impact**.
+- **우리 게이트 = ①번뿐.** 현재 심사 제출 단계라 아직 라이브 아님 → **지금 회신해도 통과 안 됨.**
+- **행동 계획**: 스토어 출시(App Store/Play 라이브) → 라이브 URL 확보 → Rebecca에게 "이제 출시됐다" 회신(아래 초안) → 온보딩 진행.
+- 원문 발췌: *"prioritizing requests from fully functioning, pickleball-related software businesses… Live, Operational Platform: publicly accessible and fully functioning… revisit the request once your platform is live."*
+
+## 출시 후 회신 초안 (영문)
+```
+Subject: Re: API Partner Integration Request — Peanut (now live)
+
+Hi Rebecca,
+
+Thanks for the guidance. Peanut is now live and publicly available:
+  - App Store: <링크>
+  - Google Play: <링크>
+
+It's a fully functioning pickleball platform in South Korea offering
+court reservations, meetups/matchmaking, clubs, and tournament
+management with bracket engine. We'd love to proceed with the API
+partner onboarding to (1) let users verify/display their DUPR rating
+in-app and (2) upload tournament/match results to DUPR.
+
+  - Region: South Korea
+  - Current scope: rating lookup/verification + match result upload
+  - Users/clubs: <채워넣기: 가입자 수·클럽 수·대회 건수 등 지표>
+  - Technical contact: <이메일>
+  - DUPR Club: <있으면 Club ID>
+
+Could you guide us through the next steps? Thank you!
+```
+
 ## 현실 요약
 - DUPR은 **공개 API가 없다.** 비공개 파트너 API는 **승인받은 파트너**만 접근 가능.
 - 스크래핑(비공식 API)은 **ToS 위반 + 불안정** → 사용 금지.

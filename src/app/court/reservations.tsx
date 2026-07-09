@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Brand, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -100,31 +100,31 @@ export default function MyReservationsScreen() {
   }
 
   const Card = ({ g }: { g: Group }) => (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, opacity: g.past ? 0.6 : 1 }]}>
+    <View style={[styles.card, g.past && styles.cardPast]}>
       <Pressable onPress={() => router.push(`/court/${g.courtId}`)} style={styles.cardTop}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.courtName, { color: theme.text }]} numberOfLines={1}>
+          <Text style={styles.courtName} numberOfLines={1}>
             {g.courtName}
-            {g.unit ? <Text style={{ color: theme.primary }}> · {g.unit}</Text> : null}
+            {g.unit ? <Text style={{ color: '#16C784' }}> · {g.unit}</Text> : null}
           </Text>
-          <Text style={[styles.meta, { color: theme.textSecondary }]}>{g.region || '지역 미설정'}</Text>
+          <Text style={styles.meta}>{g.region || '지역 미설정'}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
       </Pressable>
-      <View style={[styles.dateRow, { borderTopColor: theme.border }]}>
-        <Ionicons name="calendar-outline" size={16} color={theme.primary} />
-        <Text style={[styles.dateText, { color: theme.text }]}>{fmtDate(g.date)}</Text>
-        <Text style={[styles.hoursText, { color: theme.textSecondary }]}>{g.hours.map((h) => `${h}시`).join(', ')}</Text>
+      <View style={styles.dateRow}>
+        <Ionicons name="calendar-outline" size={16} color="#16C784" />
+        <Text style={styles.dateText}>{fmtDate(g.date)}</Text>
+        <Text style={styles.hoursText}>{g.hours.map((h) => `${h}시`).join(', ')}</Text>
       </View>
       <View style={styles.bottomRow}>
-        <Text style={[styles.total, { color: theme.textSecondary }]}>
+        <Text style={styles.total}>
           {g.hours.length}시간{g.price > 0 ? ` · ${(g.hours.length * g.price).toLocaleString()}원` : ' · 무료'}
         </Text>
         {g.past ? (
-          <Text style={[styles.doneBadge, { color: theme.textSecondary }]}>이용 완료</Text>
+          <Text style={styles.doneBadge}>이용 완료</Text>
         ) : (
-          <Pressable onPress={() => cancelGroup(g)} hitSlop={6} style={[styles.cancelBtn, { borderColor: theme.border }]}>
-            <Text style={[styles.cancelText, { color: Brand.danger }]}>예약 취소</Text>
+          <Pressable onPress={() => cancelGroup(g)} hitSlop={6} style={styles.cancelBtn}>
+            <Text style={styles.cancelText}>예약 취소</Text>
           </Pressable>
         )}
       </View>
@@ -132,7 +132,7 @@ export default function MyReservationsScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{ title: '내 예약' }} />
       {loading ? (
         <View style={styles.center}>
@@ -140,9 +140,9 @@ export default function MyReservationsScreen() {
         </View>
       ) : groups.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="calendar-outline" size={48} color={theme.tabIconDefault} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>예약 내역이 없어요</Text>
-          <Pressable onPress={() => router.replace('/court')} style={[styles.goBtn, { backgroundColor: theme.primary }]}>
+          <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
+          <Text style={styles.emptyTitle}>예약 내역이 없어요</Text>
+          <Pressable onPress={() => router.replace('/court')} style={styles.goBtn}>
             <Text style={styles.goText}>코트 예약하러 가기</Text>
           </Pressable>
         </View>
@@ -150,7 +150,7 @@ export default function MyReservationsScreen() {
         <ScrollView contentContainerStyle={styles.list}>
           {upcoming.length > 0 ? (
             <>
-              <Text style={[styles.section, { color: theme.text }]}>예정된 예약 {upcoming.length}</Text>
+              <Text style={styles.section}>예정된 예약 {upcoming.length}</Text>
               {upcoming.map((g) => (
                 <Card key={g.key} g={g} />
               ))}
@@ -158,7 +158,7 @@ export default function MyReservationsScreen() {
           ) : null}
           {pastGroups.length > 0 ? (
             <>
-              <Text style={[styles.section, { color: theme.text, marginTop: Spacing.three }]}>지난 예약</Text>
+              <Text style={[styles.section, { marginTop: Spacing.three }]}>지난 예약</Text>
               {pastGroups.map((g) => (
                 <Card key={g.key} g={g} />
               ))}
@@ -171,24 +171,32 @@ export default function MyReservationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: Spacing.four, gap: Spacing.three },
-  section: { fontSize: 15, fontWeight: '800', marginBottom: 2 },
-  card: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  section: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 2 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  cardPast: { opacity: 0.6 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.three },
-  courtName: { fontSize: 16, fontWeight: '700' },
-  meta: { fontSize: 13, marginTop: 2 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, paddingHorizontal: Spacing.three, paddingVertical: 10 },
-  dateText: { fontSize: 14, fontWeight: '700' },
-  hoursText: { fontSize: 13, flex: 1 },
+  courtName: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  meta: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#F1F3F5', paddingHorizontal: Spacing.three, paddingVertical: 10 },
+  dateText: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  hoursText: { fontSize: 13, color: '#6B7280', flex: 1 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingBottom: Spacing.three },
-  total: { fontSize: 13, fontWeight: '600' },
-  doneBadge: { fontSize: 13, fontWeight: '700' },
-  cancelBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
-  cancelText: { fontSize: 13, fontWeight: '700' },
+  total: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  doneBadge: { fontSize: 13, fontWeight: '700', color: '#9CA3AF' },
+  cancelBtn: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  cancelText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: Spacing.four },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  goBtn: { marginTop: 8, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  goBtn: { marginTop: 8, borderRadius: 999, backgroundColor: '#16C784', paddingHorizontal: 20, paddingVertical: 12 },
   goText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

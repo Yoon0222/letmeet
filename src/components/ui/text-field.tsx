@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radius } from '@/theme';
 
 interface TextFieldProps extends TextInputProps {
   label?: string;
@@ -10,20 +9,17 @@ interface TextFieldProps extends TextInputProps {
 }
 
 export function TextField({ label, hint, style, ...rest }: TextFieldProps) {
-  const theme = useTheme();
   const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text> : null}
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
-        placeholderTextColor={theme.tabIconDefault}
+        placeholderTextColor="#9CA3AF"
         style={[
           styles.input,
           {
-            backgroundColor: theme.backgroundElement,
-            color: theme.text,
-            borderColor: focused ? theme.primary : 'transparent',
+            borderColor: focused ? '#16C784' : '#E5E7EB',
           },
           style,
         ]}
@@ -31,21 +27,25 @@ export function TextField({ label, hint, style, ...rest }: TextFieldProps) {
         onBlur={() => setFocused(false)}
         {...rest}
       />
-      {hint ? <Text style={[styles.hint, { color: theme.tabIconDefault }]}>{hint}</Text> : null}
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6, alignSelf: 'stretch' },
-  label: { fontSize: 13, fontWeight: '600', marginLeft: 2 },
+  wrap: { gap: 8, alignSelf: 'stretch' },
+  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 2 },
   input: {
-    minHeight: 50,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    paddingHorizontal: Spacing.three,
+    minHeight: 56,
+    borderRadius: Radius.input,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
+    fontWeight: '500',
+    backgroundColor: '#FFFFFF',
+    color: '#111827',
   },
-  hint: { fontSize: 12, marginLeft: 2 },
+  hint: { fontSize: 13, marginLeft: 2, color: '#9CA3AF' },
 });

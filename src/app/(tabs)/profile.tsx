@@ -5,20 +5,20 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
-import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { ProfileSummaryCard } from '@/components/profile-summary-card';
+import { AppCard } from '@/components/ui/app-card';
+import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { useTheme } from '@/hooks/use-theme';
+import { useI18n } from '@/contexts/i18n';
 import { confirmDestructive } from '@/lib/confirm';
-import { playStyleLabel, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
 
 export default function ProfileScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const { t, language, languages, languageLabels, setLanguage } = useI18n();
   const { session, profile, signOut, deleteAccount } = useAuth();
   const [myMeetups, setMyMeetups] = useState<MeetupWithCounts[]>([]);
   const [deleting, setDeleting] = useState(false);
@@ -50,7 +50,12 @@ export default function ProfileScreen() {
   );
 
   function confirmSignOut() {
-    confirmDestructive('로그아웃', '정말 로그아웃 하시겠어요?', '로그아웃', () => signOut());
+    confirmDestructive(
+      t('profile.signOutTitle'),
+      t('profile.signOutBody'),
+      t('profile.signOut'),
+      () => signOut(),
+    );
   }
 
   async function doDelete() {
@@ -58,7 +63,7 @@ export default function ProfileScreen() {
     try {
       await deleteAccount();
     } catch (e) {
-      Alert.alert('탈퇴 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      Alert.alert(t('profile.deleteFailed'), e instanceof Error ? e.message : t('auth.errors.fallback'));
     } finally {
       setDeleting(false);
     }
@@ -66,9 +71,9 @@ export default function ProfileScreen() {
 
   function confirmDelete() {
     confirmDestructive(
-      '회원 탈퇴',
-      '정말 탈퇴하시겠어요?\n계정과 모든 데이터(프로필·모임·대회 참가 기록)가 영구 삭제되며 되돌릴 수 없어요.',
-      '탈퇴하기',
+      t('profile.deleteTitle'),
+      t('profile.deleteBody'),
+      t('profile.deleteAccount'),
       doDelete,
     );
   }
@@ -76,67 +81,45 @@ export default function ProfileScreen() {
   const needsSetup = profile && !profile.region;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>내 정보</Text>
-          <Pressable onPress={() => router.push('/profile/edit')} hitSlop={10}>
-            <Ionicons name="create-outline" size={24} color={theme.text} />
-          </Pressable>
-        </View>
+        <AppHeader title={t('profile.title')} rightIcon="create-outline" onRightPress={() => router.push('/profile/edit')} />
 
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Avatar nickname={profile?.nickname ?? '?'} uri={profile?.avatar_url} size={72} />
-          <Text style={[styles.nick, { color: theme.text }]}>{profile?.nickname ?? '...'}</Text>
-          <Text style={[styles.region, { color: theme.textSecondary }]}>
-            {profile?.region || '지역 미설정'} · {playStyleLabel(profile?.play_style ?? 'all')}
-          </Text>
+        <ProfileSummaryCard profile={profile} meetupCount={myMeetups.length} />
 
-          {profile?.dupr_id ? (
-            <Badge
-              label={
-                profile.dupr_verified
-                  ? `DUPR ${profile.dupr_rating?.toFixed(1) ?? ''} 인증`
-                  : `DUPR ${profile.dupr_id} (미인증)`
-              }
-              color={profile.dupr_verified ? '#185FA5' : '#60646C'}
-              bg={profile.dupr_verified ? 'rgba(45,127,249,0.14)' : 'rgba(136,135,128,0.14)'}
-              style={{ marginTop: 6 }}
-            />
-          ) : null}
-
-          <View style={styles.statsRow}>
-            <Stat
-              value={(profile?.skill_level ?? 0).toFixed(1)}
-              label={skillLabel(profile?.skill_level ?? 3)}
-              theme={theme}
-            />
-            <View style={[styles.divider, { backgroundColor: theme.border }]} />
-            <Stat value={String(myMeetups.length)} label="참여 모임" theme={theme} />
+        <AppCard disabled style={styles.languageCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.languageTitle}>{t('profile.language')}</Text>
+            <Text style={styles.languageHint}>{t('profile.languageHint')}</Text>
           </View>
-
-          {profile?.bio ? (
-            <Text style={[styles.bio, { color: theme.textSecondary }]}>{profile.bio}</Text>
-          ) : null}
-        </View>
+          <View style={styles.languageOptions}>
+            {languages.map((item) => {
+              const active = item === language;
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => setLanguage(item)}
+                  style={[styles.languageButton, active && styles.languageButtonActive]}>
+                  <Text style={[styles.languageText, active && styles.languageTextActive]}>
+                    {languageLabels[item]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </AppCard>
 
         {needsSetup && (
-          <Pressable
-            onPress={() => router.push('/profile/edit')}
-            style={[styles.setupBanner, { backgroundColor: 'rgba(61,186,111,0.12)' }]}>
-            <Ionicons name="information-circle" size={20} color={theme.primary} />
-            <Text style={[styles.setupText, { color: theme.text }]}>
-              프로필을 완성하면 더 잘 맞는 모임을 추천받아요
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          <Pressable onPress={() => router.push('/profile/edit')} style={styles.setupBanner}>
+            <Ionicons name="information-circle-outline" size={20} color="#16C784" />
+            <Text style={styles.setupText}>{t('profile.completeProfile')}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
           </Pressable>
         )}
 
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>내 모임</Text>
+        <Text style={styles.sectionTitle}>{t('profile.myMeetups')}</Text>
         {myMeetups.length === 0 ? (
-          <Text style={[styles.emptyMeetup, { color: theme.textSecondary }]}>
-            아직 참여한 모임이 없어요. 모임 탭에서 찾아보세요!
-          </Text>
+          <Text style={styles.emptyMeetup}>{t('profile.emptyMeetups')}</Text>
         ) : (
           <View style={{ gap: Spacing.three }}>
             {myMeetups.map((m) => (
@@ -145,66 +128,54 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <Button title="로그아웃" variant="outline" onPress={confirmSignOut} style={{ marginTop: Spacing.four }} />
-        <Text style={[styles.email, { color: theme.tabIconDefault }]}>{session?.user.email}</Text>
+        <Button title={t('profile.signOut')} variant="outline" onPress={confirmSignOut} style={{ marginTop: Spacing.four }} />
+        <Text style={styles.email}>{session?.user.email}</Text>
         <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
-          <Text style={[styles.deleteText, { color: Brand.danger }]}>
-            {deleting ? '탈퇴 처리 중…' : '회원 탈퇴'}
-          </Text>
+          <Text style={styles.deleteText}>{deleting ? t('profile.deleting') : t('profile.deleteAccount')}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Stat({
-  value,
-  label,
-  theme,
-}: {
-  value: string;
-  label: string;
-  theme: ReturnType<typeof useTheme>;
-}) {
-  return (
-    <View style={styles.stat}>
-      <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  card: {
+  languageCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: Spacing.four,
-    gap: 6,
+    gap: Spacing.three,
   },
-  nick: { fontSize: 22, fontWeight: '800', marginTop: 6 },
-  region: { fontSize: 14 },
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four, marginTop: Spacing.three },
-  divider: { width: 1, height: 36 },
-  stat: { alignItems: 'center', minWidth: 64 },
-  statValue: { fontSize: 22, fontWeight: '800' },
-  statLabel: { fontSize: 12, marginTop: 2 },
-  bio: { fontSize: 14, textAlign: 'center', marginTop: Spacing.three, lineHeight: 20 },
+  languageTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  languageHint: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+  languageOptions: { flexDirection: 'row', gap: 8 },
+  languageButton: {
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: '#F6F7F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageButtonActive: { backgroundColor: '#16C784' },
+  languageText: { fontSize: 13, fontWeight: '800', color: '#6B7280' },
+  languageTextActive: { color: '#FFFFFF' },
   setupBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     padding: Spacing.three,
-    borderRadius: 14,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  setupText: { flex: 1, fontSize: 13, fontWeight: '600' },
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginTop: Spacing.three },
-  emptyMeetup: { fontSize: 14, lineHeight: 20 },
-  email: { fontSize: 12, textAlign: 'center', marginTop: Spacing.three },
+  setupText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111827' },
+  sectionTitle: { fontSize: 26, fontWeight: '800', color: '#111827', marginTop: Spacing.three },
+  emptyMeetup: { fontSize: 16, lineHeight: 22, color: '#6B7280' },
+  email: { fontSize: 13, textAlign: 'center', marginTop: Spacing.three, color: '#9CA3AF' },
   deleteBtn: { alignSelf: 'center', marginTop: Spacing.three, padding: 8 },
-  deleteText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
+  deleteText: { fontSize: 13, fontWeight: '600', color: Brand.danger, textDecorationLine: 'underline' },
 });

@@ -8,7 +8,6 @@ import { MonthCalendar } from '@/components/month-calendar';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { useTheme } from '@/hooks/use-theme';
 import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { startCourtPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +16,6 @@ import type { Court, CourtBlock, CourtReservation } from '@/lib/types';
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function CourtDetail() {
-  const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -82,15 +80,15 @@ export default function CourtDetail() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.primary} />
+      <View style={styles.center}>
+        <ActivityIndicator color="#16C784" />
       </View>
     );
   }
   if (!court) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={{ color: theme.textSecondary }}>코트를 찾을 수 없어요.</Text>
+      <View style={styles.center}>
+        <Text style={styles.notFound}>코트를 찾을 수 없어요.</Text>
       </View>
     );
   }
@@ -190,30 +188,30 @@ export default function CourtDetail() {
   const total = picked.length * court.hourly_price;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{ title: court.name }} />
       <ScrollView contentContainerStyle={styles.content}>
         {images.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery} style={styles.galleryWrap}>
             {images.map((url) => (
-              <Image key={url} source={{ uri: url }} style={[styles.galleryImg, { backgroundColor: theme.backgroundElement }]} />
+              <Image key={url} source={{ uri: url }} style={styles.galleryImg} />
             ))}
           </ScrollView>
         ) : null}
-        <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Info icon="location-outline" text={`${court.region || '지역 미설정'}${court.address ? ` · ${court.address}` : ''}`} theme={theme} />
-          <Info icon="home-outline" text={court.indoor ? '실내 코트' : '실외 코트'} theme={theme} />
-          <Info icon="time-outline" text={`운영 ${court.open_hour}시 – ${court.close_hour}시`} theme={theme} />
-          <Info icon="cash-outline" text={court.hourly_price > 0 ? `시간당 ${court.hourly_price.toLocaleString()}원` : '무료'} theme={theme} />
-          {units.length > 0 ? <Info icon="grid-outline" text={unitText} theme={theme} /> : null}
-          {court.lessons ? <Info icon="school-outline" text="레슨 가능" theme={theme} /> : null}
+        <View style={styles.infoCard}>
+          <Info icon="location-outline" text={`${court.region || '지역 미설정'}${court.address ? ` · ${court.address}` : ''}`} />
+          <Info icon="home-outline" text={court.indoor ? '실내 코트' : '실외 코트'} />
+          <Info icon="time-outline" text={`운영 ${court.open_hour}시 – ${court.close_hour}시`} />
+          <Info icon="cash-outline" text={court.hourly_price > 0 ? `시간당 ${court.hourly_price.toLocaleString()}원` : '무료'} />
+          {units.length > 0 ? <Info icon="grid-outline" text={unitText} /> : null}
+          {court.lessons ? <Info icon="school-outline" text="레슨 가능" /> : null}
         </View>
 
         {amenities.length > 0 ? (
           <View style={styles.amenityRow}>
             {amenities.map((a) => (
-              <View key={a} style={[styles.amenityChip, { backgroundColor: theme.backgroundElement }]}>
-                <Text style={[styles.amenityText, { color: theme.text }]}>
+              <View key={a} style={styles.amenityChip}>
+                <Text style={styles.amenityText}>
                   {AMENITIES.find((x) => x.key === a)?.emoji ?? ''} {amenityLabel(a)}
                 </Text>
               </View>
@@ -221,14 +219,14 @@ export default function CourtDetail() {
           </View>
         ) : null}
 
-        {court.description ? <Text style={[styles.desc, { color: theme.textSecondary }]}>{court.description}</Text> : null}
+        {court.description ? <Text style={styles.desc}>{court.description}</Text> : null}
 
         {/* 날짜 (월별 달력 · 운영자가 연 날짜만 선택 가능) */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>날짜 선택</Text>
+        <Text style={styles.sectionTitle}>날짜 선택</Text>
         {!hasOpenDays ? (
-          <View style={[styles.noDays, { backgroundColor: theme.backgroundElement }]}>
-            <Ionicons name="calendar-outline" size={22} color={theme.textSecondary} />
-            <Text style={[styles.noDaysText, { color: theme.textSecondary }]}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 예약일을 열면 예약할 수 있어요.</Text>
+          <View style={styles.noDays}>
+            <Ionicons name="calendar-outline" size={22} color="#6B7280" />
+            <Text style={styles.noDaysText}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 예약일을 열면 예약할 수 있어요.</Text>
           </View>
         ) : (
           <MonthCalendar
@@ -247,7 +245,7 @@ export default function CourtDetail() {
         {/* 코트(면) 선택 — 면이 여러 개면 */}
         {selectedDate && units.length > 0 ? (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>코트 선택</Text>
+            <Text style={styles.sectionTitle}>코트 선택</Text>
             <View style={styles.unitRow}>
               {units.map((u) => {
                 const active = u.name === selectedUnit;
@@ -259,9 +257,9 @@ export default function CourtDetail() {
                       setPicked([]);
                       setAnchor(null);
                     }}
-                    style={[styles.unitChip, { backgroundColor: active ? theme.primary : theme.backgroundElement }]}>
-                    <Text style={[styles.unitName, { color: active ? '#fff' : theme.text }]}>{u.name}</Text>
-                    <Text style={[styles.unitSurface, { color: active ? '#fff' : theme.textSecondary }]}>{surfaceLabel(u.surface)}</Text>
+                    style={[styles.unitChip, active ? styles.unitChipActive : styles.unitChipIdle]}>
+                    <Text style={[styles.unitName, { color: active ? '#fff' : '#111827' }]}>{u.name}</Text>
+                    <Text style={[styles.unitSurface, { color: active ? '#EAFBF3' : '#6B7280' }]}>{surfaceLabel(u.surface)}</Text>
                   </Pressable>
                 );
               })}
@@ -272,37 +270,37 @@ export default function CourtDetail() {
         {/* 시간 슬롯 */}
         {selectedDate ? (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>시간 선택</Text>
-            <Text style={[styles.rangeHint, { color: theme.textSecondary }]}>시작 시간을 누르고 종료 시간을 누르면 연속으로 선택돼요.</Text>
+            <Text style={styles.sectionTitle}>시간 선택</Text>
+            <Text style={styles.rangeHint}>시작 시간을 누르고 종료 시간을 누르면 연속으로 선택돼요.</Text>
             <View style={styles.slotWrap}>
-          {hours.map((h) => {
-            const r = reservedByHour.get(h);
-            const mine = !!r && r.user_id === uid;
-            const past = isToday && h < curHour;
-            const blocked = blockedHours.has(h); // 연대관
-            const sel = picked.includes(h);
-            // 연대관·예약됨(내 것 포함)·지난 시간은 선택 불가. 취소는 '내 예약' 화면에서.
-            const disabled = blocked || !!r || past;
-            const bg = sel ? theme.primary : mine ? theme.backgroundElement : r || blocked ? theme.backgroundElement : theme.card;
-            const fg = sel ? '#fff' : mine ? theme.accent : r || past || blocked ? theme.textSecondary : theme.text;
-            const borderColor = sel ? theme.primary : mine ? theme.accent : theme.border;
-            return (
-              <Pressable
-                key={h}
-                disabled={disabled}
-                onPress={() => onSlotPress(h)}
-                style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past || blocked ? 0.5 : 1 }]}>
-                <Text style={[styles.slotHour, { color: fg }]}>{h}시</Text>
-                <Text style={[styles.slotState, { color: fg }]}>{blocked ? '대관' : mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
-              </Pressable>
-            );
-          })}
+              {hours.map((h) => {
+                const r = reservedByHour.get(h);
+                const mine = !!r && r.user_id === uid;
+                const past = isToday && h < curHour;
+                const blocked = blockedHours.has(h); // 연대관
+                const sel = picked.includes(h);
+                // 연대관·예약됨(내 것 포함)·지난 시간은 선택 불가. 취소는 '내 예약' 화면에서.
+                const disabled = blocked || !!r || past;
+                const bg = sel ? '#16C784' : mine || r || blocked ? '#F0F1F3' : '#FFFFFF';
+                const fg = sel ? '#fff' : mine ? '#F59E0B' : r || past || blocked ? '#6B7280' : '#111827';
+                const borderColor = sel ? '#16C784' : mine ? '#F59E0B' : '#E5E7EB';
+                return (
+                  <Pressable
+                    key={h}
+                    disabled={disabled}
+                    onPress={() => onSlotPress(h)}
+                    style={[styles.slot, { backgroundColor: bg, borderColor, opacity: past || blocked ? 0.5 : 1 }]}>
+                    <Text style={[styles.slotHour, { color: fg }]}>{h}시</Text>
+                    <Text style={[styles.slotState, { color: fg }]}>{blocked ? '대관' : mine ? '내 예약' : r ? '예약됨' : past ? '지남' : sel ? '선택' : '가능'}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </>
         ) : null}
       </ScrollView>
 
-      <View style={[styles.actionBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+      <View style={styles.actionBar}>
         <Button
           title={
             picked.length === 0
@@ -320,40 +318,51 @@ export default function CourtDetail() {
   );
 }
 
-function Info({ icon, text, theme }: { icon: keyof typeof Ionicons.glyphMap; text: string; theme: ReturnType<typeof useTheme> }) {
+function Info({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={theme.primary} />
-      <Text style={[styles.infoText, { color: theme.text }]}>{text}</Text>
+      <Ionicons name={icon} size={18} color="#16C784" />
+      <Text style={styles.infoText}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
+  notFound: { color: '#6B7280', fontSize: 15 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
   galleryWrap: { marginHorizontal: -Spacing.four },
   gallery: { gap: 8, paddingHorizontal: Spacing.four },
-  galleryImg: { width: 280, height: 170, borderRadius: 14 },
-  infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
+  galleryImg: { width: 280, height: 170, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: Spacing.three,
+    gap: 12,
+  },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
   amenityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  amenityChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  amenityText: { fontSize: 13, fontWeight: '600' },
-  desc: { fontSize: 15, lineHeight: 22 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', marginTop: Spacing.two },
-  rangeHint: { fontSize: 12, marginTop: -4 },
+  amenityChip: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  amenityText: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280' },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827', marginTop: Spacing.two },
+  rangeHint: { fontSize: 12, color: '#6B7280', marginTop: -4 },
   unitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  unitChip: { minWidth: 64, alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
+  unitChip: { minWidth: 64, alignItems: 'center', borderRadius: 12, borderCurve: 'continuous', paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
+  unitChipActive: { backgroundColor: '#16C784' },
+  unitChipIdle: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
   unitName: { fontSize: 15, fontWeight: '800' },
   unitSurface: { fontSize: 11, fontWeight: '600' },
-  noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: Spacing.three },
-  noDaysText: { fontSize: 13, lineHeight: 19, flex: 1 },
+  noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: Spacing.three },
+  noDaysText: { fontSize: 13, lineHeight: 19, color: '#6B7280', flex: 1 },
   slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  slot: { width: 72, borderWidth: 1, borderRadius: 12, paddingVertical: 8, alignItems: 'center', gap: 2 },
+  slot: { width: 72, borderWidth: 1, borderRadius: 12, borderCurve: 'continuous', paddingVertical: 8, alignItems: 'center', gap: 2 },
   slotHour: { fontSize: 15, fontWeight: '800' },
   slotState: { fontSize: 11, fontWeight: '600' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1 },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
 });

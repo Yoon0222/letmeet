@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BootScreen } from '@/components/ui/boot-screen';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/auth';
+import { I18nProvider } from '@/contexts/i18n';
 import { LoadingProvider } from '@/contexts/loading';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -84,13 +85,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <AuthProvider>
-            <LoadingProvider>
-              <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
-                <RootNavigator />
-              </View>
-            </LoadingProvider>
-          </AuthProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <LoadingProvider>
+                <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
+                  <RootNavigator />
+                </View>
+              </LoadingProvider>
+            </AuthProvider>
+          </I18nProvider>
           <StatusBar style="auto" />
         </ThemeProvider>
       </SafeAreaProvider>

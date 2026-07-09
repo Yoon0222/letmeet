@@ -12,7 +12,6 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
-import { useTheme } from '@/hooks/use-theme';
 import { groupMembers, standings } from '@/lib/bracket';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -34,7 +33,6 @@ const ENTRY_LABEL: Record<EntryStatus, string> = {
 };
 
 export default function TournamentDetail() {
-  const theme = useTheme();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -267,21 +265,21 @@ export default function TournamentDetail() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.primary} />
+      <View style={styles.center}>
+        <ActivityIndicator color="#16C784" />
       </View>
     );
   }
   if (!t) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={{ color: theme.textSecondary }}>대회를 찾을 수 없어요.</Text>
+      <View style={styles.center}>
+        <Text style={styles.notFound}>대회를 찾을 수 없어요.</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.headerArea}>
         <View style={styles.badgeRow}>
           <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#7A4E00" bg="rgba(245,166,35,0.16)" />
@@ -295,19 +293,17 @@ export default function TournamentDetail() {
             />
           )}
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>{t.title}</Text>
+        <Text style={styles.title}>{t.title}</Text>
       </View>
 
       {hasBracket && (
-        <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
+        <View style={styles.tabBar}>
           {tabItems.map((it) => {
             const active = tab === it.key;
             return (
               <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
-                <Text style={[styles.tabText, { color: active ? theme.primary : theme.textSecondary }]}>
-                  {it.label}
-                </Text>
-                <View style={[styles.tabUnderline, { backgroundColor: active ? theme.primary : 'transparent' }]} />
+                <Text style={[styles.tabText, { color: active ? '#16C784' : '#6B7280' }]}>{it.label}</Text>
+                <View style={[styles.tabUnderline, { backgroundColor: active ? '#16C784' : 'transparent' }]} />
               </Pressable>
             );
           })}
@@ -316,123 +312,111 @@ export default function TournamentDetail() {
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {(approved.length > 0 || hasBracket) && (
-          <View style={[styles.searchBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="search" size={16} color={theme.textSecondary} />
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={16} color="#6B7280" />
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder="이름으로 검색"
-              placeholderTextColor={theme.textSecondary}
+              placeholderTextColor="#9CA3AF"
               autoCapitalize="none"
-              style={[styles.searchInput, { color: theme.text }]}
+              style={styles.searchInput}
             />
             {search.length > 0 && (
-              <Ionicons name="close-circle" size={18} color={theme.textSecondary} onPress={() => setSearch('')} />
+              <Ionicons name="close-circle" size={18} color="#9CA3AF" onPress={() => setSearch('')} />
             )}
           </View>
         )}
         {(!hasBracket || tab === 'info') && (
           <>
-        <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Info icon="time-outline" text={formatMeetupTime(t.start_at)} theme={theme} />
-          {t.registration_deadline ? (
-            <Info icon="hourglass-outline" text={`접수 마감 ${formatMeetupTime(t.registration_deadline)}`} theme={theme} />
-          ) : null}
-          <Info
-            icon="location-outline"
-            text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`}
-            theme={theme}
-          />
-          <Info icon="ribbon-outline" text={`실력 ${skillRangeLabel(t.skill_min, t.skill_max)}`} theme={theme} />
-          <Info icon="people-outline" text={`정원 ${t.approved_count}/${t.max_participants}${isDoubles ? '팀' : '명'}`} theme={theme} />
-          <Info icon="cash-outline" text={t.fee > 0 ? `참가비 ${t.fee.toLocaleString()}원` : '참가비 무료'} theme={theme} />
-        </View>
-
-        {t.description ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>소개</Text>
-            <Text style={[styles.desc, { color: theme.textSecondary }]}>{t.description}</Text>
-          </View>
-        ) : null}
-
-        {courts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>코트 {courts.length}면</Text>
-            <View style={styles.courtWrap}>
-              {courts.map((c) => (
-                <View key={c.id} style={[styles.courtChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                  <Text style={[styles.courtName, { color: theme.text }]}>{c.name}</Text>
-                  <View
-                    style={[
-                      styles.courtTag,
-                      { backgroundColor: c.indoor ? 'rgba(56,132,255,0.14)' : 'rgba(245,166,35,0.16)' },
-                    ]}>
-                    <Text style={[styles.courtTagText, { color: c.indoor ? '#2D6BD6' : '#7A4E00' }]}>
-                      {c.indoor ? '실내' : '실외'}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+            <View style={styles.infoCard}>
+              <Info icon="time-outline" text={formatMeetupTime(t.start_at)} />
+              {t.registration_deadline ? (
+                <Info icon="hourglass-outline" text={`접수 마감 ${formatMeetupTime(t.registration_deadline)}`} />
+              ) : null}
+              <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} />
+              <Info icon="ribbon-outline" text={`실력 ${skillRangeLabel(t.skill_min, t.skill_max)}`} />
+              <Info icon="people-outline" text={`정원 ${t.approved_count}/${t.max_participants}${isDoubles ? '팀' : '명'}`} />
+              <Info icon="cash-outline" text={t.fee > 0 ? `참가비 ${t.fee.toLocaleString()}원` : '참가비 무료'} />
             </View>
-          </View>
-        )}
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            참가자 {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
-          </Text>
-          <View style={{ gap: 10, marginTop: 8 }}>
-            {approved.length === 0 ? (
-              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>아직 확정된 참가자가 없어요.</Text>
-            ) : approvedShown.length === 0 ? (
-              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>검색 결과가 없어요.</Text>
-            ) : (
-              approvedShown.map((e) => (
-                <View key={e.user_id} style={styles.pRow}>
-                  <Avatar nickname={e.profiles?.nickname ?? '?'} uri={e.profiles?.avatar_url} size={40} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.pName, { color: theme.text }]}>
-                      {e.profiles?.nickname ?? '알 수 없음'}
-                      {isDoubles && (e.partner?.nickname ?? e.partner_name)
-                        ? ` / ${e.partner?.nickname ?? e.partner_name}`
-                        : ''}
-                    </Text>
-                    <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
-                      {e.profiles?.region || '지역 미설정'}
-                    </Text>
-                  </View>
-                  {e.profiles ? (
-                    <Text style={[styles.pSkill, { color: theme.primary }]}>
-                      {e.profiles.skill_level.toFixed(1)} {skillLabel(e.profiles.skill_level)}
-                    </Text>
-                  ) : null}
+            {t.description ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>소개</Text>
+                <Text style={styles.desc}>{t.description}</Text>
+              </View>
+            ) : null}
+
+            {courts.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>코트 {courts.length}면</Text>
+                <View style={styles.courtWrap}>
+                  {courts.map((c) => (
+                    <View key={c.id} style={styles.courtChip}>
+                      <Text style={styles.courtName}>{c.name}</Text>
+                      <View style={[styles.courtTag, { backgroundColor: c.indoor ? 'rgba(56,132,255,0.14)' : 'rgba(245,166,35,0.16)' }]}>
+                        <Text style={[styles.courtTagText, { color: c.indoor ? '#2D6BD6' : '#7A4E00' }]}>
+                          {c.indoor ? '실내' : '실외'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
                 </View>
-              ))
+              </View>
             )}
-          </View>
-        </View>
 
-        {/* 조추첨 미공개 (선수) */}
-        {drawGenerated && !drawRevealed && drawRevealAt && (
-          <View style={[styles.revealBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} />
-            <Text style={[styles.revealText, { color: theme.text }]}>
-              조추첨은 {formatMeetupTime(drawRevealAt.toISOString())}에 공개돼요
-            </Text>
-          </View>
-        )}
-
-        {/* 내 경기 (대진 편성 시 정보 탭에 요약) */}
-        {drawRevealed && myMatches.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.subLabel, { color: theme.primary }]}>내 경기</Text>
-            <View style={{ gap: 6, marginTop: 6 }}>
-              {myMatches.map((m) => (
-                <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} highlight courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
-              ))}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                참가자 {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
+              </Text>
+              <View style={{ gap: 10, marginTop: 8 }}>
+                {approved.length === 0 ? (
+                  <Text style={styles.mutedText}>아직 확정된 참가자가 없어요.</Text>
+                ) : approvedShown.length === 0 ? (
+                  <Text style={styles.mutedText}>검색 결과가 없어요.</Text>
+                ) : (
+                  approvedShown.map((e) => (
+                    <View key={e.user_id} style={styles.pRow}>
+                      <Avatar nickname={e.profiles?.nickname ?? '?'} uri={e.profiles?.avatar_url} size={40} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pName}>
+                          {e.profiles?.nickname ?? '알 수 없음'}
+                          {isDoubles && (e.partner?.nickname ?? e.partner_name)
+                            ? ` / ${e.partner?.nickname ?? e.partner_name}`
+                            : ''}
+                        </Text>
+                        <Text style={styles.pMeta}>{e.profiles?.region || '지역 미설정'}</Text>
+                      </View>
+                      {e.profiles ? (
+                        <Text style={styles.pSkill}>
+                          {e.profiles.skill_level.toFixed(1)} {skillLabel(e.profiles.skill_level)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))
+                )}
+              </View>
             </View>
-          </View>
-        )}
+
+            {/* 조추첨 미공개 (선수) */}
+            {drawGenerated && !drawRevealed && drawRevealAt && (
+              <View style={styles.revealBox}>
+                <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                <Text style={styles.revealText}>조추첨은 {formatMeetupTime(drawRevealAt.toISOString())}에 공개돼요</Text>
+              </View>
+            )}
+
+            {/* 내 경기 (대진 편성 시 정보 탭에 요약) */}
+            {drawRevealed && myMatches.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.subLabelPrimary}>내 경기</Text>
+                <View style={{ gap: 6, marginTop: 6 }}>
+                  {myMatches.map((m) => (
+                    <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} highlight courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         )}
 
@@ -440,21 +424,15 @@ export default function TournamentDetail() {
         {hasBracket && tab === 'prelim' && (
           <View style={styles.section}>
             {groupNos.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.groupTabRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabRow}>
                 {(['all', ...groupNos] as (number | 'all')[]).map((g) => {
                   const active = groupTab === g;
                   return (
                     <Pressable
                       key={String(g)}
                       onPress={() => setGroupTab(g)}
-                      style={[
-                        styles.groupPill,
-                        { backgroundColor: active ? theme.primary : theme.backgroundElement },
-                      ]}>
-                      <Text style={[styles.groupPillText, { color: active ? '#fff' : theme.textSecondary }]}>
+                      style={[styles.groupPill, active ? styles.groupPillActive : styles.groupPillIdle]}>
+                      <Text style={[styles.groupPillText, { color: active ? '#fff' : '#6B7280' }]}>
                         {g === 'all' ? '전체' : `${g}조`}
                       </Text>
                     </Pressable>
@@ -469,26 +447,20 @@ export default function TournamentDetail() {
               if (q && shownGms.length === 0) return null;
               return (
                 <View key={`g${gno}`} style={{ marginTop: 14 }}>
-                  <Text style={[styles.subLabel, { color: theme.textSecondary }]}>{gno}조 순위</Text>
-                  <View style={[styles.tableCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Text style={styles.subLabel}>{gno}조 순위</Text>
+                  <View style={styles.tableCard}>
                     {table.map((s, i) => (
-                      <View
-                        key={s.id}
-                        style={[styles.standRow, i > 0 && { borderTopColor: theme.border, borderTopWidth: 1 }]}>
-                        <Text style={[styles.standRank, { color: theme.textSecondary }]}>{i + 1}</Text>
-                        <Text style={[styles.standName, { color: theme.text }]} numberOfLines={1}>
-                          {nameOf(s.id)}
-                        </Text>
-                        <Text style={[styles.standStat, { color: theme.text }]}>{s.wins}승</Text>
-                        <Text style={[styles.standStat, { color: theme.textSecondary }]}>
-                          {s.diff > 0 ? `+${s.diff}` : s.diff}
-                        </Text>
+                      <View key={s.id} style={[styles.standRow, i > 0 && styles.standRowDivider]}>
+                        <Text style={styles.standRank}>{i + 1}</Text>
+                        <Text style={styles.standName} numberOfLines={1}>{nameOf(s.id)}</Text>
+                        <Text style={styles.standStat}>{s.wins}승</Text>
+                        <Text style={styles.standStatMuted}>{s.diff > 0 ? `+${s.diff}` : s.diff}</Text>
                       </View>
                     ))}
                   </View>
                   <View style={{ gap: 6, marginTop: 6 }}>
                     {shownGms.map((m) => (
-                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} theme={theme} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
+                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
                     ))}
                   </View>
                 </View>
@@ -500,11 +472,7 @@ export default function TournamentDetail() {
         {/* 본선 (토너먼트) */}
         {hasBracket && tab === 'final' && (
           <View style={styles.section}>
-            {q ? (
-              <Text style={[styles.pMeta, { color: theme.textSecondary, marginBottom: 6 }]}>
-                검색어와 일치하는 선수를 강조 표시해요.
-              </Text>
-            ) : null}
+            {q ? <Text style={[styles.pMeta, { marginBottom: 6 }]}>검색어와 일치하는 선수를 강조 표시해요.</Text> : null}
             <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} highlightQuery={q} avatarOf={avatarOf} />
           </View>
         )}
@@ -512,13 +480,13 @@ export default function TournamentDetail() {
         {/* 복식 파트너 검색·선택 (미신청 + 파트너로도 미등록 + 접수중일 때) */}
         {(!hasBracket || tab === 'info') && canRegister && !myEntry && !iAmPartner && isDoubles && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>파트너 선택 (복식)</Text>
+            <Text style={styles.sectionTitle}>파트너 선택 (복식)</Text>
             {partnerSel ? (
-              <View style={[styles.partnerChip, { backgroundColor: theme.card, borderColor: theme.primary }]}>
+              <View style={styles.partnerChip}>
                 <Avatar nickname={partnerSel.nickname} uri={partnerSel.avatar_url} size={36} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.pName, { color: theme.text }]}>{partnerSel.nickname}</Text>
-                  <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
+                  <Text style={styles.pName}>{partnerSel.nickname}</Text>
+                  <Text style={styles.pMeta}>
                     {partnerSel.region || '지역 미설정'} · {partnerSel.skill_level.toFixed(1)} {skillLabel(partnerSel.skill_level)}
                   </Text>
                 </View>
@@ -527,7 +495,7 @@ export default function TournamentDetail() {
                     setPartnerSel(null);
                     setPartnerQuery('');
                   }}
-                  style={[styles.partnerClear, { color: theme.primary }]}>
+                  style={styles.partnerClear}>
                   변경
                 </Text>
               </View>
@@ -541,25 +509,22 @@ export default function TournamentDetail() {
                   autoCapitalize="none"
                 />
                 {searching ? (
-                  <Text style={[styles.pMeta, { color: theme.textSecondary, marginTop: 6 }]}>검색 중…</Text>
+                  <Text style={[styles.pMeta, { marginTop: 6 }]}>검색 중…</Text>
                 ) : partnerQuery.trim().length > 0 && partnerResults.length === 0 ? (
-                  <View style={[styles.partnerNotice, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                    <Ionicons name="alert-circle-outline" size={16} color={theme.textSecondary} />
-                    <Text style={[styles.pMeta, { color: theme.textSecondary, flex: 1 }]}>
+                  <View style={styles.partnerNotice}>
+                    <Ionicons name="alert-circle-outline" size={16} color="#6B7280" />
+                    <Text style={[styles.pMeta, { flex: 1 }]}>
                       가입되지 않은 회원이에요. 앱에 가입된 회원만 파트너로 지정할 수 있어요.
                     </Text>
                   </View>
                 ) : (
                   <View style={{ marginTop: 6, gap: 6 }}>
                     {partnerResults.map((p) => (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => setPartnerSel(p)}
-                        style={[styles.partnerRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      <Pressable key={p.id} onPress={() => setPartnerSel(p)} style={styles.partnerRow}>
                         <Avatar nickname={p.nickname} uri={p.avatar_url} size={34} />
                         <View style={{ flex: 1 }}>
-                          <Text style={[styles.pName, { color: theme.text }]}>{p.nickname}</Text>
-                          <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
+                          <Text style={styles.pName}>{p.nickname}</Text>
+                          <Text style={styles.pMeta}>
                             {p.region || '지역 미설정'} · {p.skill_level.toFixed(1)} {skillLabel(p.skill_level)}
                           </Text>
                         </View>
@@ -573,16 +538,16 @@ export default function TournamentDetail() {
         )}
       </ScrollView>
 
-      <View style={[styles.actionBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+      <View style={styles.actionBar}>
         {myEntry ? (
           <View style={{ gap: 8 }}>
             <View style={styles.statusRow}>
               <Ionicons
                 name={myEntry.status === 'approved' ? 'checkmark-circle' : 'time'}
                 size={18}
-                color={myEntry.status === 'approved' ? theme.primary : theme.textSecondary}
+                color={myEntry.status === 'approved' ? '#16C784' : '#6B7280'}
               />
-              <Text style={[styles.statusText, { color: theme.text }]}>
+              <Text style={styles.statusText}>
                 {myEntry.status === 'waitlist' ? `대기 ${myWaitlistRank}번` : ENTRY_LABEL[myEntry.status]}
               </Text>
             </View>
@@ -591,8 +556,8 @@ export default function TournamentDetail() {
               isEventDay &&
               (checkedIn ? (
                 <View style={styles.statusRow}>
-                  <Ionicons name="checkmark-done-circle" size={18} color={theme.primary} />
-                  <Text style={[styles.statusText, { color: theme.primary }]}>출전 신고 완료</Text>
+                  <Ionicons name="checkmark-done-circle" size={18} color="#16C784" />
+                  <Text style={[styles.statusText, { color: '#16C784' }]}>출전 신고 완료</Text>
                 </View>
               ) : (
                 <Button title="출전 신고" onPress={checkIn} loading={acting} />
@@ -603,10 +568,8 @@ export default function TournamentDetail() {
           </View>
         ) : iAmPartner ? (
           <View style={styles.statusRow}>
-            <Ionicons name="people" size={18} color={theme.primary} />
-            <Text style={[styles.statusText, { color: theme.text }]}>
-              {iAmPartner.profiles?.nickname ?? '상대'}님의 파트너로 참가 신청됨
-            </Text>
+            <Ionicons name="people" size={18} color="#16C784" />
+            <Text style={styles.statusText}>{iAmPartner.profiles?.nickname ?? '상대'}님의 파트너로 참가 신청됨</Text>
           </View>
         ) : canRegister ? (
           <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={apply} loading={acting} />
@@ -618,19 +581,11 @@ export default function TournamentDetail() {
   );
 }
 
-function Info({
-  icon,
-  text,
-  theme,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  text: string;
-  theme: ReturnType<typeof useTheme>;
-}) {
+function Info({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={theme.primary} />
-      <Text style={[styles.infoText, { color: theme.text }]}>{text}</Text>
+      <Ionicons name={icon} size={18} color="#16C784" />
+      <Text style={styles.infoText}>{text}</Text>
     </View>
   );
 }
@@ -640,7 +595,6 @@ function MatchRow({
   m,
   nameOf,
   uid,
-  theme,
   highlight = false,
   courtLabel,
   avatarOf,
@@ -648,7 +602,6 @@ function MatchRow({
   m: TournamentMatch;
   nameOf: (id: string | null) => string;
   uid: string | undefined;
-  theme: ReturnType<typeof useTheme>;
   highlight?: boolean;
   courtLabel?: string;
   avatarOf?: (id: string | null) => { uri: string | null; nickname: string } | null;
@@ -658,11 +611,7 @@ function MatchRow({
   const w2 = done && !!m.winner_id && m.winner_id === m.entry2_id;
   const mine = highlight || m.entry1_id === uid || m.entry2_id === uid;
   return (
-    <View
-      style={[
-        styles.matchRow,
-        { backgroundColor: theme.card, borderColor: mine ? theme.primary : theme.border },
-      ]}>
+    <View style={[styles.matchRow, { borderColor: mine ? '#16C784' : '#E5E7EB' }]}>
       <View style={{ flex: 1, gap: 4 }}>
         {[
           { id: m.entry1_id, score: m.score1, win: w1 },
@@ -673,13 +622,11 @@ function MatchRow({
             <View key={i} style={styles.matchSide}>
               <View style={styles.matchNameWrap}>
                 {av ? <Avatar nickname={av.nickname} uri={av.uri} size={22} /> : null}
-                <Text
-                  style={[styles.matchName, { color: theme.text, fontWeight: side.win ? '800' : '500' }]}
-                  numberOfLines={1}>
+                <Text style={[styles.matchName, { fontWeight: side.win ? '800' : '500' }]} numberOfLines={1}>
                   {nameOf(side.id)}
                 </Text>
               </View>
-              <Text style={[styles.matchScore, { color: side.win ? theme.primary : theme.textSecondary }]}>
+              <Text style={[styles.matchScore, { color: side.win ? '#16C784' : '#6B7280' }]}>
                 {done ? side.score ?? 0 : '·'}
               </Text>
             </View>
@@ -688,80 +635,100 @@ function MatchRow({
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         {courtLabel ? (
-          <View style={[styles.matchCourt, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={[styles.matchCourtText, { color: theme.textSecondary }]}>🏟 {courtLabel}</Text>
+          <View style={styles.matchCourt}>
+            <Text style={styles.matchCourtText}>🏟 {courtLabel}</Text>
           </View>
         ) : null}
-        {!done && <Text style={[styles.matchTag, { color: theme.textSecondary }]}>예정</Text>}
+        {!done && <Text style={styles.matchTag}>예정</Text>}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
+  notFound: { color: '#6B7280', fontSize: 15 },
+  mutedText: { color: '#6B7280', fontSize: 14 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
   headerArea: { paddingHorizontal: Spacing.four, paddingTop: Spacing.four, paddingBottom: Spacing.three, gap: 10 },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: Spacing.four },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingHorizontal: Spacing.four },
   tabItem: { marginRight: 22, paddingTop: 8, alignItems: 'center' },
   tabText: { fontSize: 15, fontWeight: '700' },
   tabUnderline: { height: 2.5, alignSelf: 'stretch', marginTop: 8, borderRadius: 2 },
   badgeRow: { flexDirection: 'row', gap: 6 },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
+  title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: Spacing.three,
+    gap: 12,
+  },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  desc: { fontSize: 15, lineHeight: 22, marginTop: 6 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginTop: 6 },
   pRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pName: { fontSize: 15, fontWeight: '700' },
-  pMeta: { fontSize: 13, marginTop: 1 },
-  pSkill: { fontSize: 13, fontWeight: '700' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1 },
+  pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  pMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  pSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
-  statusText: { fontSize: 15, fontWeight: '700' },
+  statusText: { fontSize: 15, fontWeight: '700', color: '#111827' },
   partnerChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    borderColor: '#16C784',
     borderRadius: 12,
     padding: 10,
     marginTop: 8,
   },
-  partnerClear: { fontSize: 14, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 4 },
+  partnerClear: { fontSize: 14, fontWeight: '700', color: '#16C784', paddingHorizontal: 6, paddingVertical: 4 },
   partnerNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     padding: 10,
     marginTop: 6,
   },
   courtWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  courtChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
-  courtName: { fontSize: 14, fontWeight: '700' },
+  courtChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
+  courtName: { fontSize: 14, fontWeight: '700', color: '#111827' },
   courtTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   courtTagText: { fontSize: 12, fontWeight: '700' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 44 },
-  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, height: 44 },
+  searchInput: { flex: 1, fontSize: 15, color: '#111827', paddingVertical: 0 },
   groupTabRow: { gap: 8, paddingBottom: 4 },
   groupPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  groupPillActive: { backgroundColor: '#16C784' },
+  groupPillIdle: { backgroundColor: '#F0F1F3' },
   groupPillText: { fontSize: 14, fontWeight: '700' },
-  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 14, marginTop: Spacing.two },
-  revealText: { fontSize: 15, fontWeight: '600', flex: 1 },
-  subLabel: { fontSize: 14, fontWeight: '700', marginTop: 2 },
-  tableCard: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: 'hidden' },
+  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, marginTop: Spacing.two },
+  revealText: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1 },
+  subLabel: { fontSize: 14, fontWeight: '700', color: '#6B7280', marginTop: 2 },
+  subLabelPrimary: { fontSize: 14, fontWeight: '800', color: '#16C784', marginTop: 2 },
+  tableCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, marginTop: 6, overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },
-  standRank: { width: 18, fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  standName: { flex: 1, fontSize: 14, fontWeight: '600' },
-  standStat: { width: 44, fontSize: 13, fontWeight: '600', textAlign: 'right' },
+  standRowDivider: { borderTopColor: '#F1F3F5', borderTopWidth: 1 },
+  standRank: { width: 18, fontSize: 13, fontWeight: '700', color: '#6B7280', textAlign: 'center' },
+  standName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
+  standStat: { width: 44, fontSize: 13, fontWeight: '600', color: '#111827', textAlign: 'right' },
+  standStatMuted: { width: 44, fontSize: 13, fontWeight: '600', color: '#6B7280', textAlign: 'right' },
   matchRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 8,
@@ -770,16 +737,18 @@ const styles = StyleSheet.create({
   },
   matchSide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   matchNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  matchName: { flex: 1, fontSize: 14 },
+  matchName: { flex: 1, fontSize: 14, color: '#111827' },
   matchScore: { fontSize: 15, fontWeight: '800', minWidth: 18, textAlign: 'right' },
-  matchTag: { fontSize: 12, fontWeight: '600' },
-  matchCourt: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  matchCourtText: { fontSize: 11, fontWeight: '700' },
+  matchTag: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  matchCourt: { backgroundColor: '#F0F1F3', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  matchCourtText: { fontSize: 11, fontWeight: '700', color: '#6B7280' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     padding: 8,
   },

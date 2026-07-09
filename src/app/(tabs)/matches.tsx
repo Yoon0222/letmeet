@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,36 +13,46 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
+import { AppChip } from '@/components/ui/app-chip';
+import { AppFAB } from '@/components/ui/app-fab';
+import { AppHeader } from '@/components/ui/app-header';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { getBlockedIds } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
 
-// 매칭 = 번개 모임: 함께 칠 사람과 판을 찾는 화면
 export default function MatchesScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { session } = useAuth();
+  const uid = session?.user.id;
   const [meetups, setMeetups] = useState<MeetupWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [region, setRegion] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('meetups_with_counts')
-      .select('*')
-      .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-      .order('start_time', { ascending: true })
-      .limit(100);
+    const [{ data, error }, blocked] = await Promise.all([
+      supabase
+        .from('meetups_with_counts')
+        .select('*')
+        .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+        .order('start_time', { ascending: true })
+        .limit(100),
+      uid ? getBlockedIds(uid) : Promise.resolve([]),
+    ]);
     if (error) {
       console.warn('[matches] load error', error.message);
       setMeetups([]);
     } else {
-      setMeetups(data ?? []);
+      const blockedSet = new Set(blocked);
+      setMeetups((data ?? []).filter((m) => !blockedSet.has(m.host_id)));
     }
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [uid]);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,12 +64,9 @@ export default function MatchesScreen() {
   const visible = region ? meetups.filter((m) => m.region === region) : meetups;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>번개 모임</Text>
-        <Text style={[styles.sub, { color: theme.textSecondary }]}>
-          가까운 코트에서 함께 칠 사람을 찾아보세요
-        </Text>
+        <AppHeader title="번개 모임" subtitle="가까운 코트에서 함께 칠 사람을 찾아보세요" />
       </View>
 
       {regions.length > 0 && (
@@ -69,9 +75,9 @@ export default function MatchesScreen() {
           showsHorizontalScrollIndicator={false}
           style={styles.chipsScroll}
           contentContainerStyle={styles.chips}>
-          <Chip label="전체" active={region === null} onPress={() => setRegion(null)} theme={theme} />
+          <AppChip label="전체" active={region === null} onPress={() => setRegion(null)} />
           {regions.map((r) => (
-            <Chip key={r} label={r} active={region === r} onPress={() => setRegion(r)} theme={theme} />
+            <AppChip key={r} label={r} active={region === r} onPress={() => setRegion(r)} />
           ))}
         </ScrollView>
       )}
@@ -100,77 +106,32 @@ export default function MatchesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="flash-outline" size={48} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>아직 모임이 없어요</Text>
-              <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                첫 번째 번개 모임을 만들어보세요!
-              </Text>
+              <Ionicons name="flash-outline" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>아직 모임이 없어요</Text>
+              <Text style={styles.emptyBody}>첫 번개 모임을 만들어보세요.</Text>
             </View>
           }
         />
       )}
 
-      <Pressable
-        onPress={() => router.push('/meetup/create')}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: theme.primary, opacity: pressed ? 0.9 : 1 },
-        ]}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+      <AppFAB onPress={() => router.push('/meetup/create')} style={styles.fab} />
     </SafeAreaView>
   );
 }
 
-function Chip({
-  label,
-  active,
-  onPress,
-  theme,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chip, { backgroundColor: active ? theme.primary : theme.backgroundElement }]}>
-      <Text style={[styles.chipText, { color: active ? '#fff' : theme.textSecondary }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  sub: { fontSize: 14, marginTop: 2 },
   chipsScroll: { flexGrow: 0 },
   chips: { paddingHorizontal: Spacing.four, gap: 8, paddingBottom: Spacing.three, alignItems: 'center' },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
-  chipText: { fontSize: 13, fontWeight: '600' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyBody: { fontSize: 14 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  emptyBody: { fontSize: 16, color: '#6B7280' },
   fab: {
     position: 'absolute',
     right: Spacing.four,
     bottom: Spacing.four,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
   },
 });

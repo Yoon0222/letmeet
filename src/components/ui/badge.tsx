@@ -7,7 +7,7 @@ interface BadgeProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function Badge({ label, color = '#2E9457', bg = 'rgba(61,186,111,0.14)', style }: BadgeProps) {
+export function Badge({ label, color = '#16A34A', bg = '#DCFCE7', style }: BadgeProps) {
   return (
     <View style={[styles.badge, { backgroundColor: bg }, style]}>
       <Text style={[styles.text, { color }]} numberOfLines={1}>
@@ -19,10 +19,11 @@ export function Badge({ label, color = '#2E9457', bg = 'rgba(61,186,111,0.14)', 
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderCurve: 'continuous',
     alignSelf: 'flex-start',
   },
-  text: { fontSize: 12, fontWeight: '700' },
+  text: { fontSize: 13, fontWeight: '700' },
 });

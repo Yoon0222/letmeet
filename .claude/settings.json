@@ -1,5 +1,17 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo Handoff: Peanut is a shared Codex(design)+Claude(logic) project on pinut-v2.0 branches. Read docs/HANDOFF.md for Codex-to-Claude requests and latest changes BEFORE working, and add a Claude-to-Codex entry BEFORE finishing. See the handoff skill for the full procedure."
+          }
+        ]
+      }
+    ]
   }
 }

@@ -4,18 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ReportBlock } from '@/components/report-block';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { useTheme } from '@/hooks/use-theme';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts, ParticipantWithProfile } from '@/lib/types';
 
 export default function MeetupDetail() {
-  const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -54,8 +53,14 @@ export default function MeetupDetail() {
   const closed = meetup?.status !== 'open';
 
   useEffect(() => {
-    navigation.setOptions({ title: meetup?.title ?? '모임 상세' });
-  }, [navigation, meetup?.title]);
+    navigation.setOptions({
+      title: meetup?.title ?? '모임 상세',
+      headerRight:
+        meetup && !isHost
+          ? () => <ReportBlock targetType="meetup" targetId={meetup.id} targetUserId={meetup.host_id} targetLabel={meetup.title} onBlocked={() => router.back()} />
+          : undefined,
+    });
+  }, [navigation, meetup, isHost, router]);
 
   async function join() {
     if (!uid || !id) return;
@@ -109,22 +114,22 @@ export default function MeetupDetail() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.primary} />
+      <View style={styles.center}>
+        <ActivityIndicator color="#16C784" />
       </View>
     );
   }
 
   if (!meetup) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={{ color: theme.textSecondary }}>모임을 찾을 수 없어요.</Text>
+      <View style={styles.center}>
+        <Text style={styles.notFound}>모임을 찾을 수 없어요.</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.statusRow}>
           {closed ? (
@@ -136,59 +141,37 @@ export default function MeetupDetail() {
           )}
         </View>
 
-        <Text style={[styles.title, { color: theme.text }]}>{meetup.title}</Text>
+        <Text style={styles.title}>{meetup.title}</Text>
 
-        <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <InfoRow icon="time-outline" text={formatMeetupTime(meetup.start_time)} theme={theme} />
-          <InfoRow
-            icon="hourglass-outline"
-            text={`약 ${Math.round(meetup.duration_min / 60 * 10) / 10}시간`}
-            theme={theme}
-          />
-          <InfoRow
-            icon="location-outline"
-            text={`${meetup.location_name}${meetup.region ? ` · ${meetup.region}` : ''}`}
-            theme={theme}
-          />
-          <InfoRow
-            icon="ribbon-outline"
-            text={`실력 ${skillRangeLabel(meetup.skill_min, meetup.skill_max)}`}
-            theme={theme}
-          />
-          <InfoRow
-            icon="people-outline"
-            text={`정원 ${meetup.participant_count}/${meetup.max_players}명`}
-            theme={theme}
-          />
+        <View style={styles.infoCard}>
+          <InfoRow icon="time-outline" text={formatMeetupTime(meetup.start_time)} />
+          <InfoRow icon="hourglass-outline" text={`약 ${Math.round(meetup.duration_min / 60 * 10) / 10}시간`} />
+          <InfoRow icon="location-outline" text={`${meetup.location_name}${meetup.region ? ` · ${meetup.region}` : ''}`} />
+          <InfoRow icon="ribbon-outline" text={`실력 ${skillRangeLabel(meetup.skill_min, meetup.skill_max)}`} />
+          <InfoRow icon="people-outline" text={`정원 ${meetup.participant_count}/${meetup.max_players}명`} />
         </View>
 
         {meetup.description ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>소개</Text>
-            <Text style={[styles.desc, { color: theme.textSecondary }]}>{meetup.description}</Text>
+            <Text style={styles.sectionTitle}>소개</Text>
+            <Text style={styles.desc}>{meetup.description}</Text>
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            참가자 {participants.length}명
-          </Text>
+          <Text style={styles.sectionTitle}>참가자 {participants.length}명</Text>
           <View style={{ gap: 10, marginTop: 8 }}>
             {participants.map((p) => (
               <View key={p.user_id} style={styles.pRow}>
                 <Avatar nickname={p.profiles?.nickname ?? '?'} uri={p.profiles?.avatar_url} size={40} />
                 <View style={{ flex: 1 }}>
                   <View style={styles.pNameRow}>
-                    <Text style={[styles.pName, { color: theme.text }]}>
-                      {p.profiles?.nickname ?? '알 수 없음'}
-                    </Text>
+                    <Text style={styles.pName}>{p.profiles?.nickname ?? '알 수 없음'}</Text>
                     {p.user_id === meetup.host_id && <Badge label="호스트" color="#2D7FF9" bg="rgba(45,127,249,0.14)" />}
                   </View>
-                  <Text style={[styles.pMeta, { color: theme.textSecondary }]}>
-                    {p.profiles?.region || '지역 미설정'}
-                  </Text>
+                  <Text style={styles.pMeta}>{p.profiles?.region || '지역 미설정'}</Text>
                 </View>
-                <Text style={[styles.pSkill, { color: theme.primary }]}>
+                <Text style={styles.pSkill}>
                   {p.profiles ? `${p.profiles.skill_level.toFixed(1)} ${skillLabel(p.profiles.skill_level)}` : ''}
                 </Text>
               </View>
@@ -197,7 +180,7 @@ export default function MeetupDetail() {
         </View>
       </ScrollView>
 
-      <View style={[styles.actionBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+      <View style={styles.actionBar}>
         {isHost ? (
           !closed ? (
             <Button title="모임 취소하기" variant="danger" onPress={confirmCancelMeetup} />
@@ -221,39 +204,40 @@ export default function MeetupDetail() {
   );
 }
 
-function InfoRow({
-  icon,
-  text,
-  theme,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  text: string;
-  theme: ReturnType<typeof useTheme>;
-}) {
+function InfoRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={theme.primary} />
-      <Text style={[styles.infoText, { color: theme.text }]}>{text}</Text>
+      <Ionicons name={icon} size={18} color="#16C784" />
+      <Text style={styles.infoText}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
+  notFound: { color: '#6B7280', fontSize: 15 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
   statusRow: { flexDirection: 'row' },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  infoCard: { borderRadius: 16, borderWidth: 1, padding: Spacing.three, gap: 12 },
+  title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: Spacing.three,
+    gap: 12,
+  },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  desc: { fontSize: 15, lineHeight: 22, marginTop: 6 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginTop: 6 },
   pRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pName: { fontSize: 15, fontWeight: '700' },
-  pMeta: { fontSize: 13, marginTop: 1 },
-  pSkill: { fontSize: 13, fontWeight: '700' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1 },
+  pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  pMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  pSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
 });

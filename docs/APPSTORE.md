@@ -1,6 +1,6 @@
 # App Store 제출 자료 (피넛)
 
-앱: **피넛 (PEANUT)** · 번들ID `com.pickle.app` · 카테고리 **스포츠**(보조: 소셜/라이프스타일)
+앱: **피넛 (PEANUT)** · 번들ID `com.pinut.app` · 카테고리 **스포츠**(보조: 소셜/라이프스타일)
 
 ---
 
@@ -137,4 +137,4 @@ Play · Engage · Achieve — for sports nuts.
 - [ ] iOS 빌드(`eas build -p ios --profile production`) → 스크린샷 촬영
 - [ ] (권장) UGC **신고·차단** 최소 기능 추가 (가이드라인 1.2)
 - [ ] 데모 계정 동작 확인
-- [ ] App Store Connect 앱 생성(번들 `com.pickle.app`) → 위 정보 입력 → 심사 제출
+- [ ] App Store Connect 앱 생성(번들 `com.pinut.app`) → 위 정보 입력 → 심사 제출

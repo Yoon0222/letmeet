@@ -24,7 +24,7 @@ export function Avatar({ nickname, uri, size = 44 }: AvatarProps) {
   return (
     <Image
       source={source}
-      style={{ width: size, height: size, borderRadius: radius, backgroundColor: '#E5E7EB' }}
+      style={{ width: size, height: size, borderRadius: radius, backgroundColor: '#E5E7EB', borderWidth: 2, borderColor: '#FFFFFF' }}
       contentFit="cover"
     />
   );

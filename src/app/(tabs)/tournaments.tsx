@@ -1,18 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TournamentCard } from '@/components/tournament-card';
+import { AppChip } from '@/components/ui/app-chip';
+import { AppHeader } from '@/components/ui/app-header';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
@@ -72,33 +66,21 @@ export default function TournamentsScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>대회</Text>
-        <Text style={[styles.sub, { color: theme.textSecondary }]}>
-          참가 신청하고 대진·결과를 확인하세요
-        </Text>
+        <AppHeader title="대회" subtitle="참가 신청하고 대진·결과를 확인하세요" />
       </View>
 
       {/* 단식/복식 구분 필터 */}
-      <View style={styles.segment}>
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          return (
-            <Pressable
-              key={f.key}
-              onPress={() => setFilter(f.key)}
-              style={[
-                styles.segItem,
-                { borderColor: theme.border, backgroundColor: active ? theme.primary : 'transparent' },
-              ]}>
-              <Text
-                style={[styles.segText, { color: active ? '#fff' : theme.textSecondary }]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.chips}>
+        {FILTERS.map((f) => (
+          <AppChip
+            key={f.key}
+            label={f.label}
+            active={filter === f.key}
+            onPress={() => setFilter(f.key)}
+          />
+        ))}
       </View>
 
       {loading ? (
@@ -112,9 +94,7 @@ export default function TournamentsScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
-            <Text style={[styles.monthHeader, { color: theme.textSecondary, backgroundColor: theme.background }]}>
-              {section.title}
-            </Text>
+            <Text style={styles.monthHeader}>{section.title}</Text>
           )}
           renderItem={({ item }) => (
             <TournamentCard tournament={item} onPress={() => router.push(`/tournament/${item.id}`)} />
@@ -131,13 +111,11 @@ export default function TournamentsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="trophy-outline" size={48} color={theme.tabIconDefault} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              <Ionicons name="trophy-outline" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>
                 {filter === 'all' ? '아직 대회가 없어요' : `${filter === 'singles' ? '단식' : '복식'} 대회가 없어요`}
               </Text>
-              <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                열리는 대회가 생기면 여기에 표시됩니다.
-              </Text>
+              <Text style={styles.emptyBody}>열리는 대회가 생기면 여기에 표시됩니다.</Text>
             </View>
           }
         />
@@ -147,27 +125,20 @@ export default function TournamentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F6F7F9' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  sub: { fontSize: 14, marginTop: 2 },
-  segment: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.three,
-  },
-  segItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  segText: { fontSize: 14, fontWeight: '700' },
+  chips: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.four, paddingBottom: Spacing.three },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 40 },
-  monthHeader: { fontSize: 15, fontWeight: '800', paddingTop: 8, paddingBottom: 2 },
+  monthHeader: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#6B7280',
+    backgroundColor: '#F6F7F9',
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyBody: { fontSize: 14 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  emptyBody: { fontSize: 16, color: '#6B7280' },
 });
