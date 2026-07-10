@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-09 (Codex configured admin.pinut.org)
+Last updated: 2026-07-10 (Codex prepared Play Store icon)
 
 ## Purpose
 
@@ -22,6 +22,191 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Codex -> Claude (2026-07-10, first court partner email)
+
+Context:
+
+- User visited a court to introduce P!NUT.
+- The court contact asked for related materials and showed interest in a meeting.
+
+Guidance given:
+
+- Send a polite intro email with the landing URL and short app summary.
+- Position P!NUT as preparing for opening, then collecting early user/court feedback before scheduling a more concrete meeting.
+- Avoid sounding like a hard sales pitch; frame it as an early partner / pilot discussion.
+- Suggested including `https://pinut.org` and offering to send additional materials after the initial open/feedback round.
+
+### Codex -> Claude (2026-07-10, iPhone test build readiness)
+
+What changed:
+
+- No source code changes.
+- Checked whether the Expo app can be built for iPhone testing.
+
+Findings:
+
+- Project is Expo / React Native, not Flutter.
+- `expo-dev-client` is installed.
+- `eas.json` has `development`, `preview`, and `production` build profiles.
+- EAS login is active as `yoonsik2` / `troy.yoonsik.shin@gmail.com`.
+- Recent iOS build list is empty, so a new iOS build is needed for device testing.
+
+Recommended paths:
+
+- Quick device testing during development: `npx.cmd eas-cli@latest build -p ios --profile development`.
+- App-like install without dev client: `npx.cmd eas-cli@latest build -p ios --profile preview`.
+- TestFlight/internal beta: `npx.cmd eas-cli@latest build -p ios --profile production --submit`.
+
+Notes:
+
+- iOS internal/ad hoc builds may require registering the iPhone device in Apple Developer.
+- TestFlight is usually easiest for non-technical testers once App Store Connect setup is ready.
+
+Validation:
+
+- `npx.cmd eas-cli@latest whoami`: logged in, Owner role.
+- `npx.cmd eas-cli@latest build:list --platform ios --limit 3`: no existing iOS builds listed.
+
+### Codex -> Claude (2026-07-10, Kakao Login verification note)
+
+Decision / guidance:
+
+- Basic Kakao Login setup does not appear to require business verification by itself.
+- Kakao Login must be enabled in Kakao Developers and redirect URIs must be configured.
+- If P!NUT needs Kakao-provided personal information such as email, phone number, name, birth year, or similar consent items, Kakao may require Biz App conversion, eligibility checks, and business information review.
+- For the current MVP, defer Kakao Login until business registration / verification and Apple Sign in parity are ready, or implement it with only minimal profile data.
+
+References checked:
+
+- Kakao Developers Kakao Login overview and setup docs.
+
+### Codex -> Claude (2026-07-10, store review readiness checklist)
+
+What changed:
+
+- No source code changes.
+- Reviewed current readiness for Android + iOS store review submission.
+
+Confirmed:
+
+- App is Expo / React Native, not Flutter.
+- `app.json` parses correctly as UTF-8 via Node.
+- App display name: `피넛`.
+- iOS bundle ID: `com.pinut.app`.
+- Android package: `com.pinut.app`.
+- Version: `1.0.0`.
+- Production EAS env points to Supabase production project `jbvtdthtmrlndduqiikj`.
+- `pinut.org`: HTTP 200.
+- `admin.pinut.org`: HTTP 307 to `/login`.
+- `npx.cmd tsc --noEmit`: passed.
+- `npx.cmd expo lint`: passed.
+- Latest Android production EAS build exists:
+  - Build ID `40503615-014a-44e5-ad38-c98bd55efe05`
+  - AAB URL available from EAS.
+  - Version code `2`.
+- No iOS EAS builds exist yet.
+- iPhone 6.5 screenshot set exists in `docs/appstore-screenshots/iphone-6-5/`.
+- Additional screenshot set exists in `iphone-screenshots/`.
+
+Important blockers / tomorrow work:
+
+- Create iOS production build.
+- Submit iOS build to TestFlight/App Store Connect.
+- Confirm App Store Connect app record for `com.pinut.app`.
+- Prepare privacy policy URL before Apple/Google review.
+- Prepare support URL, likely `https://pinut.org`.
+- Prepare reviewer demo account and verify it works on production DB.
+- Complete Google Play developer identity verification if still pending.
+- Upload Android production AAB to Google Play Console if not already done.
+- Complete Google Play app content forms: data safety, privacy policy, target audience, ads/no ads, app access.
+- Confirm UGC moderation stance: app has user-created meetups/clubs/profile data, so review notes should mention reporting/blocking/operations if implemented, or keep launch scope conservative.
+
+### Codex -> Claude (2026-07-10, Google Play release errors)
+
+Context:
+
+- User showed Google Play Console release page with 3 errors and 1 warning.
+
+Guidance given:
+
+- The errors mean the internal test release currently has no APK/AAB attached.
+- Use the existing Android production AAB from EAS Build ID `40503615-014a-44e5-ad38-c98bd55efe05`, versionCode `2`.
+- Upload/attach the AAB to the current internal testing release; do not create an empty release.
+- If Play Console says an old version cannot be released, discard the empty/old draft release and create a fresh internal testing release with the latest AAB.
+- The Android 13 advertising ID warning is handled in Play Console App content / Advertising ID declaration. If P!NUT does not use ads or advertising ID, declare that it does not use advertising ID.
+
+### Codex -> Claude (2026-07-10, account deletion URL for Google Play)
+
+What changed:
+
+- Added a public account/data deletion instruction page for Google Play app content requirements.
+- Hid the admin header on `/account-delete`.
+- Deployed the page to Vercel production.
+
+URL to use in Google Play Console:
+
+- `https://pinut.org/account-delete`
+
+Files touched:
+
+- `web-admin/app/account-delete/page.tsx`
+- `web-admin/components/app-header.tsx`
+- `docs/HANDOFF.md`
+
+Validation:
+
+- `npm.cmd run build` from `web-admin/`: first failed in sandbox because Google Fonts could not be fetched.
+- `npm.cmd run build` from `web-admin/` with approved network access: passed.
+- `npm.cmd run lint` from `web-admin/`: passed.
+- Vercel production build passed.
+- `https://pinut.org/account-delete`: HTTP 200.
+- Production HTML contains `계정 및 데이터 삭제 요청` and `troy.yoonsik.shin@gmail.com`.
+
+### Codex -> Claude (2026-07-10, Play Store icon)
+
+What changed:
+
+- Created a Google Play store listing icon from the existing app icon.
+
+File:
+
+- `assets/images/play-store-icon.png`
+
+Details:
+
+- Size: 512x512 PNG.
+- File size: about 333 KB, below the 1 MB Play Console limit.
+- Source: `assets/images/icon.png` (1024x1024 app icon).
+
+Use:
+
+- Upload `assets/images/play-store-icon.png` to the Google Play Console app icon field.
+
+### Codex -> Claude (2026-07-10, pinut.org production routing fix)
+
+What changed:
+
+- Redeployed `web-admin` to Vercel production with `web-admin/proxy.ts` included.
+- Fixed production routing so `pinut.org/` renders the landing page.
+- Kept `admin.pinut.org/` redirecting to `/login`.
+
+Root cause:
+
+- Previous production deployment for the account deletion page did not include the host-aware proxy routing, so both `pinut.org` and `admin.pinut.org` showed the same admin/root behavior.
+
+Deployment:
+
+- Production deployment URL: `https://web-admin-kpwvew2z7-troyyoonsikshin-2301s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/Ejkk2APPFKmNaxprKPspfZEprF4u`
+
+Validation:
+
+- Vercel remote production build passed and output includes `Proxy (Middleware)`.
+- `https://pinut.org/`: landing HTML confirmed via `PLAY INSTANT`.
+- `https://admin.pinut.org/`: HTTP 307 with `Location: /login`.
+- `https://pinut.org/account-delete`: HTTP 200.
+- `npx.cmd vercel alias ls`: `pinut.org` and `admin.pinut.org` both point to the fixed deployment.
 
 ### Codex -> Claude (2026-07-09, web landing route)
 
@@ -788,3 +973,76 @@ Validation: `npx tsc --noEmit` 0 errors, `npx expo lint` 0 errors. Live-verified
 Commits: fd895bf, 2681f8d, c5ca140, ffb3ff5, 0fdffd6, 544012b (branch pinut-v2.0).
 
 **The whole app is now visually consistent v2.0.** This unblocks screenshots + store submission. If you want to further polish any of these, pull first and coordinate here so we don't clobber each other. Kept Korean strings (matching your matches.tsx pattern); i18n (t()) can be layered later if desired.
+
+### Codex -> Claude / Next Session (2026-07-10, Google Play store assets)
+
+Prepared Google Play listing image assets for the upcoming Android review.
+
+Files created:
+
+- `assets/images/play-store-icon.png`
+- `docs/playstore-screenshots/phone/01-home.png`
+- `docs/playstore-screenshots/phone/02-matches.png`
+- `docs/playstore-screenshots/phone/03-courts.png`
+- `docs/playstore-screenshots/phone/04-tournaments.png`
+- `docs/playstore-screenshots/tablet-7/01-home.png`
+- `docs/playstore-screenshots/tablet-7/02-matches.png`
+- `docs/playstore-screenshots/tablet-7/03-courts.png`
+- `docs/playstore-screenshots/tablet-7/04-tournaments.png`
+- `docs/playstore-screenshots/tablet-10/01-home.png`
+- `docs/playstore-screenshots/tablet-10/02-matches.png`
+- `docs/playstore-screenshots/tablet-10/03-courts.png`
+- `docs/playstore-screenshots/tablet-10/04-tournaments.png`
+
+Visual QA notes:
+
+- Phone screenshots are 1080 x 1920.
+- 7-inch tablet screenshots are 1920 x 1080.
+- 10-inch tablet screenshots are 2560 x 1440.
+- Korean text was visually checked after regenerating the tablet files with Unicode-safe text handling.
+- The screenshots are mock-style store assets based on the v2.0 app design, not live device captures.
+
+Google Play upload guidance:
+
+- App icon: upload `assets/images/play-store-icon.png`.
+- Phone screenshots: upload the four files in `docs/playstore-screenshots/phone/`.
+- 7-inch tablet screenshots: upload the four files in `docs/playstore-screenshots/tablet-7/`.
+- 10-inch tablet screenshots: upload the four files in `docs/playstore-screenshots/tablet-10/`.
+
+Current caution:
+
+- There are unstaged/untracked asset changes in the workspace. Review before committing.
+- Do not rewrite Korean markdown files with PowerShell `Set-Content`; use `apply_patch` or another UTF-8-safe workflow.
+
+Correction:
+
+- The first tablet screenshot pass looked like marketing banners with a phone mockup.
+- Per user feedback, tablet screenshots were regenerated to show the app UI as if opened directly on a tablet.
+- `docs/playstore-screenshots/tablet-7/` and `docs/playstore-screenshots/tablet-10/` now contain full tablet app-screen layouts with side navigation and app content.
+- Emoji/special glyphs that rendered inconsistently on Windows fonts were removed from the tablet assets.
+
+Additional Google Play graphics:
+
+- `assets/images/play-store-icon.png` is ready for the required app icon slot: 512 x 512, under 1MB.
+- `assets/images/play-store-feature-graphic.png` is ready for the required feature graphic slot: 1024 x 500, under 15MB.
+- The feature graphic was regenerated with Unicode-safe Korean text after a first attempt showed mojibake in the rendered image.
+- Final user direction: use `assets/images/peanut-loading.png` for the feature graphic and add only the `P!NUT` brand text.
+- `assets/images/play-store-feature-graphic.png` now uses that peanut illustration, cropped/resized to 1024 x 500 with `P!NUT` added in the top-left.
+
+Google Play version naming preference:
+
+- User wants future Android App Bundle / Play Console release naming to follow the app version style, e.g. `1.0.4`.
+- Avoid naming releases like `4 (1.0.0)` in user-facing Play Console fields.
+- Keep build number / versionCode internally increasing as required by Google Play, but release name and visible version references should be written as the semantic app version.
+
+App Store screenshot assets:
+
+- Created iPhone 6.5-inch App Store screenshots in `docs/appstore-screenshots/iphone-65/`.
+- Files are `01-home.png`, `02-matches.png`, `03-courts.png`, `04-tournaments.png`.
+- All are 1284 x 2778, matching App Store Connect's iPhone 6.5-inch accepted size.
+- Initial pass accidentally preserved the store/mock `P!NUT` top banner. Per user feedback, screenshots were regenerated with that top banner removed so the image starts at the app screen.
+- Final positioning pass: added top/side breathing room and removed the thin top crop line so the iPhone screenshots no longer look pushed upward.
+- User then clarified the app screen was too small. Final App Store iPhone pass now fills the full 1284 x 2778 canvas with the app screen instead of presenting it as a small phone mockup. The artificial top banner remains removed.
+- A later hand-drawn full-screen attempt looked unlike the real app UI and should not be used.
+- Current final App Store iPhone screenshots are regenerated from the polished phone UI screenshots by cropping the actual app screen area and resizing to fill 1284 x 2778.
+- Verified `01-home.png` and `02-matches.png` visually after the final regeneration.
