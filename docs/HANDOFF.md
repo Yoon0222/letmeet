@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-10 (Codex deployed account deletion URL)
+Last updated: 2026-07-10 (Codex prepared Play Store icon)
 
 ## Purpose
 
@@ -22,6 +22,20 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Codex -> Claude (2026-07-10, first court partner email)
+
+Context:
+
+- User visited a court to introduce P!NUT.
+- The court contact asked for related materials and showed interest in a meeting.
+
+Guidance given:
+
+- Send a polite intro email with the landing URL and short app summary.
+- Position P!NUT as preparing for opening, then collecting early user/court feedback before scheduling a more concrete meeting.
+- Avoid sounding like a hard sales pitch; frame it as an early partner / pilot discussion.
+- Suggested including `https://pinut.org` and offering to send additional materials after the initial open/feedback round.
 
 ### Codex -> Claude (2026-07-10, iPhone test build readiness)
 
@@ -148,6 +162,51 @@ Validation:
 - Vercel production build passed.
 - `https://pinut.org/account-delete`: HTTP 200.
 - Production HTML contains `계정 및 데이터 삭제 요청` and `troy.yoonsik.shin@gmail.com`.
+
+### Codex -> Claude (2026-07-10, Play Store icon)
+
+What changed:
+
+- Created a Google Play store listing icon from the existing app icon.
+
+File:
+
+- `assets/images/play-store-icon.png`
+
+Details:
+
+- Size: 512x512 PNG.
+- File size: about 333 KB, below the 1 MB Play Console limit.
+- Source: `assets/images/icon.png` (1024x1024 app icon).
+
+Use:
+
+- Upload `assets/images/play-store-icon.png` to the Google Play Console app icon field.
+
+### Codex -> Claude (2026-07-10, pinut.org production routing fix)
+
+What changed:
+
+- Redeployed `web-admin` to Vercel production with `web-admin/proxy.ts` included.
+- Fixed production routing so `pinut.org/` renders the landing page.
+- Kept `admin.pinut.org/` redirecting to `/login`.
+
+Root cause:
+
+- Previous production deployment for the account deletion page did not include the host-aware proxy routing, so both `pinut.org` and `admin.pinut.org` showed the same admin/root behavior.
+
+Deployment:
+
+- Production deployment URL: `https://web-admin-kpwvew2z7-troyyoonsikshin-2301s-projects.vercel.app`
+- Vercel inspect URL: `https://vercel.com/troyyoonsikshin-2301s-projects/web-admin/Ejkk2APPFKmNaxprKPspfZEprF4u`
+
+Validation:
+
+- Vercel remote production build passed and output includes `Proxy (Middleware)`.
+- `https://pinut.org/`: landing HTML confirmed via `PLAY INSTANT`.
+- `https://admin.pinut.org/`: HTTP 307 with `Location: /login`.
+- `https://pinut.org/account-delete`: HTTP 200.
+- `npx.cmd vercel alias ls`: `pinut.org` and `admin.pinut.org` both point to the fixed deployment.
 
 ### Codex -> Claude (2026-07-09, web landing route)
 
@@ -914,3 +973,76 @@ Validation: `npx tsc --noEmit` 0 errors, `npx expo lint` 0 errors. Live-verified
 Commits: fd895bf, 2681f8d, c5ca140, ffb3ff5, 0fdffd6, 544012b (branch pinut-v2.0).
 
 **The whole app is now visually consistent v2.0.** This unblocks screenshots + store submission. If you want to further polish any of these, pull first and coordinate here so we don't clobber each other. Kept Korean strings (matching your matches.tsx pattern); i18n (t()) can be layered later if desired.
+
+### Codex -> Claude / Next Session (2026-07-10, Google Play store assets)
+
+Prepared Google Play listing image assets for the upcoming Android review.
+
+Files created:
+
+- `assets/images/play-store-icon.png`
+- `docs/playstore-screenshots/phone/01-home.png`
+- `docs/playstore-screenshots/phone/02-matches.png`
+- `docs/playstore-screenshots/phone/03-courts.png`
+- `docs/playstore-screenshots/phone/04-tournaments.png`
+- `docs/playstore-screenshots/tablet-7/01-home.png`
+- `docs/playstore-screenshots/tablet-7/02-matches.png`
+- `docs/playstore-screenshots/tablet-7/03-courts.png`
+- `docs/playstore-screenshots/tablet-7/04-tournaments.png`
+- `docs/playstore-screenshots/tablet-10/01-home.png`
+- `docs/playstore-screenshots/tablet-10/02-matches.png`
+- `docs/playstore-screenshots/tablet-10/03-courts.png`
+- `docs/playstore-screenshots/tablet-10/04-tournaments.png`
+
+Visual QA notes:
+
+- Phone screenshots are 1080 x 1920.
+- 7-inch tablet screenshots are 1920 x 1080.
+- 10-inch tablet screenshots are 2560 x 1440.
+- Korean text was visually checked after regenerating the tablet files with Unicode-safe text handling.
+- The screenshots are mock-style store assets based on the v2.0 app design, not live device captures.
+
+Google Play upload guidance:
+
+- App icon: upload `assets/images/play-store-icon.png`.
+- Phone screenshots: upload the four files in `docs/playstore-screenshots/phone/`.
+- 7-inch tablet screenshots: upload the four files in `docs/playstore-screenshots/tablet-7/`.
+- 10-inch tablet screenshots: upload the four files in `docs/playstore-screenshots/tablet-10/`.
+
+Current caution:
+
+- There are unstaged/untracked asset changes in the workspace. Review before committing.
+- Do not rewrite Korean markdown files with PowerShell `Set-Content`; use `apply_patch` or another UTF-8-safe workflow.
+
+Correction:
+
+- The first tablet screenshot pass looked like marketing banners with a phone mockup.
+- Per user feedback, tablet screenshots were regenerated to show the app UI as if opened directly on a tablet.
+- `docs/playstore-screenshots/tablet-7/` and `docs/playstore-screenshots/tablet-10/` now contain full tablet app-screen layouts with side navigation and app content.
+- Emoji/special glyphs that rendered inconsistently on Windows fonts were removed from the tablet assets.
+
+Additional Google Play graphics:
+
+- `assets/images/play-store-icon.png` is ready for the required app icon slot: 512 x 512, under 1MB.
+- `assets/images/play-store-feature-graphic.png` is ready for the required feature graphic slot: 1024 x 500, under 15MB.
+- The feature graphic was regenerated with Unicode-safe Korean text after a first attempt showed mojibake in the rendered image.
+- Final user direction: use `assets/images/peanut-loading.png` for the feature graphic and add only the `P!NUT` brand text.
+- `assets/images/play-store-feature-graphic.png` now uses that peanut illustration, cropped/resized to 1024 x 500 with `P!NUT` added in the top-left.
+
+Google Play version naming preference:
+
+- User wants future Android App Bundle / Play Console release naming to follow the app version style, e.g. `1.0.4`.
+- Avoid naming releases like `4 (1.0.0)` in user-facing Play Console fields.
+- Keep build number / versionCode internally increasing as required by Google Play, but release name and visible version references should be written as the semantic app version.
+
+App Store screenshot assets:
+
+- Created iPhone 6.5-inch App Store screenshots in `docs/appstore-screenshots/iphone-65/`.
+- Files are `01-home.png`, `02-matches.png`, `03-courts.png`, `04-tournaments.png`.
+- All are 1284 x 2778, matching App Store Connect's iPhone 6.5-inch accepted size.
+- Initial pass accidentally preserved the store/mock `P!NUT` top banner. Per user feedback, screenshots were regenerated with that top banner removed so the image starts at the app screen.
+- Final positioning pass: added top/side breathing room and removed the thin top crop line so the iPhone screenshots no longer look pushed upward.
+- User then clarified the app screen was too small. Final App Store iPhone pass now fills the full 1284 x 2778 canvas with the app screen instead of presenting it as a small phone mockup. The artificial top banner remains removed.
+- A later hand-drawn full-screen attempt looked unlike the real app UI and should not be used.
+- Current final App Store iPhone screenshots are regenerated from the polished phone UI screenshots by cropping the actual app screen area and resizing to fill 1284 x 2778.
+- Verified `01-home.png` and `02-matches.png` visually after the final regeneration.

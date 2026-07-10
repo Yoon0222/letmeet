@@ -55,3 +55,5 @@ example
 # 생성된 스크린샷 산출물 (재촬영 대상 — 커밋 안 함)
 iphone-screenshots/
 docs/appstore-screenshots/
+
+docs/playstore-screenshots/
