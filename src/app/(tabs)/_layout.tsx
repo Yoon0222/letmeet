@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '@/contexts/i18n';
 import { useTheme } from '@/hooks/use-theme';
@@ -7,6 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 export default function TabsLayout() {
   const theme = useTheme();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets(); // 하단 내비바/홈인디케이터 높이
 
   return (
     <Tabs
@@ -18,9 +20,9 @@ export default function TabsLayout() {
           backgroundColor: '#FFFFFF',
           borderTopColor: theme.border,
           borderTopWidth: 1,
-          height: 66,
+          height: 66 + insets.bottom, // 세이프 에어리어만큼 높이 확보
           paddingTop: 8,
-          paddingBottom: 8,
+          paddingBottom: 8 + insets.bottom, // 탭 아이콘을 시스템 버튼 위로
         },
         tabBarIconStyle: { marginBottom: 2 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
