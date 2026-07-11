@@ -357,6 +357,72 @@ export default function TournamentDetail() {
               <Info icon="cash-outline" text={t.fee > 0 ? `참가비 ${t.fee.toLocaleString()}원` : '참가비 무료'} />
             </View>
 
+            {/* 복식 파트너 검색·선택 — 신청 전에 정보 카드 바로 아래에 노출(발견성) */}
+            {canRegister && !myEntry && !iAmPartner && isDoubles && (
+              <View style={styles.partnerCard}>
+                <View style={styles.partnerHead}>
+                  <Ionicons name="people-circle" size={20} color="#16C784" />
+                  <Text style={styles.sectionTitle}>파트너 선택 (복식)</Text>
+                </View>
+                <Text style={styles.partnerSub}>
+                  함께 출전할 회원을 검색해 선택하세요. 선택한 상대는 자동으로 파트너로 등록돼요.
+                </Text>
+                {partnerSel ? (
+                  <View style={styles.partnerChip}>
+                    <Avatar nickname={partnerSel.nickname} uri={partnerSel.avatar_url} size={36} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pName}>{partnerSel.nickname}</Text>
+                      <Text style={styles.pMeta}>
+                        {partnerSel.region || '지역 미설정'} · {partnerSel.skill_level.toFixed(1)} {skillLabel(partnerSel.skill_level)}
+                      </Text>
+                    </View>
+                    <Text
+                      onPress={() => {
+                        setPartnerSel(null);
+                        setPartnerQuery('');
+                      }}
+                      style={styles.partnerClear}>
+                      변경
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <TextField
+                      label="파트너 이름으로 검색"
+                      value={partnerQuery}
+                      onChangeText={setPartnerQuery}
+                      placeholder="닉네임 입력 후 목록에서 선택"
+                      autoCapitalize="none"
+                    />
+                    {searching ? (
+                      <Text style={[styles.pMeta, { marginTop: 6 }]}>검색 중…</Text>
+                    ) : partnerQuery.trim().length > 0 && partnerResults.length === 0 ? (
+                      <View style={styles.partnerNotice}>
+                        <Ionicons name="alert-circle-outline" size={16} color="#6B7280" />
+                        <Text style={[styles.pMeta, { flex: 1 }]}>
+                          가입되지 않은 회원이에요. 앱에 가입된 회원만 파트너로 지정할 수 있어요.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{ marginTop: 6, gap: 6 }}>
+                        {partnerResults.map((p) => (
+                          <Pressable key={p.id} onPress={() => setPartnerSel(p)} style={styles.partnerRow}>
+                            <Avatar nickname={p.nickname} uri={p.avatar_url} size={34} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.pName}>{p.nickname}</Text>
+                              <Text style={styles.pMeta}>
+                                {p.region || '지역 미설정'} · {p.skill_level.toFixed(1)} {skillLabel(p.skill_level)}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+            )}
+
             {t.description ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>소개</Text>
@@ -494,65 +560,6 @@ export default function TournamentDetail() {
           </View>
         )}
 
-        {/* 복식 파트너 검색·선택 (미신청 + 파트너로도 미등록 + 접수중일 때) */}
-        {(!hasBracket || tab === 'info') && canRegister && !myEntry && !iAmPartner && isDoubles && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>파트너 선택 (복식)</Text>
-            {partnerSel ? (
-              <View style={styles.partnerChip}>
-                <Avatar nickname={partnerSel.nickname} uri={partnerSel.avatar_url} size={36} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pName}>{partnerSel.nickname}</Text>
-                  <Text style={styles.pMeta}>
-                    {partnerSel.region || '지역 미설정'} · {partnerSel.skill_level.toFixed(1)} {skillLabel(partnerSel.skill_level)}
-                  </Text>
-                </View>
-                <Text
-                  onPress={() => {
-                    setPartnerSel(null);
-                    setPartnerQuery('');
-                  }}
-                  style={styles.partnerClear}>
-                  변경
-                </Text>
-              </View>
-            ) : (
-              <>
-                <TextField
-                  label="파트너 이름으로 검색"
-                  value={partnerQuery}
-                  onChangeText={setPartnerQuery}
-                  placeholder="닉네임 입력 후 목록에서 선택"
-                  autoCapitalize="none"
-                />
-                {searching ? (
-                  <Text style={[styles.pMeta, { marginTop: 6 }]}>검색 중…</Text>
-                ) : partnerQuery.trim().length > 0 && partnerResults.length === 0 ? (
-                  <View style={styles.partnerNotice}>
-                    <Ionicons name="alert-circle-outline" size={16} color="#6B7280" />
-                    <Text style={[styles.pMeta, { flex: 1 }]}>
-                      가입되지 않은 회원이에요. 앱에 가입된 회원만 파트너로 지정할 수 있어요.
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={{ marginTop: 6, gap: 6 }}>
-                    {partnerResults.map((p) => (
-                      <Pressable key={p.id} onPress={() => setPartnerSel(p)} style={styles.partnerRow}>
-                        <Avatar nickname={p.nickname} uri={p.avatar_url} size={34} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.pName}>{p.nickname}</Text>
-                          <Text style={styles.pMeta}>
-                            {p.region || '지역 미설정'} · {p.skill_level.toFixed(1)} {skillLabel(p.skill_level)}
-                          </Text>
-                        </View>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        )}
       </ScrollView>
 
       <View style={styles.actionBar}>
@@ -589,7 +596,15 @@ export default function TournamentDetail() {
             <Text style={styles.statusText}>{iAmPartner.profiles?.nickname ?? '상대'}님의 파트너로 참가 신청됨</Text>
           </View>
         ) : canRegister ? (
-          <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={confirmApply} loading={acting} />
+          <View style={{ gap: 8 }}>
+            {isDoubles && !partnerSel ? (
+              <View style={styles.statusRow}>
+                <Ionicons name="people-outline" size={16} color="#6B7280" />
+                <Text style={[styles.pMeta, { marginTop: 0 }]}>복식은 파트너를 먼저 선택해야 신청할 수 있어요.</Text>
+              </View>
+            ) : null}
+            <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={confirmApply} loading={acting} />
+          </View>
         ) : (
           <Button title="접수가 마감되었어요" variant="secondary" disabled onPress={() => {}} />
         )}
@@ -696,6 +711,17 @@ const styles = StyleSheet.create({
   actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   statusText: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  partnerCard: {
+    marginTop: Spacing.two,
+    backgroundColor: '#F0FBF4',
+    borderWidth: 1,
+    borderColor: '#BCE9CD',
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    padding: Spacing.three,
+  },
+  partnerHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  partnerSub: { fontSize: 13, color: '#6B7280', marginTop: 4, marginBottom: 8, lineHeight: 19 },
   partnerChip: {
     flexDirection: 'row',
     alignItems: 'center',
