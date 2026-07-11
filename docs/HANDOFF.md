@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-10 (Codex prepared Play Store icon)
+Last updated: 2026-07-11 (Claude: tester feedback fixes + club photo/approval)
 
 ## Purpose
 
@@ -22,6 +22,32 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-07-11, tester feedback fixes + club photo/approval)
+
+What changed:
+
+- 클럽 사진·가입승인 기능 추가 (커밋 925baf9):
+  - `clubs.image_url`(대표 사진), `clubs.require_approval`, `club_members.status`('pending'|'approved') 컬럼 추가.
+  - `src/app/club/[id].tsx`: 사진 표시/운영자 업로드, 가입 신청→승인 대기, 운영자 승인/거절 UI. **파일 전체를 재작성**했으니 여기 디자인 손볼 때 참고.
+  - `src/app/club/create.tsx`: '가입 승인제' 토글 추가.
+  - `src/components/club-card.tsx`: image_url 있으면 썸네일 표시(디자인 파일 — 최소 변경만).
+- 앞선 테스터 피드백 수정들도 **디자인 파일을 건드렸음** (충돌 주의):
+  - `src/components/meetup-card.tsx`: 시간 텍스트 폰트 20→14, 색 #16C784.
+  - `src/app/(auth)/sign-up.tsx`: 비밀번호 확인 입력 추가.
+  - `src/app/(tabs)/_layout.tsx`: 탭바 `useSafeAreaInsets()` 로 안드로이드 3버튼 내비 가림 해결.
+  - `src/app/(tabs)/clubs.tsx`: 검색창 추가.
+  - `src/app/(tabs)/index.tsx`: 10명 클럽 필터 제거(최근 3개).
+
+Files touched: 위 목록 참고.
+
+Validation: `npx tsc --noEmit` 통과, `npx expo lint` 통과. 라이브 동작 확인은 미실시(빌드 필요 기능 — expo-image-picker).
+
+Follow-ups / requests:
+
+- **운영 DB에 마이그레이션 0031, 0032 실행 필요** (아직 안 함) — 사용자에게 요청함.
+- 다음 프로덕션 빌드(Android versionCode↑ / iOS buildNumber↑)에 위 수정 전부 포함해야 함.
+- club-card 썸네일·club/[id] 사진 영역 디자인 다듬을 여지 있음 — Codex가 원하면 손봐도 됨(로직 건드리지 말 것).
 
 ### Codex -> Claude (2026-07-10, first court partner email)
 
@@ -1046,3 +1072,30 @@ App Store screenshot assets:
 - A later hand-drawn full-screen attempt looked unlike the real app UI and should not be used.
 - Current final App Store iPhone screenshots are regenerated from the polished phone UI screenshots by cropping the actual app screen area and resizing to fill 1284 x 2778.
 - Verified `01-home.png` and `02-matches.png` visually after the final regeneration.
+
+Version / branch policy confirmed by user:
+
+- Bug fix releases increment patch version, e.g. `1.0.4` -> `1.0.5`.
+- Feature additions increment minor version, e.g. `1.0.x` -> `1.1.0`.
+- Large breaking/product changes increment major version, e.g. `1.x.x` -> `2.0.0`.
+- Do not manually edit EAS `buildNumber` / Android `versionCode`; EAS auto-increment owns those.
+- Use git tags like `vX.Y.Z` to permanently record which commit shipped a version.
+
+Current branch/tag check:
+
+- Current local branch: `pinut-v2.0-dev`.
+- Local branches seen: `main`, `pinut-v2.0-dev`.
+- Remote branches seen: `origin/main`, `origin/pinut-v2.0-dev`.
+- `v1.0.4` tag points at current commit `3300eea`.
+- `app.json` and `package.json` both currently report version `1.0.4`.
+
+Landing stats fix:
+
+- User noticed `pinut.org` landing still showed `현재 회원수 1명` even after signups increased.
+- Direct production Supabase check showed `profiles = 9`, `courts = 4`, so the DB was correct.
+- Cause: root route `/` was still being built/static-cached while `/landing` was dynamic.
+- Changed `web-admin/app/landing/page.tsx` to `dynamic = 'force-dynamic'`, `revalidate = 0`, `fetchCache = 'force-no-store'`.
+- Changed `web-admin/app/page.tsx` to declare the same route config directly, because Next does not allow re-exporting route config.
+- Verified `npm.cmd run build` shows both `/` and `/landing` as dynamic.
+- Deployed to Vercel production: `https://web-admin-mn6ucrpo2-troyyoonsikshin-2301s-projects.vercel.app`, aliased to `https://pinut.org`.
+- Verified live `https://pinut.org/` HTML now includes `현재 회원수 9명` and `4곳`.
