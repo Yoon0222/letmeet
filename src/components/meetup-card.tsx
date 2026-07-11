@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
@@ -20,6 +20,7 @@ export function MeetupCard({
 
   return (
     <AppCard onPress={onPress} style={styles.card}>
+      {meetup.image_url ? <Image source={{ uri: meetup.image_url }} style={styles.cover} /> : null}
       <View style={styles.topRow}>
         <Text style={styles.time}>{formatMeetupTime(meetup.start_time)}</Text>
         {closed ? (
@@ -72,6 +73,7 @@ const styles = StyleSheet.create({
   card: {
     gap: AppSpacing.xs,
   },
+  cover: { width: '100%', height: 128, borderRadius: Radius.card, borderCurve: 'continuous', backgroundColor: '#E5E7EB', marginBottom: AppSpacing.xs },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm },
   time: { fontSize: 14, fontWeight: '800', color: '#16C784' }, // 날짜는 작게(제목보다), 그린 라벨
   title: { ...Typography.cardTitle, color: '#111827' },

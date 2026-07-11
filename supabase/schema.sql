@@ -47,6 +47,7 @@ create table if not exists public.meetups (
   max_players   int not null default 4 check (max_players between 2 and 32),
   fee           integer not null default 0,        -- 게스트비(원), 0=무료 (0033)
   require_approval boolean not null default false,  -- 참가 신청 승인 필요 여부 (0033)
+  image_url     text,                              -- 코트/장소 사진 (0034)
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
 );
@@ -224,6 +225,15 @@ select
   (select count(*) from public.meetup_participants mp where mp.meetup_id = m.id and mp.status = 'approved') as participant_count
 from public.meetups m
 join public.profiles p on p.id = m.host_id;
+
+-- meetup-images 스토리지 버킷 (공개 조회, 로그인 사용자 업로드) (0034)
+insert into storage.buckets (id, name, public) values ('meetup-images', 'meetup-images', true) on conflict (id) do nothing;
+drop policy if exists "meetup_images_read" on storage.objects;
+create policy "meetup_images_read" on storage.objects for select using (bucket_id = 'meetup-images');
+drop policy if exists "meetup_images_insert" on storage.objects;
+create policy "meetup_images_insert" on storage.objects for insert with check (bucket_id = 'meetup-images' and auth.uid() is not null);
+drop policy if exists "meetup_images_update" on storage.objects;
+create policy "meetup_images_update" on storage.objects for update using (bucket_id = 'meetup-images' and auth.uid() is not null);
 
 -- ============================================================
 -- 클럽(동호회)
@@ -878,3 +888,65 @@ create policy "reports_select" on public.reports
 drop policy if exists "reports_update_admin" on public.reports;
 create policy "reports_update_admin" on public.reports
   for update using (public.my_role() in ('organizer','court_manager','super_admin'));
+
+-- ============================================================
+-- 신청 알림: 클럽 가입 / 번개 참가 pending 시 주최자에게 Expo 푸시 (0035)
+-- ============================================================
+create extension if not exists pg_net;
+
+create or replace function public.notify_host_on_pending()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_host  uuid;
+  v_token text;
+  v_title text;
+  v_who   text;
+begin
+  if new.status is distinct from 'pending' then
+    return new;
+  end if;
+
+  if tg_table_name = 'club_members' then
+    select owner_id into v_host from public.clubs where id = new.club_id;
+    v_title := '클럽 가입 신청';
+  elsif tg_table_name = 'meetup_participants' then
+    select host_id into v_host from public.meetups where id = new.meetup_id;
+    v_title := '번개모임 참가 신청';
+  else
+    return new;
+  end if;
+
+  if v_host is null then return new; end if;
+
+  select push_token into v_token from public.profiles where id = v_host;
+  if v_token is null or v_token = '' then return new; end if;
+
+  select nickname into v_who from public.profiles where id = new.user_id;
+
+  perform net.http_post(
+    url     := 'https://exp.host/--/api/v2/push/send',
+    headers := jsonb_build_object('Content-Type', 'application/json'),
+    body    := jsonb_build_object(
+      'to', v_token,
+      'sound', 'default',
+      'title', v_title,
+      'body', coalesce(v_who, '누군가') || '님이 신청했어요. 승인/거절을 확인해 주세요.'
+    )
+  );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_club_member_pending on public.club_members;
+create trigger on_club_member_pending
+  after insert on public.club_members
+  for each row execute function public.notify_host_on_pending();
+
+drop trigger if exists on_meetup_participant_pending on public.meetup_participants;
+create trigger on_meetup_participant_pending
+  after insert on public.meetup_participants
+  for each row execute function public.notify_host_on_pending();

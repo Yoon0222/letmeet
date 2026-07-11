@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -46,7 +47,27 @@ export default function CreateMeetup() {
   const [skillMax, setSkillMax] = useState(8.0);
   const [fee, setFee] = useState(''); // 게스트비(원). 빈값=무료
   const [requireApproval, setRequireApproval] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null); // 코트/장소 사진 (로컬 uri, 생성 후 업로드)
   const [saving, setSaving] = useState(false);
+
+  // 코트/장소 사진 선택 (업로드는 모임 생성 후)
+  async function pickImage() {
+    let ImagePicker: typeof import('expo-image-picker');
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      ImagePicker = require('expo-image-picker');
+    } catch {
+      Alert.alert('사진 첨부', '이 기능은 최신 앱 빌드에서 사용할 수 있어요.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('권한 필요', '사진을 첨부하려면 갤러리 접근 권한이 필요해요.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+    if (!result.canceled) setImageUri(result.assets[0].uri);
+  }
 
   function openPicker() {
     if (Platform.OS === 'android') {
@@ -107,12 +128,27 @@ export default function CreateMeetup() {
       })
       .select('id')
       .single();
-    setSaving(false);
-    hide();
     if (error) {
+      setSaving(false);
+      hide();
       Alert.alert('생성 실패', error.message);
       return;
     }
+    // 사진 첨부 시 생성된 모임에 업로드 (실패해도 모임은 생성됨)
+    if (imageUri && data?.id) {
+      try {
+        const ext = (imageUri.split('.').pop() ?? 'jpg').toLowerCase();
+        const path = `${data.id}/cover_${Date.now()}.${ext}`;
+        const buf = await fetch(imageUri).then((r) => r.arrayBuffer());
+        await supabase.storage.from('meetup-images').upload(path, buf, { contentType: 'image/jpeg', upsert: true });
+        const url = supabase.storage.from('meetup-images').getPublicUrl(path).data.publicUrl;
+        await supabase.from('meetups').update({ image_url: url }).eq('id', data.id);
+      } catch {
+        // 사진 업로드 실패는 무시 (상세에서 다시 시도 가능)
+      }
+    }
+    setSaving(false);
+    hide();
     router.replace(`/meetup/${data.id}`);
   }
 
@@ -130,6 +166,24 @@ export default function CreateMeetup() {
         />
         <TextField label="장소" value={location} onChangeText={setLocation} placeholder="예: 올림픽공원 피클볼장" />
         <TextField label="지역" value={region} onChangeText={setRegion} placeholder="예: 서울 송파구" />
+
+        <View style={styles.field}>
+          <Text style={styles.label}>코트/장소 사진 (선택)</Text>
+          {imageUri ? (
+            <Pressable onPress={pickImage}>
+              <Image source={{ uri: imageUri }} style={styles.photo} />
+              <View style={styles.photoEdit}>
+                <Ionicons name="camera" size={14} color="#fff" />
+                <Text style={styles.photoEditText}>사진 변경</Text>
+              </View>
+            </Pressable>
+          ) : (
+            <Pressable onPress={pickImage} style={styles.photoEmpty}>
+              <Ionicons name="image-outline" size={22} color="#16C784" />
+              <Text style={styles.photoEmptyText}>코트/장소 사진 추가</Text>
+            </Pressable>
+          )}
+        </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>날짜 · 시간</Text>
@@ -274,4 +328,9 @@ const styles = StyleSheet.create({
   },
   toggleTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
   toggleHint: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  photo: { width: '100%', height: 160, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  photoEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  photoEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  photoEmpty: { height: 96, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+  photoEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
 });

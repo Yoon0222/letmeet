@@ -50,6 +50,7 @@ export type Meetup = {
   max_players: number;
   fee: number; // 게스트비(원), 0=무료 (0033)
   require_approval: boolean; // 참가 신청 승인 필요 여부 (0033)
+  image_url: string | null; // 코트/장소 사진 (0034)
   status: MeetupStatus;
   created_at: string;
 };
