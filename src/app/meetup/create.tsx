@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -43,6 +44,8 @@ export default function CreateMeetup() {
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [skillMin, setSkillMin] = useState(2.0);
   const [skillMax, setSkillMax] = useState(8.0);
+  const [fee, setFee] = useState(''); // 게스트비(원). 빈값=무료
+  const [requireApproval, setRequireApproval] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function openPicker() {
@@ -99,6 +102,8 @@ export default function CreateMeetup() {
         max_players: maxPlayers,
         skill_min: skillMin,
         skill_max: skillMax,
+        fee: Math.max(0, parseInt(fee.replace(/[^0-9]/g, ''), 10) || 0),
+        require_approval: requireApproval,
       })
       .select('id')
       .single();
@@ -172,6 +177,27 @@ export default function CreateMeetup() {
         </View>
 
         <TextField
+          label="게스트비 (원)"
+          value={fee}
+          onChangeText={(v) => setFee(v.replace(/[^0-9]/g, ''))}
+          placeholder="0 (무료). 예: 5000"
+          keyboardType="number-pad"
+          hint={
+            fee && parseInt(fee, 10) > 0
+              ? `참가자에게 ${parseInt(fee, 10).toLocaleString()}원으로 표시돼요`
+              : '비워두면 무료로 표시돼요'
+          }
+        />
+
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleTitle}>참가 승인제</Text>
+            <Text style={styles.toggleHint}>켜면 호스트가 승인해야 참가 확정돼요.</Text>
+          </View>
+          <Switch value={requireApproval} onValueChange={setRequireApproval} trackColor={{ true: '#16C784' }} />
+        </View>
+
+        <TextField
           label="설명 (선택)"
           value={description}
           onChangeText={setDescription}
@@ -235,4 +261,17 @@ const styles = StyleSheet.create({
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepTxt: { fontSize: 26, fontWeight: '800', color: '#16C784' },
   stepVal: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    padding: Spacing.three,
+  },
+  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  toggleHint: { fontSize: 13, color: '#6B7280', marginTop: 2 },
 });

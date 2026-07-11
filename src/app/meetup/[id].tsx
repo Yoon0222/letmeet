@@ -48,7 +48,11 @@ export default function MeetupDetail() {
   }, [load]);
 
   const isHost = meetup?.host_id === uid;
-  const joined = participants.some((p) => p.user_id === uid);
+  const approved = participants.filter((p) => p.status === 'approved');
+  const pending = participants.filter((p) => p.status === 'pending');
+  const myPart = participants.find((p) => p.user_id === uid);
+  const isApproved = myPart?.status === 'approved';
+  const isPending = myPart?.status === 'pending';
   const full = !!meetup && meetup.participant_count >= meetup.max_players;
   const closed = meetup?.status !== 'open';
 
@@ -63,14 +67,41 @@ export default function MeetupDetail() {
   }, [navigation, meetup, isHost, router]);
 
   async function join() {
-    if (!uid || !id) return;
+    if (!uid || !id || !meetup) return;
     setActing(true);
-    const { error } = await supabase.from('meetup_participants').insert({ meetup_id: id, user_id: uid });
+    // 승인제면 pending, 아니면 바로 approved
+    const { error } = await supabase
+      .from('meetup_participants')
+      .insert({ meetup_id: id, user_id: uid, status: meetup.require_approval ? 'pending' : 'approved' });
     setActing(false);
     if (error) {
       Alert.alert('참가 실패', error.message);
       return;
     }
+    if (meetup.require_approval) Alert.alert('참가 신청 완료', '호스트 승인 후 참가가 확정돼요.');
+    load();
+  }
+
+  // 참가 전 게스트비·승인 여부 확인
+  function confirmJoin() {
+    if (!meetup) return;
+    const feeLine = meetup.fee > 0 ? `게스트비: ${meetup.fee.toLocaleString()}원\n` : '게스트비: 무료\n';
+    const tailLine = meetup.require_approval ? '호스트 승인 후 참가가 확정됩니다.' : '이 모임에 참가할까요?';
+    Alert.alert(meetup.require_approval ? '참가 신청' : '참가하기', `${feeLine}${tailLine}`, [
+      { text: '닫기', style: 'cancel' },
+      { text: meetup.require_approval ? '신청' : '참가', onPress: join },
+    ]);
+  }
+
+  // 호스트: 참가 신청 승인/거절
+  async function approve(userId: string) {
+    if (!id) return;
+    await supabase.from('meetup_participants').update({ status: 'approved' }).eq('meetup_id', id).eq('user_id', userId);
+    load();
+  }
+  async function reject(userId: string) {
+    if (!id) return;
+    await supabase.from('meetup_participants').delete().eq('meetup_id', id).eq('user_id', userId);
     load();
   }
 
@@ -91,10 +122,14 @@ export default function MeetupDetail() {
   }
 
   function confirmLeave() {
-    Alert.alert('참가 취소', '이 모임 참가를 취소할까요?', [
-      { text: '닫기', style: 'cancel' },
-      { text: '참가 취소', style: 'destructive', onPress: leave },
-    ]);
+    Alert.alert(
+      isPending ? '신청 취소' : '참가 취소',
+      isPending ? '참가 신청을 취소할까요?' : '이 모임 참가를 취소할까요?',
+      [
+        { text: '닫기', style: 'cancel' },
+        { text: isPending ? '신청 취소' : '참가 취소', style: 'destructive', onPress: leave },
+      ],
+    );
   }
 
   function confirmCancelMeetup() {
@@ -149,6 +184,8 @@ export default function MeetupDetail() {
           <InfoRow icon="location-outline" text={`${meetup.location_name}${meetup.region ? ` · ${meetup.region}` : ''}`} />
           <InfoRow icon="ribbon-outline" text={`실력 ${skillRangeLabel(meetup.skill_min, meetup.skill_max)}`} />
           <InfoRow icon="people-outline" text={`정원 ${meetup.participant_count}/${meetup.max_players}명`} />
+          <InfoRow icon="cash-outline" text={meetup.fee > 0 ? `게스트비 ${meetup.fee.toLocaleString()}원` : '게스트비 무료'} />
+          {meetup.require_approval ? <InfoRow icon="shield-checkmark-outline" text="호스트 승인제 모임" /> : null}
         </View>
 
         {meetup.description ? (
@@ -158,10 +195,30 @@ export default function MeetupDetail() {
           </View>
         ) : null}
 
+        {/* 호스트: 참가 신청 대기 목록 */}
+        {isHost && pending.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>참가 신청 {pending.length}명</Text>
+            <View style={{ gap: 10, marginTop: 8 }}>
+              {pending.map((p) => (
+                <View key={p.user_id} style={styles.pRow}>
+                  <Avatar nickname={p.profiles?.nickname ?? '?'} uri={p.profiles?.avatar_url} size={40} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pName}>{p.profiles?.nickname ?? '알 수 없음'}</Text>
+                    <Text style={styles.pMeta}>{p.profiles?.region || '지역 미설정'}</Text>
+                  </View>
+                  <Text onPress={() => approve(p.user_id)} style={styles.approveBtn}>승인</Text>
+                  <Text onPress={() => reject(p.user_id)} style={styles.rejectBtn}>거절</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>참가자 {participants.length}명</Text>
+          <Text style={styles.sectionTitle}>참가자 {approved.length}명</Text>
           <View style={{ gap: 10, marginTop: 8 }}>
-            {participants.map((p) => (
+            {approved.map((p) => (
               <View key={p.user_id} style={styles.pRow}>
                 <Avatar nickname={p.profiles?.nickname ?? '?'} uri={p.profiles?.avatar_url} size={40} />
                 <View style={{ flex: 1 }}>
@@ -189,12 +246,14 @@ export default function MeetupDetail() {
           )
         ) : closed ? (
           <Button title="참가할 수 없는 모임입니다" variant="secondary" disabled onPress={() => {}} />
-        ) : joined ? (
+        ) : isPending ? (
+          <Button title="참가 신청 취소 (승인 대기 중)" variant="outline" onPress={confirmLeave} loading={acting} />
+        ) : isApproved ? (
           <Button title="참가 취소" variant="outline" onPress={confirmLeave} loading={acting} />
         ) : (
           <Button
-            title={full ? '정원이 가득 찼어요' : '참가하기'}
-            onPress={join}
+            title={full ? '정원이 가득 찼어요' : meetup.require_approval ? '참가 신청하기' : '참가하기'}
+            onPress={confirmJoin}
             disabled={full}
             loading={acting}
           />
@@ -239,5 +298,26 @@ const styles = StyleSheet.create({
   pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
   pMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
   pSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
+  approveBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    backgroundColor: '#16C784',
+    borderRadius: 999,
+    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  rejectBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B7280',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 999,
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
   actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
 });

@@ -45,6 +45,8 @@ create table if not exists public.meetups (
   skill_min     numeric(3,1) not null default 2.0,
   skill_max     numeric(3,1) not null default 8.0,
   max_players   int not null default 4 check (max_players between 2 and 32),
+  fee           integer not null default 0,        -- 게스트비(원), 0=무료 (0033)
+  require_approval boolean not null default false,  -- 참가 신청 승인 필요 여부 (0033)
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
 );
@@ -58,6 +60,7 @@ create index if not exists meetups_region_idx on public.meetups (region);
 create table if not exists public.meetup_participants (
   meetup_id uuid not null references public.meetups(id) on delete cascade,
   user_id   uuid not null references public.profiles(id) on delete cascade,
+  status    text not null default 'approved', -- 'pending' | 'approved' (0033)
   joined_at timestamptz not null default now(),
   primary key (meetup_id, user_id)
 );
@@ -199,6 +202,15 @@ drop policy if exists "participants_delete_self" on public.meetup_participants;
 create policy "participants_delete_self" on public.meetup_participants
   for delete using (auth.uid() = user_id);
 
+-- 호스트는 자기 모임 참가 신청을 승인(상태 변경)/거절(삭제) 가능 (0033)
+drop policy if exists "participants_update_host" on public.meetup_participants;
+create policy "participants_update_host" on public.meetup_participants
+  for update using (exists (select 1 from public.meetups m where m.id = meetup_id and m.host_id = auth.uid()));
+
+drop policy if exists "participants_delete_host" on public.meetup_participants;
+create policy "participants_delete_host" on public.meetup_participants
+  for delete using (exists (select 1 from public.meetups m where m.id = meetup_id and m.host_id = auth.uid()));
+
 -- ============================================================
 -- 편의 뷰: 모임 + 참가자 수 + 호스트 정보
 -- ============================================================
@@ -209,7 +221,7 @@ select
   m.*,
   p.nickname    as host_nickname,
   p.avatar_url  as host_avatar_url,
-  (select count(*) from public.meetup_participants mp where mp.meetup_id = m.id) as participant_count
+  (select count(*) from public.meetup_participants mp where mp.meetup_id = m.id and mp.status = 'approved') as participant_count
 from public.meetups m
 join public.profiles p on p.id = m.host_id;
 

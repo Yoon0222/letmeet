@@ -38,7 +38,11 @@ export default function HomeScreen() {
     const items: UpcomingItem[] = [];
 
     if (uid) {
-      const { data: parts } = await supabase.from('meetup_participants').select('meetup_id').eq('user_id', uid);
+      const { data: parts } = await supabase
+        .from('meetup_participants')
+        .select('meetup_id')
+        .eq('user_id', uid)
+        .eq('status', 'approved'); // 승인된(확정) 참가만 일정에 표시
       const ids = (parts ?? []).map((p) => p.meetup_id);
       if (ids.length > 0) {
         const { data } = await supabase

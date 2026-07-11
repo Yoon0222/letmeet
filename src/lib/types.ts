@@ -14,6 +14,8 @@ export const PLAY_STYLE_LABELS: Record<PlayStyle, string> = {
 
 export type MeetupStatus = 'open' | 'closed' | 'cancelled';
 
+export type MeetupParticipantStatus = 'pending' | 'approved';
+
 // NOTE: Supabase 의 GenericTable 제약(Record<string, unknown>)을 만족하려면
 // interface 가 아니라 type 별칭이어야 한다 (암묵적 인덱스 시그니처).
 export type Profile = {
@@ -46,6 +48,8 @@ export type Meetup = {
   skill_min: number;
   skill_max: number;
   max_players: number;
+  fee: number; // 게스트비(원), 0=무료 (0033)
+  require_approval: boolean; // 참가 신청 승인 필요 여부 (0033)
   status: MeetupStatus;
   created_at: string;
 };
@@ -60,6 +64,7 @@ export type MeetupWithCounts = Meetup & {
 export type Participant = {
   meetup_id: string;
   user_id: string;
+  status: MeetupParticipantStatus; // 'pending' | 'approved' (0033)
   joined_at: string;
 };
 
@@ -319,7 +324,7 @@ export interface Database {
       };
       meetup_participants: {
         Row: Participant;
-        Insert: { meetup_id: string; user_id: string };
+        Insert: { meetup_id: string; user_id: string; status?: MeetupParticipantStatus };
         Update: WriteDefaults<Participant>;
         Relationships: [];
       };

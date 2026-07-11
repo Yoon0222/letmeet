@@ -5,7 +5,7 @@ import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AppSpacing, Radius, Typography } from '@/theme';
-import { formatMeetupTime, skillRangeLabel } from '@/lib/format';
+import { formatMeetupTime } from '@/lib/format';
 import type { MeetupWithCounts } from '@/lib/types';
 
 export function MeetupCard({
@@ -50,9 +50,11 @@ export function MeetupCard({
         </View>
 
         <View style={styles.tags}>
-          <View style={styles.pill}>
-            <Ionicons name="ribbon-outline" size={13} color="#6B7280" />
-            <Text style={styles.pillText}>{skillRangeLabel(meetup.skill_min, meetup.skill_max)}</Text>
+          <View style={[styles.pill, meetup.fee > 0 && styles.feePill]}>
+            <Ionicons name="cash-outline" size={13} color={meetup.fee > 0 ? '#16C784' : '#6B7280'} />
+            <Text style={[styles.pillText, meetup.fee > 0 && styles.feePillText]}>
+              {meetup.fee > 0 ? `${meetup.fee.toLocaleString()}원` : '무료'}
+            </Text>
           </View>
           <View style={styles.pill}>
             <Ionicons name="people-outline" size={13} color="#6B7280" />
@@ -96,4 +98,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F7F9',
   },
   pillText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  feePill: { backgroundColor: '#EAFBF1' },
+  feePillText: { color: '#16C784', fontWeight: '700' },
 });

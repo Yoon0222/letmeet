@@ -29,7 +29,8 @@ export default function ProfileScreen() {
     const { data: parts } = await supabase
       .from('meetup_participants')
       .select('meetup_id')
-      .eq('user_id', uid);
+      .eq('user_id', uid)
+      .eq('status', 'approved'); // 승인된(확정) 참가만
     const ids = (parts ?? []).map((p) => p.meetup_id);
     if (ids.length === 0) {
       setMyMeetups([]);
