@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     gap: AppSpacing.xs,
   },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm },
-  time: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  time: { fontSize: 14, fontWeight: '800', color: '#16C784' }, // 날짜는 작게(제목보다), 그린 라벨
   title: { ...Typography.cardTitle, color: '#111827' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   meta: { ...Typography.caption, color: '#6B7280', flex: 1 },

@@ -25,6 +25,7 @@ export default function SignUp() {
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function onSubmit() {
@@ -34,6 +35,10 @@ export default function SignUp() {
     }
     if (password.length < 6) {
       Alert.alert('비밀번호', '비밀번호는 6자 이상이어야 합니다.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      Alert.alert('비밀번호 확인', '비밀번호가 일치하지 않아요. 다시 확인해주세요.');
       return;
     }
     setLoading(true);
@@ -91,6 +96,14 @@ export default function SignUp() {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+            />
+            <TextField
+              label="비밀번호 확인"
+              placeholder="비밀번호를 다시 입력"
+              secureTextEntry
+              value={passwordConfirm}
+              onChangeText={setPasswordConfirm}
+              hint={passwordConfirm.length > 0 && password !== passwordConfirm ? '비밀번호가 일치하지 않아요' : undefined}
             />
             <Button title="가입하기" onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
           </View>

@@ -115,15 +115,14 @@ export default function HomeScreen() {
     const upcomingMeetupIds = new Set(items.filter((i) => i.type === 'meetup').map((i) => i.key.slice(1)));
     setRecommended((recs ?? []).filter((m) => !upcomingMeetupIds.has(m.id)).slice(0, 3));
 
-    const { data: cs, count: clubCount } = await supabase
+    const { data: cs } = await supabase
       .from('clubs_with_counts')
-      .select('*', { count: 'exact' })
+      .select('*')
       .order('member_count', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(20);
-    let clubList = cs ?? [];
-    if ((clubCount ?? clubList.length) >= 3) clubList = clubList.filter((c) => c.member_count >= 10);
-    setClubs(clubList.slice(0, 3));
+      .limit(3);
+    // 회원 많은 순(동수면 최근순)으로 최대 3개 노출 — 이전엔 3개↑일 때 10명↑만 노출해 작은 클럽이 사라져 혼란 → 완화
+    setClubs((cs ?? []).slice(0, 3));
     setRefreshing(false);
   }, [uid, myRegion]);
 
