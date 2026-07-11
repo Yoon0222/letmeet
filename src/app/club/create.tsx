@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
@@ -17,6 +17,7 @@ export default function CreateClub() {
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
   const [description, setDescription] = useState('');
+  const [requireApproval, setRequireApproval] = useState(false);
   const [saving, setSaving] = useState(false);
 
   async function onSubmit() {
@@ -34,6 +35,7 @@ export default function CreateClub() {
         name: name.trim(),
         region: region.trim(),
         description: description.trim(),
+        require_approval: requireApproval,
       })
       .select('id')
       .single();
@@ -68,6 +70,13 @@ export default function CreateClub() {
           maxLength={300}
           style={{ minHeight: 110, textAlignVertical: 'top' }}
         />
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleTitle}>가입 승인제</Text>
+            <Text style={styles.toggleHint}>켜면 운영자가 승인해야 가입돼요.</Text>
+          </View>
+          <Switch value={requireApproval} onValueChange={setRequireApproval} trackColor={{ true: '#16C784' }} />
+        </View>
         <Button title="클럽 만들기" onPress={onSubmit} loading={saving} style={{ marginTop: Spacing.two }} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -77,4 +86,17 @@ export default function CreateClub() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    padding: Spacing.three,
+  },
+  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  toggleHint: { fontSize: 13, color: '#6B7280', marginTop: 2 },
 });

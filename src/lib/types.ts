@@ -71,12 +71,16 @@ export type ParticipantWithProfile = Participant & {
 // ---- 클럽(동호회) ----
 export type ClubRole = 'owner' | 'member';
 
+export type ClubMemberStatus = 'pending' | 'approved';
+
 export type Club = {
   id: string;
   owner_id: string;
   name: string;
   description: string;
   region: string;
+  image_url: string | null; // 클럽 대표 사진 (0031)
+  require_approval: boolean; // 가입 승인 필요 여부 (0032)
   created_at: string;
 };
 
@@ -91,6 +95,7 @@ export type ClubMember = {
   club_id: string;
   user_id: string;
   role: ClubRole;
+  status: ClubMemberStatus; // 'pending' | 'approved' (0032)
   joined_at: string;
 };
 
@@ -326,7 +331,7 @@ export interface Database {
       };
       club_members: {
         Row: ClubMember;
-        Insert: { club_id: string; user_id: string; role?: ClubRole };
+        Insert: { club_id: string; user_id: string; role?: ClubRole; status?: ClubMemberStatus };
         Update: WriteDefaults<ClubMember>;
         Relationships: [];
       };

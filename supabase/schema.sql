@@ -222,6 +222,8 @@ create table if not exists public.clubs (
   name        text not null,
   description text not null default '',
   region      text not null default '',
+  image_url   text,                                       -- 클럽 대표 사진 (0031)
+  require_approval boolean not null default false,         -- 가입 승인 필요 여부 (0032)
   created_at  timestamptz not null default now()
 );
 create index if not exists clubs_region_idx on public.clubs (region);
@@ -230,6 +232,7 @@ create table if not exists public.club_members (
   club_id   uuid not null references public.clubs(id) on delete cascade,
   user_id   uuid not null references public.profiles(id) on delete cascade,
   role      text not null default 'member',   -- 'owner' | 'member'
+  status    text not null default 'approved', -- 'pending' | 'approved' (0032)
   joined_at timestamptz not null default now(),
   primary key (club_id, user_id)
 );
@@ -283,7 +286,17 @@ drop policy if exists "club_members_delete_self" on public.club_members;
 create policy "club_members_delete_self" on public.club_members
   for delete using (auth.uid() = user_id);
 
--- 편의 뷰: 클럽 + 개설자 + 멤버 수
+-- owner 는 자기 클럽 멤버의 상태 변경(가입 승인) 가능 (0032)
+drop policy if exists "club_members_update_owner" on public.club_members;
+create policy "club_members_update_owner" on public.club_members
+  for update using (exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid()));
+
+-- owner 는 자기 클럽 멤버 삭제(가입 거절/추방) 가능 (0032)
+drop policy if exists "club_members_delete_owner" on public.club_members;
+create policy "club_members_delete_owner" on public.club_members
+  for delete using (exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid()));
+
+-- 편의 뷰: 클럽 + 개설자 + 멤버 수 (승인된 멤버만 카운트)
 create or replace view public.clubs_with_counts
 with (security_invoker = true)
 as
@@ -291,9 +304,18 @@ select
   c.*,
   p.nickname   as owner_nickname,
   p.avatar_url as owner_avatar_url,
-  (select count(*) from public.club_members cm where cm.club_id = c.id) as member_count
+  (select count(*) from public.club_members cm where cm.club_id = c.id and cm.status = 'approved') as member_count
 from public.clubs c
 join public.profiles p on p.id = c.owner_id;
+
+-- club-images 스토리지 버킷 (공개 조회, 로그인 사용자 업로드) (0031)
+insert into storage.buckets (id, name, public) values ('club-images', 'club-images', true) on conflict (id) do nothing;
+drop policy if exists "club_images_read" on storage.objects;
+create policy "club_images_read" on storage.objects for select using (bucket_id = 'club-images');
+drop policy if exists "club_images_insert" on storage.objects;
+create policy "club_images_insert" on storage.objects for insert with check (bucket_id = 'club-images' and auth.uid() is not null);
+drop policy if exists "club_images_update" on storage.objects;
+create policy "club_images_update" on storage.objects for update using (bucket_id = 'club-images' and auth.uid() is not null);
 
 -- ============================================================
 -- 대회 (tournaments)  — 주최자(organizer)가 개설·운영, 사용자는 참가 신청

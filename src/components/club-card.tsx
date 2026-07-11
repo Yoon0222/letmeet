@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
@@ -9,9 +9,13 @@ import type { ClubWithCounts } from '@/lib/types';
 export function ClubCard({ club, onPress }: { club: ClubWithCounts; onPress: () => void }) {
   return (
     <AppCard onPress={onPress} style={styles.card}>
-      <View style={styles.cover}>
-        <Ionicons name="people-outline" size={24} color="#16C784" />
-      </View>
+      {club.image_url ? (
+        <Image source={{ uri: club.image_url }} style={styles.cover} />
+      ) : (
+        <View style={styles.cover}>
+          <Ionicons name="people-outline" size={24} color="#16C784" />
+        </View>
+      )}
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
         <Text style={styles.meta} numberOfLines={1}>
