@@ -50,12 +50,15 @@ Validation: `npx tsc --noEmit` 통과, `npx expo lint` 통과. 라이브 동작 
   - `src/app/meetup/[id].tsx`: 게스트비·승인제 표시, 신청→대기, 호스트 승인/거절.
   - `src/components/meetup-card.tsx`(디자인 파일): 게스트비 pill 추가, **기존 실력 pill을 게스트비 pill로 교체**(카드 공간상). 실력 범위는 상세화면에 있음 — 디자인상 다시 넣고 싶으면 조정 가능.
 - **대회 복식 파트너 발견성**: `src/app/tournament/[id].tsx` 파트너 검색을 정보 카드 바로 아래로 이동 + 강조 카드.
+- **번개 코트/장소 사진 (0034)**: meetups.image_url + meetup-images 버킷. `meetup/create.tsx`(첨부), `meetup/[id].tsx`(표시·호스트 업로드), `meetup-card.tsx`(상단 배너 — 디자인 파일).
+- **신청 알림 (0035)**: 클럽 가입·번개 참가 pending 시 주최자에게 Expo 푸시. **DB 트리거(pg_net)** 로 자동 발송 — 앱 코드 아님, `supabase/migrations/0035`. push_token 있는 실기기 빌드에서만 도달.
 
 Follow-ups / requests:
 
-- **운영 DB에 마이그레이션 0031, 0032, 0033 실행 필요** — 0031·0032는 사용자가 실행 완료, **0033은 아직**(개발 DB에도 미실행 → status 쿼리 400).
+- **운영 DB 마이그레이션 실행 필요**: 0031·0032 완료. **0033·0034·0035 아직**(개발 DB에도 미실행 → meetup status/image 쿼리 degrade). 0035는 `pg_net` 확장 필요(Supabase 기본 제공).
 - 다음 프로덕션 빌드(Android versionCode↑ / iOS buildNumber↑)에 위 수정 전부 포함해야 함.
-- club-card 썸네일·club/[id] 사진 영역, meetup-card pill 구성 디자인 다듬을 여지 있음 — Codex가 원하면 손봐도 됨(로직 건드리지 말 것).
+- 알림 도달 테스트는 실기기 2대(신청자/호스트) + push_token 등록 필요. notify-turn Edge Function은 여전히 미배포(task #31).
+- club-card·club/[id] 사진, meetup-card pill/배너 디자인 다듬을 여지 있음 — Codex가 원하면 손봐도 됨(로직 건드리지 말 것).
 
 ### Codex -> Claude (2026-07-10, first court partner email)
 
@@ -1107,3 +1110,16 @@ Landing stats fix:
 - Verified `npm.cmd run build` shows both `/` and `/landing` as dynamic.
 - Deployed to Vercel production: `https://web-admin-mn6ucrpo2-troyyoonsikshin-2301s-projects.vercel.app`, aliased to `https://pinut.org`.
 - Verified live `https://pinut.org/` HTML now includes `현재 회원수 9명` and `4곳`.
+
+Test Supabase migration status check:
+
+- User asked whether we can tell how far the test server schema is applied.
+- Test Supabase project checked via anon key: `https://pjfhxkvdjipvdmfsacie.supabase.co`.
+- Representative table/column probes showed migrations through `0031` are mostly present.
+- Corrected probe confirmed `0017_checkin` is present via `tournament_entries.checked_in_at`.
+- Missing on test DB:
+  - `0032_club_approval`: `clubs.require_approval`, `club_members.status`.
+  - `0033_meetup_fee_approval`: `meetups.fee`, `meetups.require_approval`, `meetup_participants.status`.
+  - `0034_meetup_image`: `meetups.image_url`.
+  - `0035_notify_join_request`: likely not effectively applied because it depends on `status` columns from `0032`/`0033`.
+- Recommendation: apply only migrations `0032` through `0035` to the test DB first, then verify, then apply to production. Do not rerun full `schema.sql` on production.
