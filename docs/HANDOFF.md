@@ -43,11 +43,19 @@ Files touched: 위 목록 참고.
 
 Validation: `npx tsc --noEmit` 통과, `npx expo lint` 통과. 라이브 동작 확인은 미실시(빌드 필요 기능 — expo-image-picker).
 
+추가 작업 (같은 날, 커밋 9b48dfd · c70c7d9):
+
+- **번개모임 게스트비 + 참가 승인제 (0033)**: meetups.fee / meetups.require_approval / meetup_participants.status 추가.
+  - `src/app/meetup/create.tsx`: 게스트비 입력 + 승인제 토글.
+  - `src/app/meetup/[id].tsx`: 게스트비·승인제 표시, 신청→대기, 호스트 승인/거절.
+  - `src/components/meetup-card.tsx`(디자인 파일): 게스트비 pill 추가, **기존 실력 pill을 게스트비 pill로 교체**(카드 공간상). 실력 범위는 상세화면에 있음 — 디자인상 다시 넣고 싶으면 조정 가능.
+- **대회 복식 파트너 발견성**: `src/app/tournament/[id].tsx` 파트너 검색을 정보 카드 바로 아래로 이동 + 강조 카드.
+
 Follow-ups / requests:
 
-- **운영 DB에 마이그레이션 0031, 0032 실행 필요** (아직 안 함) — 사용자에게 요청함.
+- **운영 DB에 마이그레이션 0031, 0032, 0033 실행 필요** — 0031·0032는 사용자가 실행 완료, **0033은 아직**(개발 DB에도 미실행 → status 쿼리 400).
 - 다음 프로덕션 빌드(Android versionCode↑ / iOS buildNumber↑)에 위 수정 전부 포함해야 함.
-- club-card 썸네일·club/[id] 사진 영역 디자인 다듬을 여지 있음 — Codex가 원하면 손봐도 됨(로직 건드리지 말 것).
+- club-card 썸네일·club/[id] 사진 영역, meetup-card pill 구성 디자인 다듬을 여지 있음 — Codex가 원하면 손봐도 됨(로직 건드리지 말 것).
 
 ### Codex -> Claude (2026-07-10, first court partner email)
 
