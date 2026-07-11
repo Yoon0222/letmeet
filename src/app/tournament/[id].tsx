@@ -207,6 +207,23 @@ export default function TournamentDetail() {
     return () => clearTimeout(timer);
   }, [partnerQuery, partnerSel, uid, entries]);
 
+  // 참가 신청 전 확인 알럿
+  function confirmApply() {
+    if (isDoubles && !partnerSel) {
+      Alert.alert('파트너 필요', '복식은 함께 출전할 파트너를 선택해야 해요.');
+      return;
+    }
+    const partnerLine = isDoubles && partnerSel ? `\n파트너: ${partnerSel.nickname}` : '';
+    Alert.alert(
+      slotsFull ? '대기 신청' : '참가 신청',
+      `${t?.title ?? '대회'}${partnerLine}\n${slotsFull ? '정원이 차서 대기열로 신청됩니다.' : '이 대회에 참가 신청할까요?'}`,
+      [
+        { text: '닫기', style: 'cancel' },
+        { text: slotsFull ? '대기 신청' : '신청', onPress: apply },
+      ],
+    );
+  }
+
   async function apply() {
     if (!uid || !id) return;
     if (isDoubles && !partnerSel) {
@@ -572,7 +589,7 @@ export default function TournamentDetail() {
             <Text style={styles.statusText}>{iAmPartner.profiles?.nickname ?? '상대'}님의 파트너로 참가 신청됨</Text>
           </View>
         ) : canRegister ? (
-          <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={apply} loading={acting} />
+          <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={confirmApply} loading={acting} />
         ) : (
           <Button title="접수가 마감되었어요" variant="secondary" disabled onPress={() => {}} />
         )}

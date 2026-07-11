@@ -38,6 +38,7 @@ export default function MatchesScreen() {
       supabase
         .from('meetups_with_counts')
         .select('*')
+        .neq('status', 'cancelled') // 취소된 모임은 목록에서 숨김
         .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
         .order('start_time', { ascending: true })
         .limit(100),

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
@@ -22,6 +22,7 @@ export default function ClubsScreen() {
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     const [{ data, error }, blocked] = await Promise.all([
@@ -45,11 +46,38 @@ export default function ClubsScreen() {
     }, [load]),
   );
 
+  // 이름·지역 검색
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? clubs.filter((c) => `${c.name} ${c.region}`.toLowerCase().includes(q))
+    : clubs;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <AppHeader title="클럽" subtitle="함께 꾸준히 칠 동호회를 찾거나 만들어보세요" />
       </View>
+
+      {!loading && clubs.length > 0 ? (
+        <View style={styles.searchWrap}>
+          <View style={styles.search}>
+            <Ionicons name="search" size={16} color="#6B7280" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="클럽 이름·지역 검색"
+              placeholderTextColor="#9CA3AF"
+              style={styles.searchInput}
+              returnKeyType="search"
+            />
+            {query.length > 0 ? (
+              <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.center}>
@@ -57,7 +85,7 @@ export default function ClubsScreen() {
         </View>
       ) : (
         <FlatList
-          data={clubs}
+          data={visible}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -75,9 +103,9 @@ export default function ClubsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="people-outline" size={48} color="#9CA3AF" />
-              <Text style={styles.emptyTitle}>아직 클럽이 없어요</Text>
-              <Text style={styles.emptyBody}>첫 번째 클럽을 만들어보세요.</Text>
+              <Ionicons name={q ? 'search' : 'people-outline'} size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>{q ? '검색 결과가 없어요' : '아직 클럽이 없어요'}</Text>
+              <Text style={styles.emptyBody}>{q ? '다른 이름·지역으로 검색해보세요.' : '첫 번째 클럽을 만들어보세요.'}</Text>
             </View>
           }
         />
@@ -91,6 +119,20 @@ export default function ClubsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F6F7F9' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
+  searchWrap: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.three },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchInput: { flex: 1, fontSize: 15, padding: 0, color: '#111827' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
