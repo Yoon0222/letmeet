@@ -178,6 +178,40 @@ export type TournamentTeamWithMembers = TournamentTeam & {
   members: { user_id: string; profiles: PartnerProfile }[];
 };
 
+// ---- 단체전 진행: tie(팀 대 팀) + 서브매치 (0039) ----
+export type TieMatchKind = 'singles' | 'doubles';
+export type TieSide = 'team1' | 'team2';
+
+export type TournamentTie = {
+  id: string;
+  tournament_id: string;
+  phase: MatchPhase; // 'group' | 'knockout'
+  group_no: number | null;
+  round_order: number | null;
+  round_name: string | null;
+  slot: number;
+  team1_id: string | null;
+  team2_id: string | null;
+  winner_team_id: string | null;
+  status: MatchStatus; // 'scheduled' | 'done'
+  court_id: string | null;
+  created_at: string;
+};
+
+export type TieMatch = {
+  id: string;
+  tie_id: string;
+  kind: TieMatchKind;
+  slot: number;
+  team1_players: string[];
+  team2_players: string[];
+  score1: number | null;
+  score2: number | null;
+  winner: TieSide | null;
+  status: MatchStatus;
+  created_at: string;
+};
+
 /** tournaments_with_counts 뷰 결과 */
 export type TournamentWithCounts = Tournament & {
   organizer_nickname: string;
@@ -421,6 +455,18 @@ export interface Database {
         Row: TournamentTeamMember;
         Insert: { team_id: string; user_id: string };
         Update: WriteDefaults<TournamentTeamMember>;
+        Relationships: [];
+      };
+      tournament_ties: {
+        Row: TournamentTie;
+        Insert: WriteDefaults<TournamentTie> & { tournament_id: string };
+        Update: WriteDefaults<TournamentTie>;
+        Relationships: [];
+      };
+      tie_matches: {
+        Row: TieMatch;
+        Insert: WriteDefaults<TieMatch> & { tie_id: string; kind: TieMatchKind };
+        Update: WriteDefaults<TieMatch>;
         Relationships: [];
       };
       courts: {

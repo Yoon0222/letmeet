@@ -86,6 +86,56 @@ export type TournamentCourt = {
   created_at: string;
 };
 
+// ---- 단체전 팀 + 진행 (0037/0039) ----
+export type TeamStatus = 'pending' | 'approved' | 'rejected';
+
+export type TournamentTeam = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  captain_id: string;
+  status: TeamStatus;
+  seed: number | null;
+  created_at: string;
+};
+
+export type TournamentTeamWithMembers = TournamentTeam & {
+  members: { user_id: string; profiles: { id: string; nickname: string; skill_level: number; avatar_url: string | null; region: string } }[];
+};
+
+export type TieMatchKind = 'singles' | 'doubles';
+export type TieSide = 'team1' | 'team2';
+
+export type TournamentTie = {
+  id: string;
+  tournament_id: string;
+  phase: MatchPhase;
+  group_no: number | null;
+  round_order: number | null;
+  round_name: string | null;
+  slot: number;
+  team1_id: string | null;
+  team2_id: string | null;
+  winner_team_id: string | null;
+  status: 'scheduled' | 'done';
+  court_id: string | null;
+  created_at: string;
+};
+
+export type TieMatch = {
+  id: string;
+  tie_id: string;
+  kind: TieMatchKind;
+  slot: number;
+  team1_players: string[];
+  team2_players: string[];
+  score1: number | null;
+  score2: number | null;
+  winner: TieSide | null;
+  status: 'scheduled' | 'done';
+  created_at: string;
+};
+
 // 코트 예약 시설(대회와 무관한 상시 예약 코트)
 /** 면(코트) 1개 — 이름 + 바닥 종류 */
 export type CourtUnit = { name: string; surface: string };
