@@ -39,7 +39,13 @@ What changed (전부 로직 파일, 디자인 파일 안 건드림):
 
 현재 사용 가능: 단체전 대회 생성 ✅ + 모바일 팀 신청 ✅(pending 팀 생성). **아직 없음**: 관리자 팀 승인 UI(신청현황 탭은 tournament_entries 기준이라 팀 안 보임), 팀 진행(타이 경기).
 
-단체전 남은 단계(4~5): **팀 진행엔진**(관리자 팀승인 + 팀 예선리그→토너먼트, 타이=서브매치 tie_singles/tie_doubles, 팀승수 집계) · **오더 싸움**(타이 전 주장 라인업 배정). 서브매치 데이터모델(tournament_ties/tie_matches 또는 tournament_matches 확장) 설계 필요 — 큰 작업, 별도 세션 권장.
+- **단체전 4a~4c 진행엔진 (커밋 ffd7da6·7bb3b83·75d3747)**:
+  - 0039: tournament_ties + tie_matches (서브매치, 오더용 team1/2_players 컬럼 포함) + RLS(쓰기=주최자).
+  - 4b 관리자 팀승인: `web-admin/components/team-roster.tsx`, 신청현황 탭 team이면 렌더. 승인→확정 검증.
+  - 4c 예선: `web-admin/app/tournaments/[id]/team/page.tsx` + `lib/team-bracket.ts`(tieWinner 다승, teamStandings). buildGroups 재사용→tie+서브매치(단식 tie_singles+복식 tie_doubles) 생성→서브매치 승자 입력→tie 승자·팀순위. **라이브 검증 완료**(2팀 예선, tie 2:0 종료, 순위 반영). layout에 team '팀 대진' 탭.
+  - **0039 개발DB 실행됨.**
+
+단체전 남은 것: 4c **토너먼트(본선)** — 예선 상위 팀으로 knockout tie 생성(firstRoundPairs 재사용). **4d 모바일 팀 대진 표시**. **5 오더 싸움**(타이 전 주장이 tie_matches.team1/2_players 라인업 배정 — 컬럼은 준비됨).
 
 Follow-ups:
 
