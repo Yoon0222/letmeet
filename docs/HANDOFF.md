@@ -45,7 +45,15 @@ What changed (전부 로직 파일, 디자인 파일 안 건드림):
   - 4c 예선: `web-admin/app/tournaments/[id]/team/page.tsx` + `lib/team-bracket.ts`(tieWinner 다승, teamStandings). buildGroups 재사용→tie+서브매치(단식 tie_singles+복식 tie_doubles) 생성→서브매치 승자 입력→tie 승자·팀순위. **라이브 검증 완료**(2팀 예선, tie 2:0 종료, 순위 반영). layout에 team '팀 대진' 탭.
   - **0039 개발DB 실행됨.**
 
-단체전 남은 것: 4c **토너먼트(본선)** — 예선 상위 팀으로 knockout tie 생성(firstRoundPairs 재사용). **4d 모바일 팀 대진 표시**. **5 오더 싸움**(타이 전 주장이 tie_matches.team1/2_players 라인업 배정 — 컬럼은 준비됨).
+- **4c 본선 (커밋 28d1a12)**: advanceTeamKnockout(knockout.ts) + 팀 페이지 본선 생성·라운드 표시. 라이브 검증(결승 tie 0:2 종료).
+- **4d 모바일 표시 (커밋 42d1d33)**: `team-bracket-view.tsx` — 조 순위+타이·서브매치 결과+본선. 라이브 검증.
+- **5 오더 (커밋 dcc2124)**: 0040 `set_tie_lineup` RPC(주장만 자기팀 라인업) + `team-lineup.tsx`(주장 서브매치별 선수 배정) + bracket-view 오더 표시. **tsc/lint 통과, 라이브 검증은 dev DB 0040 + 활성 타이 필요.**
+
+단체전 전 기능 구현 완료(1~5). 남은 건 오더 라이브 검증(0040)뿐. 개선여지: 오더 동시제출·블라인드 공개.
+
+Follow-ups (마이그레이션):
+- 개발 DB: 0036~0039 실행됨. **0040 아직**(오더 RPC).
+- 운영 DB: **0036~0040 전부 아직** — 출시 전 일괄 실행 필요.
 
 Follow-ups:
 
