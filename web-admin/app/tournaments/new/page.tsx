@@ -33,6 +33,10 @@ function NewTournamentInner() {
   const [title, setTitle] = useState('');
   const [format, setFormat] = useState<TournamentFormat>('group_knockout');
   const [discipline, setDiscipline] = useState<'singles' | 'doubles'>('singles');
+  // 단체전 설정
+  const [teamMinSize, setTeamMinSize] = useState(2);
+  const [tieSingles, setTieSingles] = useState(2);
+  const [tieDoubles, setTieDoubles] = useState(1);
   const [venue, setVenue] = useState('');
   const [region, setRegion] = useState('');
   const [startAt, setStartAt] = useState('');
@@ -123,6 +127,9 @@ function NewTournamentInner() {
         title: title.trim(),
         format,
         discipline,
+        team_min_size: teamMinSize,
+        tie_singles: tieSingles,
+        tie_doubles: tieDoubles,
         venue: venue.trim(),
         region: region.trim(),
         start_at: iso,
@@ -172,12 +179,32 @@ function NewTournamentInner() {
           </select>
           <p className="mt-1 text-xs text-slate-500">{TOURNAMENT_FORMAT_DESC[format]}</p>
         </Field>
-        <Field label="종목">
-          <select className={inputCls} value={discipline} onChange={(e) => setDiscipline(e.target.value as 'singles' | 'doubles')}>
-            <option value="singles">단식</option>
-            <option value="doubles">복식</option>
-          </select>
-        </Field>
+        {format === 'team' ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <span className="mb-2 block text-sm font-medium text-slate-700">단체전 설정</span>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="팀당 최소 인원">
+                <input type="number" min={1} max={20} className={inputCls} value={teamMinSize} onChange={(e) => setTeamMinSize(Number(e.target.value))} />
+              </Field>
+              <Field label="타이당 단식 수">
+                <input type="number" min={0} max={9} className={inputCls} value={tieSingles} onChange={(e) => setTieSingles(Number(e.target.value))} />
+              </Field>
+              <Field label="타이당 복식 수">
+                <input type="number" min={0} max={9} className={inputCls} value={tieDoubles} onChange={(e) => setTieDoubles(Number(e.target.value))} />
+              </Field>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              팀 대 팀 한 판(타이)은 단식 {tieSingles}경기 + 복식 {tieDoubles}경기 = 총 {tieSingles + tieDoubles}경기로 겨루고, 더 많이 이긴 팀이 승리합니다.
+            </p>
+          </div>
+        ) : (
+          <Field label="종목">
+            <select className={inputCls} value={discipline} onChange={(e) => setDiscipline(e.target.value as 'singles' | 'doubles')}>
+              <option value="singles">단식</option>
+              <option value="doubles">복식</option>
+            </select>
+          </Field>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <Field label="장소">
             <input
