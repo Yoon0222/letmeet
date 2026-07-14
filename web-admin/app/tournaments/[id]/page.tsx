@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 
 import { Avatar } from '@/components/avatar';
+import { TeamRoster } from '@/components/team-roster';
 import { ENTRY_STATUS_LABEL } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
@@ -27,6 +28,12 @@ export default function EntriesTab() {
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
 
   const isOrganizer = t.organizer_id === session?.user.id;
+
+  // 단체전은 개인 신청 대신 팀 신청/승인
+  if (t.format === 'team') {
+    return <TeamRoster tournamentId={id} isOrganizer={isOrganizer} />;
+  }
+
   const q = query.trim().toLowerCase();
   // 거절된 신청은 목록에서 숨기고, 검색어가 있으면 이름(닉/파트너)으로 필터
   const visibleEntries = entries

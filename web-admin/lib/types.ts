@@ -280,6 +280,30 @@ export interface Database {
         Update: Write<TournamentCourt>;
         Relationships: [];
       };
+      tournament_teams: {
+        Row: TournamentTeam;
+        Insert: Write<TournamentTeam> & { tournament_id: string; name: string; captain_id: string };
+        Update: Write<TournamentTeam>;
+        Relationships: [];
+      };
+      tournament_team_members: {
+        Row: { team_id: string; user_id: string; created_at: string };
+        Insert: { team_id: string; user_id: string };
+        Update: Write<{ team_id: string; user_id: string; created_at: string }>;
+        Relationships: [];
+      };
+      tournament_ties: {
+        Row: TournamentTie;
+        Insert: Write<TournamentTie> & { tournament_id: string };
+        Update: Write<TournamentTie>;
+        Relationships: [];
+      };
+      tie_matches: {
+        Row: TieMatch;
+        Insert: Write<TieMatch> & { tie_id: string; kind: TieMatchKind };
+        Update: Write<TieMatch>;
+        Relationships: [];
+      };
       audit_logs: {
         Row: AuditLog;
         Insert: Write<AuditLog>;
