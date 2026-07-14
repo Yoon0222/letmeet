@@ -37,8 +37,15 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
     load();
   }, [load, refreshKey]);
 
-  // 진행 전이면 아무것도 안 보임
-  if (!loaded || ties.length === 0) return null;
+  if (!loaded) return null;
+  // 진행(대진 생성) 전 안내
+  if (ties.length === 0) {
+    return (
+      <View style={styles.emptyBox}>
+        <Text style={styles.emptyText}>아직 대진이 시작되지 않았어요. 접수 마감 후 운영자가 대진을 편성해요.</Text>
+      </View>
+    );
+  }
 
   const nameOf = (teamId: string | null) => teams.find((x) => x.id === teamId)?.name ?? '미정';
   // uid -> 닉네임 (오더 표시용)
@@ -174,6 +181,8 @@ const styles = StyleSheet.create({
   subResult: { fontSize: 13, fontWeight: '600', color: '#111827' },
   lineup: { fontSize: 12, color: '#6B7280' },
   lineupHidden: { fontSize: 12, color: '#9CA3AF', fontStyle: 'italic' },
+  emptyBox: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.four, marginTop: Spacing.two },
+  emptyText: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
   pending: { fontSize: 12, color: '#9CA3AF', marginTop: 6 },
   roundLabel: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
 });

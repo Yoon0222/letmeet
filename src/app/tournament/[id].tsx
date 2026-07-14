@@ -48,7 +48,7 @@ export default function TournamentDetail() {
   const [courts, setCourts] = useState<TournamentCourt[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
-  const [tab, setTab] = useState<'info' | 'prelim' | 'final'>('info');
+  const [tab, setTab] = useState<'info' | 'prelim' | 'final' | 'register' | 'bracket'>('info');
   const [groupTab, setGroupTab] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
@@ -185,6 +185,13 @@ export default function TournamentDetail() {
     ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: t?.format === 'kdk' ? '순위' : '예선' }] : []),
     ...(koMatches.length > 0 ? [{ key: 'final' as const, label: '본선' }] : []),
   ];
+  // 단체전은 정보/참가/대진 탭으로 분리
+  const teamTabItems: { key: 'info' | 'register' | 'bracket'; label: string }[] = [
+    { key: 'info', label: '정보' },
+    { key: 'register', label: '참가' },
+    { key: 'bracket', label: '대진' },
+  ];
+  const showTabBar = isTeam || hasBracket;
 
   // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
   useEffect(() => {
@@ -320,9 +327,9 @@ export default function TournamentDetail() {
         <Text style={styles.title}>{t.title}</Text>
       </View>
 
-      {hasBracket && (
+      {showTabBar && (
         <View style={styles.tabBar}>
-          {tabItems.map((it) => {
+          {(isTeam ? teamTabItems : tabItems).map((it) => {
             const active = tab === it.key;
             return (
               <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
@@ -351,7 +358,7 @@ export default function TournamentDetail() {
             )}
           </View>
         )}
-        {(!hasBracket || tab === 'info') && (
+        {(tab === 'info' || (!hasBracket && !isTeam)) && (
           <>
             <View style={styles.infoCard}>
               <Info icon="time-outline" text={formatMeetupTime(t.start_at)} />
@@ -455,12 +462,7 @@ export default function TournamentDetail() {
               </View>
             )}
 
-            {isTeam ? (
-              <>
-                <TeamRegister tournament={t} uid={uid} onChange={() => setTeamRev((v) => v + 1)} />
-                <TeamBracketView tournamentId={t.id} refreshKey={teamRev} />
-              </>
-            ) : (
+            {!isTeam && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
                 참가자 {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
@@ -516,6 +518,11 @@ export default function TournamentDetail() {
             )}
           </>
         )}
+
+        {/* 단체전: 참가 탭 */}
+        {isTeam && tab === 'register' && <TeamRegister tournament={t} uid={uid} onChange={() => setTeamRev((v) => v + 1)} />}
+        {/* 단체전: 대진 탭 */}
+        {isTeam && tab === 'bracket' && <TeamBracketView tournamentId={t.id} refreshKey={teamRev} />}
 
         {/* 예선 (조별리그) */}
         {hasBracket && tab === 'prelim' && (
