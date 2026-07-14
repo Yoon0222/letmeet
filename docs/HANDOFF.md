@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-14 (Claude: 부팅 무한로딩 수정 + DB 점검)
+Last updated: 2026-07-14 (Claude: 대회 진행 방식 KDK/단체전 + 부팅 수정)
 
 ## Purpose
 
@@ -22,6 +22,23 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-07-14, 대회 진행 방식 KDK/단체전/지금)
+
+What changed (전부 로직 파일, 디자인 파일 안 건드림):
+
+- **진행 방식 토대 (0036, 커밋 09279ea)**: `tournaments.format` = group_knockout | kdk | team + check. web-admin 생성폼에 '진행 방식' 선택, 모바일 상세·관리자 헤더에 방식 배지. `TOURNAMENT_FORMAT_LABELS/DESC` (모바일·web-admin 양쪽 types).
+- **KDK 엔진 (커밋 6cbfd12)**: 단식 개인 풀리그. 기존 `buildGroups`+`standings` 재사용(조별 라운드로빈+개인순위, 본선 없음). 관리자 탭 KDK=신청현황+순위전. prelim 페이지에 KDK 분기. 모바일은 '순위' 탭. 라이브 검증(KDK 대회 생성→순위전 렌더).
+- **단체전 1단계 데이터모델 (0037, 커밋 f3b0a75)**: `tournament_teams`(팀명·주장·상태·시드), `tournament_team_members`. tournaments에 team_min_size/tie_singles/tie_doubles. RLS 포함. types 동기화.
+
+단체전 확정 규칙: 팀명+가입유저 검색해 팀단위 신청 · 팀당 최소인원 · **오더 싸움**(타이 전 주장 라인업) · 타이 구성(단식/복식 수) 생성시 선택 · 예선리그→토너먼트.
+
+단체전 남은 단계(2~5): 모바일 팀신청 플로우 · 생성폼 설정 · 팀 진행엔진(타이=서브매치) · 오더 싸움 UI.
+
+Follow-ups:
+
+- **마이그레이션 0036, 0037 을 개발·운영 DB 양쪽에 실행 필요** (아직).
+- group_knockout(지금방식)·KDK는 완성. 단체전은 데이터모델만 됨 — 아직 신청/진행 불가(생성 시 team 고르면 진행 탭 '준비 중').
 
 ### Claude -> Codex (2026-07-14, 부팅 무한로딩 수정 + DB 점검)
 
