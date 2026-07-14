@@ -27,7 +27,9 @@ If no code changed, still leave a short note when the session included an import
 
 - **버전 1.1.0** (커밋+태그 v1.1.0). 프로덕션 빌드 큐: Android versionCode 7(56c7e1a9), iOS buildNumber 5(63294abc). 이번 빌드에 대회 진행방식(KDK·단체전·오더·코트배정)+클럽/번개 개선+부팅 크래시 수정 전부 포함.
 - **Edge Function 배포 완료**: `notify-turn`(개인/KDK 차례알림), `notify-tie`(단체전 타이 알림) → 운영·개발 DB 양쪽 배포됨(사용자가 `supabase functions deploy` 실행). 라이브 검증: notify-tie 호출 200 `{sent:0, no push tokens}`(테스트팀 토큰없음이라 정상). 실기기 push_token 등록 선수에게 실제 발송됨.
-- **남은 출시 작업**: (1) 운영 DB에 마이그레이션 0036~0041 실행(개발만 반영됨) — 안 하면 1.1.0에서 대회방식/클럽/번개 400. (2) 빌드 완료 후 Play/App Store Connect 업로드.
+- **운영 DB 마이그레이션 0036~0041 실행 완료** (사용자, 검증됨 — 테이블/컬럼/뷰/RPC 전부 200). 개발·운영 모두 동기화.
+- **빌드 상태**: iOS 1.1.0(build 5) FINISHED, Android 1.1.0(build 7) 진행중.
+- **남은 출시 작업**: 빌드 완료 후 Play(AAB)·App Store Connect(`eas submit -p ios`) 업로드 + 심사 제출.
 
 
 ### Claude -> Codex (2026-07-14, 대회 진행 방식 KDK/단체전/지금)
