@@ -3,7 +3,8 @@
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { buildGroups, groupCountForSize } from '@/lib/bracket';
+import { advanceCountForGroupSize, buildGroups, firstRoundPairs, groupCountForSize, roundName } from '@/lib/bracket';
+import { advanceTeamKnockout } from '@/lib/knockout';
 import { supabase } from '@/lib/supabase';
 import { teamStandings, tieWinner } from '@/lib/team-bracket';
 import { useSession } from '@/lib/use-session';
@@ -54,6 +55,11 @@ export default function TeamBracketTab() {
   const nameOf = (teamId: string | null) => teams.find((x) => x.id === teamId)?.name ?? '미정';
   const groupTies = ties.filter((x) => x.phase === 'group');
   const groupNos = [...new Set(groupTies.map((x) => x.group_no ?? 1))].sort((a, b) => a - b);
+  const koTies = ties
+    .filter((x) => x.phase === 'knockout')
+    .sort((a, b) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot);
+  const koRounds = [...new Set(koTies.map((x) => x.round_order ?? 1))].sort((a, b) => a - b);
+  const groupsDone = groupTies.length > 0 && groupTies.every((x) => x.status === 'done');
 
   // 팀 예선 생성 — 조별 팀 대진 + 각 타이 서브매치(단식 tie_singles + 복식 tie_doubles)
   async function generatePrelim() {
@@ -113,8 +119,114 @@ export default function TeamBracketTab() {
         .from('tournament_ties')
         .update({ winner_team_id: winnerTeamId, status: w ? 'done' : 'scheduled' })
         .eq('id', tie.id);
+      // 본선이면 승리 팀을 다음 라운드로 전파
+      if (tie.phase === 'knockout') await advanceTeamKnockout(id);
     }
     load();
+  }
+
+  // 본선(토너먼트) 생성 — 조별 상위 팀 진출 → knockout 타이 + 서브매치
+  async function generateKnockout() {
+    if (koTies.length > 0 || busy) return;
+    const gc = t!.group_count ?? 0;
+    const seeds: string[] = [];
+    for (let g = 1; g <= gc; g++) {
+      const gt = groupTies.filter((x) => (x.group_no ?? 1) === g);
+      const teamIds = [...new Set(gt.flatMap((x) => [x.team1_id, x.team2_id]).filter(Boolean) as string[])];
+      const st = teamStandings(teamIds, gt);
+      seeds.push(...st.slice(0, advanceCountForGroupSize(teamIds.length)).map((s) => s.teamId));
+    }
+    if (seeds.length < 2) {
+      alert('진출 팀이 2팀 이상이어야 본선을 만들 수 있어요.');
+      return;
+    }
+    let size = 1;
+    while (size < seeds.length) size *= 2;
+    const totalRounds = Math.log2(size);
+    const pairs = firstRoundPairs(seeds);
+    setBusy(true);
+    type TieRow = {
+      tournament_id: string;
+      phase: 'knockout';
+      round_order: number;
+      round_name: string;
+      slot: number;
+      team1_id?: string | null;
+      team2_id?: string | null;
+      winner_team_id?: string | null;
+      status: 'scheduled' | 'done';
+    };
+    const rows: TieRow[] = pairs.map((p, i) => ({
+      tournament_id: id,
+      phase: 'knockout',
+      round_order: 1,
+      round_name: roundName(size),
+      slot: i,
+      team1_id: p[0],
+      team2_id: p[1],
+      winner_team_id: p[1] ? null : p[0],
+      status: p[1] ? 'scheduled' : 'done',
+    }));
+    for (let r = 2; r <= totalRounds; r++) {
+      const players = size / 2 ** (r - 1);
+      for (let s = 0; s < players / 2; s++) {
+        rows.push({ tournament_id: id, phase: 'knockout', round_order: r, round_name: roundName(players), slot: s, status: 'scheduled' });
+      }
+    }
+    const { data: created, error } = await supabase.from('tournament_ties').insert(rows).select('id, status');
+    if (error || !created) {
+      setBusy(false);
+      alert(`본선 생성 실패: ${error?.message}`);
+      return;
+    }
+    // 부전승(status done)이 아닌 타이에 서브매치 미리 생성 (승리 팀 진출 시 바로 진행 가능)
+    const subRows: { tie_id: string; kind: 'singles' | 'doubles'; slot: number }[] = [];
+    for (const tie of created) {
+      if (tie.status === 'done') continue;
+      let slot = 0;
+      for (let i = 0; i < t!.tie_singles; i++) subRows.push({ tie_id: tie.id, kind: 'singles', slot: slot++ });
+      for (let i = 0; i < t!.tie_doubles; i++) subRows.push({ tie_id: tie.id, kind: 'doubles', slot: slot++ });
+    }
+    if (subRows.length > 0) await supabase.from('tie_matches').insert(subRows);
+    await advanceTeamKnockout(id);
+    setBusy(false);
+    load();
+  }
+
+  // 타이 1건 렌더 (예선·본선 공용)
+  function renderTie(tie: TournamentTie) {
+    const tsubs = subs.filter((x) => x.tie_id === tie.id);
+    const w1 = tsubs.filter((x) => x.winner === 'team1').length;
+    const w2 = tsubs.filter((x) => x.winner === 'team2').length;
+    const ready = !!tie.team1_id && !!tie.team2_id;
+    return (
+      <div key={tie.id} className="rounded-lg border border-slate-200 p-3">
+        <div className="flex items-center justify-between text-sm font-medium">
+          <span className={tie.winner_team_id === tie.team1_id && tie.status === 'done' ? 'text-emerald-700' : ''}>{nameOf(tie.team1_id)}</span>
+          <span className="text-slate-500">{w1} : {w2}{tie.status === 'done' ? ' · 종료' : ''}</span>
+          <span className={tie.winner_team_id === tie.team2_id && tie.status === 'done' ? 'text-emerald-700' : ''}>{nameOf(tie.team2_id)}</span>
+        </div>
+        {ready ? (
+          <div className="mt-2 space-y-1.5">
+            {tsubs.map((m) => (
+              <div key={m.id} className="flex items-center justify-between rounded-md bg-slate-50 px-2.5 py-1.5 text-sm">
+                <span className="text-slate-600">{m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}</span>
+                {isOrganizer ? (
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setSubResult(m, 'team1')} className={`rounded px-2 py-0.5 text-xs font-medium ${m.winner === 'team1' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100'}`}>팀1 승</button>
+                    <button onClick={() => setSubResult(m, 'team2')} className={`rounded px-2 py-0.5 text-xs font-medium ${m.winner === 'team2' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100'}`}>팀2 승</button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-500">{m.winner === 'team1' ? '팀1 승' : m.winner === 'team2' ? '팀2 승' : '예정'}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-slate-400">양 팀 확정 대기 중</p>
+        )}
+      </div>
+    );
   }
 
   // 대진 생성 전
@@ -168,40 +280,35 @@ export default function TeamBracketTab() {
               </tbody>
             </table>
 
-            <div className="mt-3 space-y-3">
-              {gTies.map((tie) => {
-                const tsubs = subs.filter((x) => x.tie_id === tie.id);
-                const w1 = tsubs.filter((x) => x.winner === 'team1').length;
-                const w2 = tsubs.filter((x) => x.winner === 'team2').length;
-                return (
-                  <div key={tie.id} className="rounded-lg border border-slate-200 p-3">
-                    <div className="flex items-center justify-between text-sm font-medium">
-                      <span className={tie.winner_team_id === tie.team1_id ? 'text-emerald-700' : ''}>{nameOf(tie.team1_id)}</span>
-                      <span className="text-slate-500">{w1} : {w2}{tie.status === 'done' ? ' · 종료' : ''}</span>
-                      <span className={tie.winner_team_id === tie.team2_id ? 'text-emerald-700' : ''}>{nameOf(tie.team2_id)}</span>
-                    </div>
-                    <div className="mt-2 space-y-1.5">
-                      {tsubs.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between rounded-md bg-slate-50 px-2.5 py-1.5 text-sm">
-                          <span className="text-slate-600">{m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}</span>
-                          {isOrganizer ? (
-                            <div className="flex gap-1.5">
-                              <button onClick={() => setSubResult(m, 'team1')} className={`rounded px-2 py-0.5 text-xs font-medium ${m.winner === 'team1' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100'}`}>팀1 승</button>
-                              <button onClick={() => setSubResult(m, 'team2')} className={`rounded px-2 py-0.5 text-xs font-medium ${m.winner === 'team2' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100'}`}>팀2 승</button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-500">{m.winner === 'team1' ? '팀1 승' : m.winner === 'team2' ? '팀2 승' : '예정'}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <div className="mt-3 space-y-3">{gTies.map((tie) => renderTie(tie))}</div>
           </div>
         );
       })}
+
+      {/* 본선(토너먼트) */}
+      {koTies.length > 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="font-medium">본선 토너먼트</h3>
+          <div className="mt-3 space-y-4">
+            {koRounds.map((r) => {
+              const rTies = koTies.filter((x) => (x.round_order ?? 1) === r);
+              return (
+                <div key={r}>
+                  <p className="mb-1.5 text-sm font-medium text-slate-500">{rTies[0]?.round_name ?? `${r}라운드`}</p>
+                  <div className="space-y-3">{rTies.map((tie) => renderTie(tie))}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : groupsDone && isOrganizer ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-600">예선이 끝났어요. 상위 팀으로 본선 토너먼트를 만들 수 있어요.</p>
+          <button onClick={generateKnockout} disabled={busy} className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+            {busy ? '생성 중…' : '본선 토너먼트 생성'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { TournamentMatch } from './types';
+import type { TournamentMatch, TournamentTie } from './types';
 
 // 본선(토너먼트) 승자를 다음 라운드 슬롯으로 전파한다.
 // 라운드 r 슬롯 s 경기의 승자 → 라운드 r+1 슬롯 floor(s/2)의 entry1(s 짝수)/entry2(s 홀수).
@@ -34,5 +34,38 @@ export async function advanceKnockoutWinners(tournamentId: string): Promise<void
   for (const u of updates) {
     const patch = u.field === 'entry1_id' ? { entry1_id: u.value } : { entry2_id: u.value };
     await supabase.from('tournament_matches').update(patch).eq('id', u.id);
+  }
+}
+
+// 단체전 본선: 승리 팀을 다음 라운드 타이 슬롯으로 전파 (advanceKnockoutWinners 의 팀 버전).
+export async function advanceTeamKnockout(tournamentId: string): Promise<void> {
+  const { data } = await supabase
+    .from('tournament_ties')
+    .select('*')
+    .eq('tournament_id', tournamentId)
+    .eq('phase', 'knockout');
+  const ko = (data as TournamentTie[]) ?? [];
+  if (ko.length === 0) return;
+
+  const at = (r: number, s: number) => ko.find((m) => m.round_order === r && m.slot === s);
+  const maxRound = Math.max(0, ...ko.map((m) => m.round_order ?? 0));
+
+  const updates: { id: string; field: 'team1_id' | 'team2_id'; value: string }[] = [];
+  for (let r = 1; r < maxRound; r++) {
+    for (const tie of ko.filter((x) => x.round_order === r)) {
+      if (tie.status !== 'done' || !tie.winner_team_id) continue;
+      const next = at(r + 1, Math.floor(tie.slot / 2));
+      if (!next) continue;
+      const field: 'team1_id' | 'team2_id' = tie.slot % 2 === 0 ? 'team1_id' : 'team2_id';
+      if (next[field] !== tie.winner_team_id) {
+        next[field] = tie.winner_team_id;
+        updates.push({ id: next.id, field, value: tie.winner_team_id });
+      }
+    }
+  }
+
+  for (const u of updates) {
+    const patch = u.field === 'team1_id' ? { team1_id: u.value } : { team2_id: u.value };
+    await supabase.from('tournament_ties').update(patch).eq('id', u.id);
   }
 }
