@@ -36,7 +36,8 @@ function Header() {
   const tabs = [
     { href: base, label: '신청현황' },
     ...progressTabs,
-    ...(courts.length > 0 ? [{ href: `${base}/courts`, label: '코트배정' }] : []),
+    // 코트배정 탭은 개인 경기(tournament_matches) 전용 — 단체전은 '팀 대진' 탭에서 타이별 배정
+    ...(courts.length > 0 && t.format !== 'team' ? [{ href: `${base}/courts`, label: '코트배정' }] : []),
   ];
 
   async function endTournament() {

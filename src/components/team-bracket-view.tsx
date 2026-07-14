@@ -11,16 +11,19 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
   const [teams, setTeams] = useState<TournamentTeamWithMembers[]>([]);
   const [ties, setTies] = useState<TournamentTie[]>([]);
   const [subs, setSubs] = useState<TieMatch[]>([]);
+  const [courts, setCourts] = useState<{ id: string; name: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: tm }, { data: ti }] = await Promise.all([
+    const [{ data: tm }, { data: ti }, { data: cs }] = await Promise.all([
       supabase
         .from('tournament_teams')
         .select('*, members:tournament_team_members(user_id, profiles(id, nickname, skill_level, avatar_url, region))')
         .eq('tournament_id', tournamentId),
       supabase.from('tournament_ties').select('*').eq('tournament_id', tournamentId).order('slot', { ascending: true }),
+      supabase.from('tournament_courts').select('id, name').eq('tournament_id', tournamentId),
     ]);
+    setCourts((cs as { id: string; name: string }[]) ?? []);
     setTeams((tm as unknown as TournamentTeamWithMembers[]) ?? []);
     const tieList = (ti as TournamentTie[]) ?? [];
     setTies(tieList);
@@ -71,6 +74,9 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
           <Text style={styles.tieScore}>{w1} : {w2}</Text>
           <Text style={[styles.tieName, styles.right, done && tie.winner_team_id === tie.team2_id && styles.win]} numberOfLines={1}>{nameOf(tie.team2_id)}</Text>
         </View>
+        {tie.court_id && !done ? (
+          <Text style={styles.court}>🏟 {courts.find((c) => c.id === tie.court_id)?.name ?? '코트'}</Text>
+        ) : null}
         {tie.team1_id && tie.team2_id ? (
           <View style={{ gap: 4, marginTop: 6 }}>
             {tsubs.map((m) => {
@@ -175,6 +181,7 @@ const styles = StyleSheet.create({
   right: { textAlign: 'right' },
   win: { color: '#16A34A' },
   tieScore: { fontSize: 14, fontWeight: '800', color: '#6B7280', paddingHorizontal: 10 },
+  court: { fontSize: 12, fontWeight: '700', color: '#2D6BD6', marginTop: 4 },
   sub: { backgroundColor: '#F6F7F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, gap: 2 },
   subTop: { flexDirection: 'row', justifyContent: 'space-between' },
   subKind: { fontSize: 13, color: '#6B7280' },

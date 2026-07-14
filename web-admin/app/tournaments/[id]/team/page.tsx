@@ -15,7 +15,7 @@ import { useTournament } from '../_ctx';
 export default function TeamBracketTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, loading } = useTournament();
+  const { t, courts, loading } = useTournament();
 
   const [teams, setTeams] = useState<TournamentTeam[]>([]);
   const [ties, setTies] = useState<TournamentTie[]>([]);
@@ -137,6 +137,23 @@ export default function TeamBracketTab() {
     load();
   }
 
+  // 타이에 코트 배정
+  async function assignTieCourt(tieId: string, courtId: string | null) {
+    await supabase.from('tournament_ties').update({ court_id: courtId }).eq('id', tieId);
+    load();
+  }
+
+  // 타이 차례 알림 — 양 팀 선수들에게 푸시 (notify-tie Edge Function)
+  async function notifyTie(tieId: string) {
+    const { data, error } = await supabase.functions.invoke('notify-tie', { body: { tie_id: tieId } });
+    if (error) {
+      alert(`알림 전송 실패: ${error.message}`);
+      return;
+    }
+    const sent = (data as { sent?: number })?.sent ?? 0;
+    alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
+  }
+
   // 본선(토너먼트) 생성 — 조별 상위 팀 진출 → knockout 타이 + 서브매치
   async function generateKnockout() {
     if (koTies.length > 0 || busy) return;
@@ -218,6 +235,26 @@ export default function TeamBracketTab() {
           <span className="text-slate-500">{w1} : {w2}{tie.status === 'done' ? ' · 종료' : ''}</span>
           <span className={tie.winner_team_id === tie.team2_id && tie.status === 'done' ? 'text-emerald-700' : ''}>{nameOf(tie.team2_id)}</span>
         </div>
+        {/* 코트 배정 + 차례 알림 (운영자, 진행 중 타이) */}
+        {ready && isOrganizer && tie.status !== 'done' && courts.length > 0 ? (
+          <div className="mt-2 flex items-center gap-2">
+            <select
+              value={tie.court_id ?? ''}
+              onChange={(e) => assignTieCourt(tie.id, e.target.value || null)}
+              className={`rounded border px-2 py-1 text-xs outline-none focus:border-emerald-500 ${tie.court_id ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
+            >
+              <option value="">코트 미배정</option>
+              {courts.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.indoor ? '실내' : '실외'})</option>
+              ))}
+            </select>
+            {tie.court_id ? (
+              <button onClick={() => notifyTie(tie.id)} className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700">차례 알림</button>
+            ) : null}
+          </div>
+        ) : tie.court_id ? (
+          <div className="mt-1 text-xs text-slate-500">🏟 {courts.find((c) => c.id === tie.court_id)?.name ?? '코트'}</div>
+        ) : null}
         {ready ? (
           <div className="mt-2 space-y-1.5">
             {tsubs.map((m) => (
