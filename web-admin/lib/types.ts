@@ -50,6 +50,9 @@ export type Tournament = {
   status: TournamentStatus;
   group_count: number | null;
   advance_per_group: number | null;
+  team_min_size: number; // 단체전: 팀당 최소 인원 (0037)
+  tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
+  tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)
   created_at: string;
 };
 

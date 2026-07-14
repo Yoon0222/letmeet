@@ -362,10 +362,62 @@ create table if not exists public.tournaments (
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
   group_count           int,                                  -- 조 개수 (대진 생성 시)
   advance_per_group     int,                                  -- 조별 진출 인원
+  team_min_size         int not null default 2,               -- 단체전: 팀당 최소 인원 (0037)
+  tie_singles           int not null default 2,               -- 단체전: 타이당 단식 매치 수 (0037)
+  tie_doubles           int not null default 1,               -- 단체전: 타이당 복식 매치 수 (0037)
   created_at            timestamptz not null default now()
 );
 create index if not exists tournaments_start_idx on public.tournaments (start_at);
 create index if not exists tournaments_region_idx on public.tournaments (region);
+
+-- 단체전 팀/팀원 (0037)
+create table if not exists public.tournament_teams (
+  id            uuid primary key default uuid_generate_v4(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  name          text not null,
+  captain_id    uuid not null references public.profiles(id) on delete cascade,
+  status        text not null default 'pending',  -- 'pending' | 'approved' | 'rejected'
+  seed          int,
+  created_at    timestamptz not null default now()
+);
+create index if not exists team_tournament_idx on public.tournament_teams (tournament_id);
+
+create table if not exists public.tournament_team_members (
+  team_id    uuid not null references public.tournament_teams(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (team_id, user_id)
+);
+create index if not exists team_member_user_idx on public.tournament_team_members (user_id);
+
+alter table public.tournament_teams enable row level security;
+alter table public.tournament_team_members enable row level security;
+
+drop policy if exists "teams_select" on public.tournament_teams;
+create policy "teams_select" on public.tournament_teams for select using (true);
+drop policy if exists "teams_insert_captain" on public.tournament_teams;
+create policy "teams_insert_captain" on public.tournament_teams for insert with check (auth.uid() = captain_id);
+drop policy if exists "teams_update_owner" on public.tournament_teams;
+create policy "teams_update_owner" on public.tournament_teams for update using (
+  auth.uid() = captain_id
+  or exists (select 1 from public.tournaments t where t.id = tournament_id and t.organizer_id = auth.uid())
+);
+drop policy if exists "teams_delete_owner" on public.tournament_teams;
+create policy "teams_delete_owner" on public.tournament_teams for delete using (
+  auth.uid() = captain_id
+  or exists (select 1 from public.tournaments t where t.id = tournament_id and t.organizer_id = auth.uid())
+);
+
+drop policy if exists "team_members_select" on public.tournament_team_members;
+create policy "team_members_select" on public.tournament_team_members for select using (true);
+drop policy if exists "team_members_insert_captain" on public.tournament_team_members;
+create policy "team_members_insert_captain" on public.tournament_team_members for insert with check (
+  exists (select 1 from public.tournament_teams tt where tt.id = team_id and tt.captain_id = auth.uid())
+);
+drop policy if exists "team_members_delete_captain" on public.tournament_team_members;
+create policy "team_members_delete_captain" on public.tournament_team_members for delete using (
+  exists (select 1 from public.tournament_teams tt where tt.id = team_id and tt.captain_id = auth.uid())
+);
 
 create table if not exists public.tournament_entries (
   tournament_id uuid not null references public.tournaments(id) on delete cascade,

@@ -148,7 +148,34 @@ export type Tournament = {
   status: TournamentStatus;
   group_count: number | null;
   advance_per_group: number | null;
+  team_min_size: number; // 단체전: 팀당 최소 인원 (0037)
+  tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
+  tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)
   created_at: string;
+};
+
+// ---- 단체전 팀 (0037) ----
+export type TeamStatus = 'pending' | 'approved' | 'rejected';
+
+export type TournamentTeam = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  captain_id: string;
+  status: TeamStatus;
+  seed: number | null;
+  created_at: string;
+};
+
+export type TournamentTeamMember = {
+  team_id: string;
+  user_id: string;
+  created_at: string;
+};
+
+/** 팀 + 팀원 프로필 (조인 결과) */
+export type TournamentTeamWithMembers = TournamentTeam & {
+  members: { user_id: string; profiles: PartnerProfile }[];
 };
 
 /** tournaments_with_counts 뷰 결과 */
@@ -382,6 +409,18 @@ export interface Database {
         Row: TournamentCourt;
         Insert: WriteDefaults<TournamentCourt> & { tournament_id: string; name: string };
         Update: WriteDefaults<TournamentCourt>;
+        Relationships: [];
+      };
+      tournament_teams: {
+        Row: TournamentTeam;
+        Insert: WriteDefaults<TournamentTeam> & { tournament_id: string; name: string; captain_id: string };
+        Update: WriteDefaults<TournamentTeam>;
+        Relationships: [];
+      };
+      tournament_team_members: {
+        Row: TournamentTeamMember;
+        Insert: { team_id: string; user_id: string };
+        Update: WriteDefaults<TournamentTeamMember>;
         Relationships: [];
       };
       courts: {
