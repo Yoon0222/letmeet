@@ -22,6 +22,7 @@ export default function TeamBracketTab() {
   const [subs, setSubs] = useState<TieMatch[]>([]);
   const [perGroup, setPerGroup] = useState(4);
   const [busy, setBusy] = useState(false);
+  const [score, setScore] = useState<Record<string, { s1: string; s2: string }>>({}); // 서브매치 점수 입력
 
   const load = useCallback(async () => {
     const [{ data: tm }, { data: ti }] = await Promise.all([
@@ -105,9 +106,21 @@ export default function TeamBracketTab() {
     load();
   }
 
-  // 서브매치 승자 지정 → 타이 승자 재계산
-  async function setSubResult(m: TieMatch, winner: 'team1' | 'team2') {
-    await supabase.from('tie_matches').update({ winner, status: 'done' }).eq('id', m.id);
+  // 서브매치 점수 입력 → 승자 도출 → 타이 승자 재계산
+  async function setSubScore(m: TieMatch) {
+    const sc = score[m.id];
+    const s1 = parseInt(sc?.s1 ?? (m.score1?.toString() ?? ''), 10);
+    const s2 = parseInt(sc?.s2 ?? (m.score2?.toString() ?? ''), 10);
+    if (isNaN(s1) || isNaN(s2)) {
+      alert('양 팀 점수를 입력하세요.');
+      return;
+    }
+    if (s1 === s2) {
+      alert('무승부는 없어요. 점수를 다르게 입력하세요.');
+      return;
+    }
+    const winner: 'team1' | 'team2' = s1 > s2 ? 'team1' : 'team2';
+    await supabase.from('tie_matches').update({ score1: s1, score2: s2, winner, status: 'done' }).eq('id', m.id);
     const updated = subs
       .filter((x) => x.tie_id === m.tie_id)
       .map((x) => (x.id === m.id ? { ...x, winner, status: 'done' as const } : x));
@@ -119,7 +132,6 @@ export default function TeamBracketTab() {
         .from('tournament_ties')
         .update({ winner_team_id: winnerTeamId, status: w ? 'done' : 'scheduled' })
         .eq('id', tie.id);
-      // 본선이면 승리 팀을 다음 라운드로 전파
       if (tie.phase === 'knockout') await advanceTeamKnockout(id);
     }
     load();
@@ -133,7 +145,7 @@ export default function TeamBracketTab() {
     for (let g = 1; g <= gc; g++) {
       const gt = groupTies.filter((x) => (x.group_no ?? 1) === g);
       const teamIds = [...new Set(gt.flatMap((x) => [x.team1_id, x.team2_id]).filter(Boolean) as string[])];
-      const st = teamStandings(teamIds, gt);
+      const st = teamStandings(teamIds, gt, subs);
       seeds.push(...st.slice(0, advanceCountForGroupSize(teamIds.length)).map((s) => s.teamId));
     }
     if (seeds.length < 2) {
@@ -210,14 +222,31 @@ export default function TeamBracketTab() {
           <div className="mt-2 space-y-1.5">
             {tsubs.map((m) => (
               <div key={m.id} className="flex items-center justify-between rounded-md bg-slate-50 px-2.5 py-1.5 text-sm">
-                <span className="text-slate-600">{m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}</span>
+                <span className="text-slate-600">
+                  {m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}
+                  {m.status === 'done' ? <span className="ml-1.5 text-xs text-slate-400">{m.winner === 'team1' ? nameOf(tie.team1_id) : nameOf(tie.team2_id)} 승</span> : null}
+                </span>
                 {isOrganizer ? (
-                  <div className="flex gap-1.5">
-                    <button onClick={() => setSubResult(m, 'team1')} className={`rounded px-2 py-0.5 text-xs font-medium ${m.winner === 'team1' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100'}`}>팀1 승</button>
-                    <button onClick={() => setSubResult(m, 'team2')} className={`rounded px-2 py-0.5 text-xs font-medium ${m.winner === 'team2' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100'}`}>팀2 승</button>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      value={score[m.id]?.s1 ?? (m.score1?.toString() ?? '')}
+                      onChange={(e) => setScore((p) => ({ ...p, [m.id]: { s1: e.target.value, s2: p[m.id]?.s2 ?? (m.score2?.toString() ?? '') } }))}
+                      className="w-12 rounded border border-slate-300 px-1.5 py-0.5 text-center text-xs"
+                    />
+                    <span className="text-slate-400">:</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={score[m.id]?.s2 ?? (m.score2?.toString() ?? '')}
+                      onChange={(e) => setScore((p) => ({ ...p, [m.id]: { s1: p[m.id]?.s1 ?? (m.score1?.toString() ?? ''), s2: e.target.value } }))}
+                      className="w-12 rounded border border-slate-300 px-1.5 py-0.5 text-center text-xs"
+                    />
+                    <button onClick={() => setSubScore(m)} className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-emerald-700">저장</button>
                   </div>
                 ) : (
-                  <span className="text-xs text-slate-500">{m.winner === 'team1' ? '팀1 승' : m.winner === 'team2' ? '팀2 승' : '예정'}</span>
+                  <span className="text-xs text-slate-500">{m.status === 'done' ? `${m.score1} : ${m.score2}` : '예정'}</span>
                 )}
               </div>
             ))}
@@ -260,13 +289,13 @@ export default function TeamBracketTab() {
       {groupNos.map((g) => {
         const gTies = groupTies.filter((x) => (x.group_no ?? 1) === g);
         const teamIds = [...new Set(gTies.flatMap((x) => [x.team1_id, x.team2_id]).filter(Boolean) as string[])];
-        const st = teamStandings(teamIds, gTies);
+        const st = teamStandings(teamIds, gTies, subs);
         return (
           <div key={g} className="rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="font-medium">{g}조</h3>
             <table className="mt-2 w-full text-sm">
               <thead className="text-left text-slate-500">
-                <tr><th className="py-1 font-medium">순위</th><th className="py-1 font-medium">팀</th><th className="py-1 font-medium">승</th><th className="py-1 font-medium">경기</th></tr>
+                <tr><th className="py-1 font-medium">순위</th><th className="py-1 font-medium">팀</th><th className="py-1 font-medium">승</th><th className="py-1 font-medium">득실</th><th className="py-1 font-medium">경기</th></tr>
               </thead>
               <tbody>
                 {st.map((s, i) => (
@@ -274,6 +303,7 @@ export default function TeamBracketTab() {
                     <td className="py-1">{i + 1}</td>
                     <td className="py-1 font-medium">{nameOf(s.teamId)}</td>
                     <td className="py-1">{s.wins}</td>
+                    <td className="py-1">{s.diff > 0 ? '+' : ''}{s.diff}</td>
                     <td className="py-1">{s.played}</td>
                   </tr>
                 ))}

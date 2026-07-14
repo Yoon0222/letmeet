@@ -73,8 +73,7 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
                   <View style={styles.subTop}>
                     <Text style={styles.subKind}>{m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}</Text>
                     <Text style={styles.subResult}>
-                      {m.winner === 'team1' ? nameOf(tie.team1_id) : m.winner === 'team2' ? nameOf(tie.team2_id) : '예정'}
-                      {m.winner ? ' 승' : ''}
+                      {m.status === 'done' && m.score1 != null ? `${m.score1} : ${m.score2}` : '예정'}
                     </Text>
                   </View>
                   {revealed && hasLineup ? (
@@ -100,12 +99,21 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
       {groupNos.map((g) => {
         const gt = groupTies.filter((x) => (x.group_no ?? 1) === g);
         const teamIds = [...new Set(gt.flatMap((x) => [x.team1_id, x.team2_id]).filter(Boolean) as string[])];
-        const wins = new Map<string, number>();
-        teamIds.forEach((tid) => wins.set(tid, 0));
+        // 팀 승수 + 득실 (서브매치 스코어 합산). 정렬: 승 → 득실 → 득점
+        const stat = new Map<string, { wins: number; pf: number; pa: number }>();
+        teamIds.forEach((tid) => stat.set(tid, { wins: 0, pf: 0, pa: 0 }));
         gt.forEach((tie) => {
-          if (tie.status === 'done' && tie.winner_team_id && wins.has(tie.winner_team_id)) wins.set(tie.winner_team_id, wins.get(tie.winner_team_id)! + 1);
+          if (tie.status !== 'done') return;
+          if (tie.winner_team_id && stat.has(tie.winner_team_id)) stat.get(tie.winner_team_id)!.wins++;
+          subs.filter((m) => m.tie_id === tie.id && m.status === 'done' && m.score1 != null && m.score2 != null).forEach((m) => {
+            const a = tie.team1_id ? stat.get(tie.team1_id) : undefined;
+            const b = tie.team2_id ? stat.get(tie.team2_id) : undefined;
+            if (a) { a.pf += m.score1!; a.pa += m.score2!; }
+            if (b) { b.pf += m.score2!; b.pa += m.score1!; }
+          });
         });
-        const ranked = [...teamIds].sort((a, b) => (wins.get(b) ?? 0) - (wins.get(a) ?? 0));
+        const diffOf = (tid: string) => (stat.get(tid)?.pf ?? 0) - (stat.get(tid)?.pa ?? 0);
+        const ranked = [...teamIds].sort((a, b) => (stat.get(b)!.wins - stat.get(a)!.wins) || (diffOf(b) - diffOf(a)) || (stat.get(b)!.pf - stat.get(a)!.pf));
         return (
           <View key={g} style={styles.section}>
             <Text style={styles.sectionTitle}>{g}조</Text>
@@ -114,7 +122,8 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
                 <View key={tid} style={[styles.standRow, i > 0 && styles.divider]}>
                   <Text style={styles.rank}>{i + 1}</Text>
                   <Text style={styles.standName} numberOfLines={1}>{nameOf(tid)}</Text>
-                  <Text style={styles.standWins}>{wins.get(tid) ?? 0}승</Text>
+                  <Text style={styles.standDiff}>{diffOf(tid) > 0 ? '+' : ''}{diffOf(tid)}</Text>
+                  <Text style={styles.standWins}>{stat.get(tid)?.wins ?? 0}승</Text>
                 </View>
               ))}
             </View>
@@ -151,7 +160,8 @@ const styles = StyleSheet.create({
   divider: { borderTopWidth: 1, borderTopColor: '#F1F3F5' },
   rank: { width: 18, fontSize: 13, fontWeight: '700', color: '#6B7280', textAlign: 'center' },
   standName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111827' },
-  standWins: { fontSize: 13, fontWeight: '700', color: '#16C784' },
+  standDiff: { fontSize: 12, color: '#6B7280', minWidth: 34, textAlign: 'right' },
+  standWins: { fontSize: 13, fontWeight: '700', color: '#16C784', minWidth: 34, textAlign: 'right' },
   tie: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, borderCurve: 'continuous', padding: 12 },
   tieHead: { flexDirection: 'row', alignItems: 'center' },
   tieName: { flex: 1, fontSize: 14, fontWeight: '700', color: '#111827' },
