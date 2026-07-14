@@ -475,6 +475,34 @@ create policy "tie_matches_write_organizer" on public.tie_matches for all using 
           where tt.id = tie_id and t.organizer_id = auth.uid())
 );
 
+-- 오더(라인업): 주장이 자기 팀 서브매치 출전 선수 지정 (0040)
+create or replace function public.set_tie_lineup(p_tie_match uuid, p_side text, p_players uuid[])
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_ok boolean;
+begin
+  if p_side not in ('team1', 'team2') then
+    raise exception 'invalid side';
+  end if;
+  select exists (
+    select 1 from public.tie_matches tm
+    join public.tournament_ties tt on tt.id = tm.tie_id
+    join public.tournament_teams team
+      on team.id = (case when p_side = 'team1' then tt.team1_id else tt.team2_id end)
+    where tm.id = p_tie_match and team.captain_id = auth.uid()
+  ) into v_ok;
+  if not v_ok then raise exception 'not captain of this side'; end if;
+  if p_side = 'team1' then
+    update public.tie_matches set team1_players = p_players where id = p_tie_match;
+  else
+    update public.tie_matches set team2_players = p_players where id = p_tie_match;
+  end if;
+end;
+$$;
+
 create table if not exists public.tournament_entries (
   tournament_id uuid not null references public.tournaments(id) on delete cascade,
   user_id       uuid not null references public.profiles(id) on delete cascade,

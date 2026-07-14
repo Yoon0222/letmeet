@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { TeamLineup } from '@/components/team-lineup';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -180,6 +181,8 @@ export function TeamRegister({
           {isCaptain && canRegister && myTeam.status !== 'approved' ? (
             <Button title="팀 신청 취소" variant="outline" onPress={confirmCancel} loading={acting} style={{ marginTop: Spacing.two }} />
           ) : null}
+          {/* 주장: 확정 팀이면 오더(라인업) 배정 */}
+          {isCaptain && myTeam.status === 'approved' ? <TeamLineup team={myTeam} /> : null}
         </View>
       ) : canRegister ? (
         <View style={styles.section}>

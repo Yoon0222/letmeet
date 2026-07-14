@@ -528,6 +528,7 @@ export interface Database {
     };
     Functions: {
       delete_account: { Args: Record<string, never>; Returns: undefined };
+      set_tie_lineup: { Args: { p_tie_match: string; p_side: string; p_players: string[] }; Returns: undefined };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

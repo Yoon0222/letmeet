@@ -3,21 +3,24 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import type { TieMatch, TournamentTeam, TournamentTie } from '@/lib/types';
+import type { TieMatch, TournamentTeamWithMembers, TournamentTie } from '@/lib/types';
 
-// 단체전 대진 표시 (읽기전용) — 조별 팀 순위 + 타이·서브매치 결과 + 본선.
+// 단체전 대진 표시 (읽기전용) — 조별 팀 순위 + 타이·서브매치 결과·오더 + 본선.
 export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
-  const [teams, setTeams] = useState<TournamentTeam[]>([]);
+  const [teams, setTeams] = useState<TournamentTeamWithMembers[]>([]);
   const [ties, setTies] = useState<TournamentTie[]>([]);
   const [subs, setSubs] = useState<TieMatch[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data: tm }, { data: ti }] = await Promise.all([
-      supabase.from('tournament_teams').select('*').eq('tournament_id', tournamentId),
+      supabase
+        .from('tournament_teams')
+        .select('*, members:tournament_team_members(user_id, profiles(id, nickname, skill_level, avatar_url, region))')
+        .eq('tournament_id', tournamentId),
       supabase.from('tournament_ties').select('*').eq('tournament_id', tournamentId).order('slot', { ascending: true }),
     ]);
-    setTeams((tm as TournamentTeam[]) ?? []);
+    setTeams((tm as unknown as TournamentTeamWithMembers[]) ?? []);
     const tieList = (ti as TournamentTie[]) ?? [];
     setTies(tieList);
     if (tieList.length > 0) {
@@ -36,6 +39,10 @@ export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
   if (!loaded || ties.length === 0) return null;
 
   const nameOf = (teamId: string | null) => teams.find((x) => x.id === teamId)?.name ?? '미정';
+  // uid -> 닉네임 (오더 표시용)
+  const playerName = new Map<string, string>();
+  teams.forEach((t) => t.members?.forEach((m) => playerName.set(m.user_id, m.profiles?.nickname ?? '?')));
+  const lineup = (ids: string[]) => ids.map((id) => playerName.get(id) ?? '?').join('·');
   const groupTies = ties.filter((x) => x.phase === 'group');
   const groupNos = [...new Set(groupTies.map((x) => x.group_no ?? 1))].sort((a, b) => a - b);
   const koTies = ties.filter((x) => x.phase === 'knockout').sort((a, b) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot);
@@ -55,15 +62,25 @@ export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
         </View>
         {tie.team1_id && tie.team2_id ? (
           <View style={{ gap: 4, marginTop: 6 }}>
-            {tsubs.map((m) => (
-              <View key={m.id} style={styles.sub}>
-                <Text style={styles.subKind}>{m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}</Text>
-                <Text style={styles.subResult}>
-                  {m.winner === 'team1' ? nameOf(tie.team1_id) : m.winner === 'team2' ? nameOf(tie.team2_id) : '예정'}
-                  {m.winner ? ' 승' : ''}
-                </Text>
-              </View>
-            ))}
+            {tsubs.map((m) => {
+              const hasLineup = m.team1_players.length > 0 || m.team2_players.length > 0;
+              return (
+                <View key={m.id} style={styles.sub}>
+                  <View style={styles.subTop}>
+                    <Text style={styles.subKind}>{m.kind === 'singles' ? '단식' : '복식'} {m.slot + 1}</Text>
+                    <Text style={styles.subResult}>
+                      {m.winner === 'team1' ? nameOf(tie.team1_id) : m.winner === 'team2' ? nameOf(tie.team2_id) : '예정'}
+                      {m.winner ? ' 승' : ''}
+                    </Text>
+                  </View>
+                  {hasLineup ? (
+                    <Text style={styles.lineup}>
+                      {m.team1_players.length ? lineup(m.team1_players) : '미정'} vs {m.team2_players.length ? lineup(m.team2_players) : '미정'}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : (
           <Text style={styles.pending}>양 팀 확정 대기 중</Text>
@@ -135,9 +152,11 @@ const styles = StyleSheet.create({
   right: { textAlign: 'right' },
   win: { color: '#16A34A' },
   tieScore: { fontSize: 14, fontWeight: '800', color: '#6B7280', paddingHorizontal: 10 },
-  sub: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F6F7F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  sub: { backgroundColor: '#F6F7F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, gap: 2 },
+  subTop: { flexDirection: 'row', justifyContent: 'space-between' },
   subKind: { fontSize: 13, color: '#6B7280' },
   subResult: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  lineup: { fontSize: 12, color: '#6B7280' },
   pending: { fontSize: 12, color: '#9CA3AF', marginTop: 6 },
   roundLabel: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
 });
