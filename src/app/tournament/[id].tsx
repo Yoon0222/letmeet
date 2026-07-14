@@ -177,7 +177,8 @@ export default function TournamentDetail() {
   const hasBracket = drawGenerated && drawRevealed;
   const tabItems: { key: 'info' | 'prelim' | 'final'; label: string }[] = [
     { key: 'info', label: '정보' },
-    ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: '예선' }] : []),
+    // KDK 는 조별 풀리그 개인순위가 결과라 '순위' 로 표기 (본선 없음)
+    ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: t?.format === 'kdk' ? '순위' : '예선' }] : []),
     ...(koMatches.length > 0 ? [{ key: 'final' as const, label: '본선' }] : []),
   ];
 

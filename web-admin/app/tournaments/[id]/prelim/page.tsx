@@ -29,8 +29,8 @@ export default function PrelimTab() {
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
 
-  // KDK·단체전은 전용 진행 화면을 쓴다 (조별리그+토너먼트 엔진 미적용)
-  if (t.format !== 'group_knockout') {
+  // 단체전은 전용 진행 화면을 쓴다 (준비 중). KDK 는 조별 풀리그(본선 없음)로 여기서 진행.
+  if (t.format === 'team') {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
         이 대회는 <b>{TOURNAMENT_FORMAT_LABELS[t.format]}</b> 방식이에요. 전용 진행 화면은 준비 중입니다.
@@ -38,6 +38,7 @@ export default function PrelimTab() {
     );
   }
 
+  const isKdk = t.format === 'kdk'; // KDK: 조별 풀리그 + 개인 순위 (본선 없음)
   const isOrganizer = t.organizer_id === session?.user.id;
   const unit = t.discipline === 'doubles' ? '팀' : '명';
   const approved = entries.filter((e) => e.status === 'approved');
@@ -136,11 +137,16 @@ export default function PrelimTab() {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         {approved.length < 2 ? (
-          <p className="text-sm text-slate-500">참가 승인이 2{unit} 이상이면 조별리그를 만들 수 있어요.</p>
+          <p className="text-sm text-slate-500">참가 승인이 2{unit} 이상이면 {isKdk ? '순위전' : '조별리그'}을 만들 수 있어요.</p>
         ) : !isOrganizer ? (
           <p className="text-sm text-slate-500">아직 대진이 생성되지 않았습니다.</p>
         ) : (
           <div className="flex flex-wrap items-end gap-3">
+            {isKdk && (
+              <p className="w-full text-sm text-slate-600">
+                KDK 개인전 — 조 안에서 전원이 서로 한 번씩 겨루고 <b>개인 성적(승·득실)으로 순위</b>를 매깁니다. 조당 인원이 참가 인원과 같으면 전체가 한 조로 겨룹니다.
+              </p>
+            )}
             <label className="text-sm">
               <span className="mb-1 block text-slate-600">
                 조당 {t.discipline === 'doubles' ? '팀 수' : '인원'} (승인 {approved.length}{unit})
@@ -148,11 +154,13 @@ export default function PrelimTab() {
               <input type="number" min={2} value={perGroupInput} onChange={(e) => setPerGroupInput(Number(e.target.value))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             </label>
             <button onClick={generateGroups} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-              조별리그 생성 ({groupCountForSize(approved.length, Math.max(2, perGroupInput))}개 조)
+              {isKdk ? '순위전 대진 생성' : '조별리그 생성'} ({groupCountForSize(approved.length, Math.max(2, perGroupInput))}개 조)
             </button>
-            <button onClick={generateStraightKnockout} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
-              조별리그 없이 바로 본선
-            </button>
+            {!isKdk && (
+              <button onClick={generateStraightKnockout} className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
+                조별리그 없이 바로 본선
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -183,6 +191,11 @@ export default function PrelimTab() {
 
   return (
     <div>
+      {isKdk && (
+        <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-100">
+          🏆 KDK 개인전 — 아래 <b>조별 순위표가 곧 최종 결과</b>입니다 (별도 본선 없음). 모든 경기 결과를 입력하면 순위가 확정돼요.
+        </p>
+      )}
       {/* 조추첨 선수 공개 안내 */}
       <p className="mb-3 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-700 ring-1 ring-sky-100">
         🔒 선수에게는 <b>{revealAt.getMonth() + 1}월 {revealAt.getDate()}일 오후 7시</b>에 공개돼요 (전날 19:00). 운영자는 지금 편성·수정할 수 있어요.

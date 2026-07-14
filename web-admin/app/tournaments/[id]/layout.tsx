@@ -23,10 +23,19 @@ function Header() {
   const isOrganizer = t.organizer_id === session?.user.id;
   const unit = t.discipline === 'doubles' ? '팀' : '명';
   const base = `/tournaments/${id}`;
+  // 진행 방식별 탭: KDK=순위전(본선 없음), 단체전=신청현황만(엔진 준비중), 그 외=예선+본선
+  const progressTabs =
+    t.format === 'kdk'
+      ? [{ href: `${base}/prelim`, label: '순위전' }]
+      : t.format === 'team'
+        ? []
+        : [
+            { href: `${base}/prelim`, label: '예선' },
+            { href: `${base}/final`, label: '본선' },
+          ];
   const tabs = [
     { href: base, label: '신청현황' },
-    { href: `${base}/prelim`, label: '예선' },
-    { href: `${base}/final`, label: '본선' },
+    ...progressTabs,
     ...(courts.length > 0 ? [{ href: `${base}/courts`, label: '코트배정' }] : []),
   ];
 
