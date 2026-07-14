@@ -16,9 +16,11 @@ import type { PartnerProfile, TournamentTeamWithMembers, TournamentWithCounts } 
 export function TeamRegister({
   tournament,
   uid,
+  onChange,
 }: {
   tournament: TournamentWithCounts;
   uid: string | undefined;
+  onChange?: () => void;
 }) {
   const id = tournament.id;
   const canRegister = tournament.status === 'registration';
@@ -182,7 +184,7 @@ export function TeamRegister({
             <Button title="팀 신청 취소" variant="outline" onPress={confirmCancel} loading={acting} style={{ marginTop: Spacing.two }} />
           ) : null}
           {/* 주장: 확정 팀이면 오더(라인업) 배정 */}
-          {isCaptain && myTeam.status === 'approved' ? <TeamLineup team={myTeam} /> : null}
+          {isCaptain && myTeam.status === 'approved' ? <TeamLineup team={myTeam} onChange={onChange} /> : null}
         </View>
       ) : canRegister ? (
         <View style={styles.section}>

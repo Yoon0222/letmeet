@@ -433,6 +433,8 @@ create table if not exists public.tournament_ties (
   winner_team_id uuid references public.tournament_teams(id) on delete set null,
   status         text not null default 'scheduled',
   court_id       uuid references public.tournament_courts(id) on delete set null,
+  team1_lineup_ready boolean not null default false,  -- 오더 제출(잠금) (0041)
+  team2_lineup_ready boolean not null default false,
   created_at     timestamptz not null default now()
 );
 create index if not exists ties_tournament_idx on public.tournament_ties (tournament_id);
@@ -475,7 +477,7 @@ create policy "tie_matches_write_organizer" on public.tie_matches for all using 
           where tt.id = tie_id and t.organizer_id = auth.uid())
 );
 
--- 오더(라인업): 주장이 자기 팀 서브매치 출전 선수 지정 (0040)
+-- 오더(라인업): 주장이 자기 팀 서브매치 출전 선수 지정 (0040/0041). 제출 후 수정 불가.
 create or replace function public.set_tie_lineup(p_tie_match uuid, p_side text, p_players uuid[])
 returns void
 language plpgsql
@@ -483,10 +485,9 @@ security definer set search_path = public
 as $$
 declare
   v_ok boolean;
+  v_ready boolean;
 begin
-  if p_side not in ('team1', 'team2') then
-    raise exception 'invalid side';
-  end if;
+  if p_side not in ('team1', 'team2') then raise exception 'invalid side'; end if;
   select exists (
     select 1 from public.tie_matches tm
     join public.tournament_ties tt on tt.id = tm.tie_id
@@ -495,10 +496,43 @@ begin
     where tm.id = p_tie_match and team.captain_id = auth.uid()
   ) into v_ok;
   if not v_ok then raise exception 'not captain of this side'; end if;
+  select (case when p_side = 'team1' then tt.team1_lineup_ready else tt.team2_lineup_ready end) into v_ready
+  from public.tie_matches tm join public.tournament_ties tt on tt.id = tm.tie_id where tm.id = p_tie_match;
+  if v_ready then raise exception 'lineup already submitted'; end if;
   if p_side = 'team1' then
     update public.tie_matches set team1_players = p_players where id = p_tie_match;
   else
     update public.tie_matches set team2_players = p_players where id = p_tie_match;
+  end if;
+end;
+$$;
+
+-- 오더 제출(잠금): 모든 서브매치 라인업 완성 시 제출 (0041). 양 팀 제출 시 공개.
+create or replace function public.submit_tie_lineup(p_tie uuid, p_side text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_cap boolean;
+  v_incomplete int;
+begin
+  if p_side not in ('team1', 'team2') then raise exception 'invalid side'; end if;
+  select exists (
+    select 1 from public.tournament_ties tt
+    join public.tournament_teams team on team.id = (case when p_side = 'team1' then tt.team1_id else tt.team2_id end)
+    where tt.id = p_tie and team.captain_id = auth.uid()
+  ) into v_cap;
+  if not v_cap then raise exception 'not captain of this side'; end if;
+  select count(*) into v_incomplete from public.tie_matches tm
+  where tm.tie_id = p_tie
+    and coalesce(array_length(case when p_side = 'team1' then tm.team1_players else tm.team2_players end, 1), 0)
+        <> (case when tm.kind = 'singles' then 1 else 2 end);
+  if v_incomplete > 0 then raise exception 'lineup incomplete'; end if;
+  if p_side = 'team1' then
+    update public.tournament_ties set team1_lineup_ready = true where id = p_tie;
+  else
+    update public.tournament_ties set team2_lineup_ready = true where id = p_tie;
   end if;
 end;
 $$;

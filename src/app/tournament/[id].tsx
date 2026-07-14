@@ -52,6 +52,7 @@ export default function TournamentDetail() {
   const [groupTab, setGroupTab] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
+  const [teamRev, setTeamRev] = useState(0); // 단체전 오더 저장 시 대진뷰 새로고침 트리거
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -456,8 +457,8 @@ export default function TournamentDetail() {
 
             {isTeam ? (
               <>
-                <TeamRegister tournament={t} uid={uid} />
-                <TeamBracketView tournamentId={t.id} />
+                <TeamRegister tournament={t} uid={uid} onChange={() => setTeamRev((v) => v + 1)} />
+                <TeamBracketView tournamentId={t.id} refreshKey={teamRev} />
               </>
             ) : (
             <View style={styles.section}>

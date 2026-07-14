@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase';
 import type { TieMatch, TournamentTeamWithMembers, TournamentTie } from '@/lib/types';
 
 // 단체전 대진 표시 (읽기전용) — 조별 팀 순위 + 타이·서브매치 결과·오더 + 본선.
-export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
+// 오더는 양 팀 모두 제출해야(블라인드) 공개된다.
+export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId: string; refreshKey?: number }) {
   const [teams, setTeams] = useState<TournamentTeamWithMembers[]>([]);
   const [ties, setTies] = useState<TournamentTie[]>([]);
   const [subs, setSubs] = useState<TieMatch[]>([]);
@@ -31,9 +32,10 @@ export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
   }, [tournamentId]);
 
   useEffect(() => {
+    // refreshKey 변경 시(오더 저장 등) 다시 로드
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   // 진행 전이면 아무것도 안 보임
   if (!loaded || ties.length === 0) return null;
@@ -53,6 +55,8 @@ export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
     const w1 = tsubs.filter((x) => x.winner === 'team1').length;
     const w2 = tsubs.filter((x) => x.winner === 'team2').length;
     const done = tie.status === 'done';
+    // 오더는 양 팀 모두 제출해야 공개 (또는 경기 종료 시)
+    const revealed = (tie.team1_lineup_ready && tie.team2_lineup_ready) || done;
     return (
       <View style={styles.tie}>
         <View style={styles.tieHead}>
@@ -73,10 +77,12 @@ export function TeamBracketView({ tournamentId }: { tournamentId: string }) {
                       {m.winner ? ' 승' : ''}
                     </Text>
                   </View>
-                  {hasLineup ? (
+                  {revealed && hasLineup ? (
                     <Text style={styles.lineup}>
                       {m.team1_players.length ? lineup(m.team1_players) : '미정'} vs {m.team2_players.length ? lineup(m.team2_players) : '미정'}
                     </Text>
+                  ) : !revealed && (tie.team1_lineup_ready || tie.team2_lineup_ready) ? (
+                    <Text style={styles.lineupHidden}>오더 미공개 (양 팀 제출 후 공개)</Text>
                   ) : null}
                 </View>
               );
@@ -157,6 +163,7 @@ const styles = StyleSheet.create({
   subKind: { fontSize: 13, color: '#6B7280' },
   subResult: { fontSize: 13, fontWeight: '600', color: '#111827' },
   lineup: { fontSize: 12, color: '#6B7280' },
+  lineupHidden: { fontSize: 12, color: '#9CA3AF', fontStyle: 'italic' },
   pending: { fontSize: 12, color: '#9CA3AF', marginTop: 6 },
   roundLabel: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
 });

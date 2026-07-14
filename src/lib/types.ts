@@ -195,6 +195,8 @@ export type TournamentTie = {
   winner_team_id: string | null;
   status: MatchStatus; // 'scheduled' | 'done'
   court_id: string | null;
+  team1_lineup_ready: boolean; // 오더 제출 잠금 (0041)
+  team2_lineup_ready: boolean;
   created_at: string;
 };
 
@@ -529,6 +531,7 @@ export interface Database {
     Functions: {
       delete_account: { Args: Record<string, never>; Returns: undefined };
       set_tie_lineup: { Args: { p_tie_match: string; p_side: string; p_players: string[] }; Returns: undefined };
+      submit_tie_lineup: { Args: { p_tie: string; p_side: string }; Returns: undefined };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

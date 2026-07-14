@@ -119,6 +119,8 @@ export type TournamentTie = {
   winner_team_id: string | null;
   status: 'scheduled' | 'done';
   court_id: string | null;
+  team1_lineup_ready: boolean; // 오더 제출 잠금 (0041)
+  team2_lineup_ready: boolean;
   created_at: string;
 };
 
