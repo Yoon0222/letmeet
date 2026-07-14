@@ -52,32 +52,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data ?? null);
   }, []);
 
+  // 세션 초기화 — 스플래시는 '세션 확인'까지만 기다린다 (프로필은 뒤에서 백그라운드 로드).
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      if (data.session?.user) {
-        await loadProfile(data.session.user.id);
-      }
-      setInitializing(false);
-    });
+    // 안전장치: 세션 조회가 어떤 이유로든 안 끝나도 스플래시가 영구히 멈추지 않도록.
+    const safety = setTimeout(() => {
+      if (mounted) setInitializing(false);
+    }, 8000);
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (mounted) setSession(data.session);
+      })
+      .catch((e) => {
+        console.warn('[auth] 세션 확인 실패:', e?.message ?? e);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        clearTimeout(safety);
+        setInitializing(false);
+      });
+
+    // ⚠️ onAuthStateChange 콜백 안에서 다른 supabase 호출을 await 하면 내부 auth 락과
+    // 교착(deadlock)이 생겨 부팅이 무한로딩에 걸릴 수 있다 → 여기선 세션만 동기로 반영하고,
+    // 프로필은 아래 별도 effect 가 세션 변화에 맞춰 백그라운드로 로드한다.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
       setSession(newSession);
-      if (newSession?.user) {
-        await loadProfile(newSession.user.id);
-      } else {
-        setProfile(null);
-      }
+      if (!newSession) setProfile(null);
+      setInitializing(false);
     });
 
     return () => {
       mounted = false;
+      clearTimeout(safety);
       sub.subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, []);
+
+  // 세션 사용자에 맞춰 프로필을 백그라운드 로드 (스플래시를 막지 않음)
+  useEffect(() => {
+    const uid = session?.user?.id;
+    // loadProfile 은 비동기(await 후 setProfile)라 동기 cascading 렌더가 아니다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (uid) loadProfile(uid);
+  }, [session?.user?.id, loadProfile]);
 
   // 로그인한 기기의 Expo 푸시 토큰을 등록·저장 (내 경기 알림용). 실기기에서만 동작.
   useEffect(() => {
