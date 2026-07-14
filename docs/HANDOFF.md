@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-11 (Claude: tester feedback fixes + club photo/approval)
+Last updated: 2026-07-14 (Claude: 부팅 무한로딩 수정 + DB 점검)
 
 ## Purpose
 
@@ -22,6 +22,25 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-07-14, 부팅 무한로딩 수정 + DB 점검)
+
+What changed:
+
+- **부팅 무한로딩(스플래시 멈춤) 수정** (커밋 a219d10, `src/contexts/auth.tsx`):
+  - 원인: `onAuthStateChange` 콜백이 async 로 supabase 쿼리(loadProfile)를 await → supabase-js auth 락 + 토큰갱신 타이밍과 겹치면 교착. `getSession().then` 이 안 끝나 `setInitializing(false)` 미호출 → 무한 스플래시. getSession `.catch` 부재도 원인.
+  - 수정: initializing 을 프로필 로드와 분리(세션 확인 즉시 해제) · onAuthStateChange 콜백에서 supabase await 제거(세션만 동기) · 프로필은 별도 effect 백그라운드 로드 · getSession `.catch/.finally` + 8초 안전 타임아웃.
+  - 검증: 웹 프리뷰 세션복원 리로드 4회 연속 홈 정상.
+- **DB 점검**: 사용자가 0031~0035 를 개발·운영 DB 양쪽에 실행 완료 확인(anon PostgREST 프로브). 테이블/뷰 19/19, 최근 컬럼·버킷 모두 반영됨.
+
+Files touched: `src/contexts/auth.tsx`.
+
+Validation: `npx tsc --noEmit` 통과, `npx expo lint` 통과, 웹 프리뷰 부팅 4회 확인.
+
+Follow-ups:
+
+- 이 수정은 native 토큰갱신 타이밍 버그라 웹 100% 재현은 어렵지만 구조적으로 3개 실패경로 다 차단 → 다음 프로덕션 빌드에 포함 필요.
+- 다음 단계: 프로덕션 재빌드(Android versionCode↑ / iOS buildNumber↑) — 그동안의 클럽/번개/파트너/부팅 수정 전부 포함.
 
 ### Claude -> Codex (2026-07-11, tester feedback fixes + club photo/approval)
 
@@ -1123,3 +1142,15 @@ Test Supabase migration status check:
   - `0034_meetup_image`: `meetups.image_url`.
   - `0035_notify_join_request`: likely not effectively applied because it depends on `status` columns from `0032`/`0033`.
 - Recommendation: apply only migrations `0032` through `0035` to the test DB first, then verify, then apply to production. Do not rerun full `schema.sql` on production.
+
+Production Supabase migration status check:
+
+- Production Supabase project checked via anon key: `https://jbvtdthtmrlndduqiikj.supabase.co`.
+- Representative probes show production has more recent schema than test.
+- Present on production:
+  - `0032_club_approval`: `clubs.require_approval`, `club_members.status`.
+  - `0033_meetup_fee_approval`: `meetups.fee`, `meetups.require_approval`, `meetup_participants.status`.
+- Missing on production:
+  - `0034_meetup_image`: `meetups.image_url`.
+- `0035_notify_join_request` cannot be fully verified through anon-column probes; it is function/trigger based. It depends on the `status` columns from `0032`/`0033`, which are present in production.
+- Production counts at check time: `profiles = 12`, `courts = 4`, `meetups = 4`, `clubs = 8`.
