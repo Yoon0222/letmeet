@@ -28,7 +28,7 @@ function Header() {
     t.format === 'kdk'
       ? [{ href: `${base}/prelim`, label: '순위전' }]
       : t.format === 'team'
-        ? []
+        ? [{ href: `${base}/team`, label: '팀 대진' }]
         : [
             { href: `${base}/prelim`, label: '예선' },
             { href: `${base}/final`, label: '본선' },
