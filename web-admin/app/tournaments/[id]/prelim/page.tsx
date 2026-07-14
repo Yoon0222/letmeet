@@ -15,7 +15,7 @@ import {
 import { autoAdvanceCourts } from '@/lib/court-assign';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
-import type { TournamentMatch } from '@/lib/types';
+import { TOURNAMENT_FORMAT_LABELS, type TournamentMatch } from '@/lib/types';
 
 import { useTournament } from '../_ctx';
 
@@ -28,6 +28,15 @@ export default function PrelimTab() {
 
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
   if (!t) return <p className="text-slate-500">대회를 찾을 수 없습니다.</p>;
+
+  // KDK·단체전은 전용 진행 화면을 쓴다 (조별리그+토너먼트 엔진 미적용)
+  if (t.format !== 'group_knockout') {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        이 대회는 <b>{TOURNAMENT_FORMAT_LABELS[t.format]}</b> 방식이에요. 전용 진행 화면은 준비 중입니다.
+      </div>
+    );
+  }
 
   const isOrganizer = t.organizer_id === session?.user.id;
   const unit = t.discipline === 'doubles' ? '팀' : '명';

@@ -115,6 +115,21 @@ export type TournamentStatus = 'registration' | 'ongoing' | 'finished' | 'cancel
 export type EntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'waitlist';
 export type Discipline = 'singles' | 'doubles';
 
+// 대회 진행 방식 (0036)
+export type TournamentFormat = 'group_knockout' | 'kdk' | 'team';
+
+export const TOURNAMENT_FORMAT_LABELS: Record<TournamentFormat, string> = {
+  group_knockout: '조별리그 + 토너먼트',
+  kdk: 'KDK 개인전',
+  team: '단체전',
+};
+
+export const TOURNAMENT_FORMAT_DESC: Record<TournamentFormat, string> = {
+  group_knockout: '조별 예선을 거쳐 상위 진출자가 토너먼트 본선을 치릅니다.',
+  kdk: '파트너를 바꿔가며 여러 경기를 치르고 개인 성적으로 순위를 매깁니다.',
+  team: '팀(단체)끼리 여러 경기를 묶어 겨루고 팀 승수로 순위를 매깁니다.',
+};
+
 export type Tournament = {
   id: string;
   organizer_id: string;
@@ -129,7 +144,7 @@ export type Tournament = {
   skill_max: number;
   fee: number;
   discipline: Discipline;
-  format: string;
+  format: TournamentFormat;
   status: TournamentStatus;
   group_count: number | null;
   advance_per_group: number | null;

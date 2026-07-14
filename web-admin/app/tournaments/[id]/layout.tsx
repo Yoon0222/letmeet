@@ -8,7 +8,7 @@ import { Protected } from '@/components/protected';
 import { formatDateTime, skillRange, TOURNAMENT_STATUS_LABEL } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
-import type { TournamentStatus } from '@/lib/types';
+import { TOURNAMENT_FORMAT_LABELS, type TournamentStatus } from '@/lib/types';
 
 import { TournamentProvider, useTournament } from './_ctx';
 
@@ -42,6 +42,7 @@ function Header() {
           <span className="text-sm text-slate-500">{TOURNAMENT_STATUS_LABEL[t.status]}</span>
           <h1 className="text-2xl font-semibold">{t.title}</h1>
           <p className="mt-1 text-sm text-slate-500">
+            <span className="mr-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">{TOURNAMENT_FORMAT_LABELS[t.format]}</span>
             {t.discipline === 'doubles' ? '복식' : '단식'} · {formatDateTime(t.start_at)} · {t.venue || '장소 미정'}
             {t.region ? ` · ${t.region}` : ''} · 정원 {t.approved_count}/{t.max_participants}{unit}
             {' · '}실력 {skillRange(t.skill_min, t.skill_max)}

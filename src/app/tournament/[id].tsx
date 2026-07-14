@@ -15,6 +15,7 @@ import { useLoading } from '@/contexts/loading';
 import { groupMembers, standings } from '@/lib/bracket';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { TOURNAMENT_FORMAT_LABELS } from '@/lib/types';
 import type {
   EntryStatus,
   PartnerProfile,
@@ -299,6 +300,7 @@ export default function TournamentDetail() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.headerArea}>
         <View style={styles.badgeRow}>
+          <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#2D6BD6" bg="rgba(56,132,255,0.14)" />
           <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#7A4E00" bg="rgba(245,166,35,0.16)" />
           {t.status === 'registration' ? (
             <Badge label="접수중" />

@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { Protected } from '@/components/protected';
 import { supabase } from '@/lib/supabase';
+import { TOURNAMENT_FORMAT_DESC, TOURNAMENT_FORMAT_LABELS, type TournamentFormat } from '@/lib/types';
 import { useSession } from '@/lib/use-session';
 
 function toIso(local: string): string | null {
@@ -30,6 +31,7 @@ function NewTournamentInner() {
   const { session } = useSession();
 
   const [title, setTitle] = useState('');
+  const [format, setFormat] = useState<TournamentFormat>('group_knockout');
   const [discipline, setDiscipline] = useState<'singles' | 'doubles'>('singles');
   const [venue, setVenue] = useState('');
   const [region, setRegion] = useState('');
@@ -119,6 +121,7 @@ function NewTournamentInner() {
       .insert({
         organizer_id: uid,
         title: title.trim(),
+        format,
         discipline,
         venue: venue.trim(),
         region: region.trim(),
@@ -158,6 +161,16 @@ function NewTournamentInner() {
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <Field label="대회 제목">
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 2026 송파 오픈 복식" maxLength={50} />
+        </Field>
+        <Field label="진행 방식">
+          <select className={inputCls} value={format} onChange={(e) => setFormat(e.target.value as TournamentFormat)}>
+            {(Object.keys(TOURNAMENT_FORMAT_LABELS) as TournamentFormat[]).map((f) => (
+              <option key={f} value={f}>
+                {TOURNAMENT_FORMAT_LABELS[f]}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">{TOURNAMENT_FORMAT_DESC[format]}</p>
         </Field>
         <Field label="종목">
           <select className={inputCls} value={discipline} onChange={(e) => setDiscipline(e.target.value as 'singles' | 'doubles')}>

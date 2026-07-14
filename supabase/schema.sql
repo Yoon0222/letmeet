@@ -357,7 +357,8 @@ create table if not exists public.tournaments (
   fee                   int not null default 0,          -- 참가비(원)
   discipline            text not null default 'singles'  -- 'singles' | 'doubles'
                         check (discipline in ('singles', 'doubles')),
-  format                text not null default 'single_elim',  -- 대진 방식(추후)
+  format                text not null default 'group_knockout' -- 진행 방식 (0036): group_knockout | kdk | team
+                        check (format in ('group_knockout', 'kdk', 'team')),
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
   group_count           int,                                  -- 조 개수 (대진 생성 시)
   advance_per_group     int,                                  -- 조별 진출 인원
