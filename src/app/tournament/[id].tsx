@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BracketTree } from '@/components/bracket-tree';
+import { TeamBracketView } from '@/components/team-bracket-view';
 import { TeamRegister } from '@/components/team-register';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -454,7 +455,10 @@ export default function TournamentDetail() {
             )}
 
             {isTeam ? (
-              <TeamRegister tournament={t} uid={uid} />
+              <>
+                <TeamRegister tournament={t} uid={uid} />
+                <TeamBracketView tournamentId={t.id} />
+              </>
             ) : (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
