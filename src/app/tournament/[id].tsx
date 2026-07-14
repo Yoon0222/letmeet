@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BracketTree } from '@/components/bracket-tree';
+import { TeamRegister } from '@/components/team-register';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -98,6 +99,7 @@ export default function TournamentDetail() {
   const approved = entries.filter((e) => e.status === 'approved');
   const canRegister = t?.status === 'registration';
   const isDoubles = t?.discipline === 'doubles';
+  const isTeam = t?.format === 'team'; // 단체전: 개인 신청 대신 팀 신청 UI
   const isOrganizer = !!t && t.organizer_id === uid;
 
   // 조추첨 공개: 시합 전날 오후 7시부터 선수에게 공개 (운영자는 항상)
@@ -361,7 +363,7 @@ export default function TournamentDetail() {
             </View>
 
             {/* 복식 파트너 검색·선택 — 신청 전에 정보 카드 바로 아래에 노출(발견성) */}
-            {canRegister && !myEntry && !iAmPartner && isDoubles && (
+            {canRegister && !myEntry && !iAmPartner && isDoubles && !isTeam && (
               <View style={styles.partnerCard}>
                 <View style={styles.partnerHead}>
                   <Ionicons name="people-circle" size={20} color="#16C784" />
@@ -451,6 +453,9 @@ export default function TournamentDetail() {
               </View>
             )}
 
+            {isTeam ? (
+              <TeamRegister tournament={t} uid={uid} />
+            ) : (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
                 참가자 {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
@@ -483,6 +488,7 @@ export default function TournamentDetail() {
                 )}
               </View>
             </View>
+            )}
 
             {/* 조추첨 미공개 (선수) */}
             {drawGenerated && !drawRevealed && drawRevealAt && (
@@ -565,6 +571,7 @@ export default function TournamentDetail() {
 
       </ScrollView>
 
+      {!isTeam && (
       <View style={styles.actionBar}>
         {myEntry ? (
           <View style={{ gap: 8 }}>
@@ -612,6 +619,7 @@ export default function TournamentDetail() {
           <Button title="접수가 마감되었어요" variant="secondary" disabled onPress={() => {}} />
         )}
       </View>
+      )}
     </SafeAreaView>
   );
 }
