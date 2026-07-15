@@ -34,6 +34,9 @@ export function MonthCalendar({ todayYmd, selected, onSelectDay, enabledDays, ma
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
+  // 7칸씩 주 단위로 묶어 각 주를 flex 행으로 렌더(네이티브 % 반올림 어긋남 방지)
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   const shift = (delta: number) => {
     const m = view.m + delta;
@@ -65,37 +68,35 @@ export function MonthCalendar({ todayYmd, selected, onSelectDay, enabledDays, ma
         ))}
       </View>
 
-      {/* 날짜 그리드 */}
-      <View style={styles.grid}>
-        {cells.map((d, idx) => {
-          if (d == null) return <View key={`b${idx}`} style={styles.cell} />;
-          const key = toYmd(view.y, view.m, d);
-          const enabled = enabledDays.has(key);
-          const marked = markedDays?.has(key);
-          const isSel = key === selected;
-          const isToday = key === todayYmd;
-          return (
-            <Pressable
-              key={key}
-              disabled={!enabled}
-              onPress={() => onSelectDay(key)}
-              style={styles.cell}>
-              <View style={[styles.dayInner, isSel && { backgroundColor: theme.primary }, !isSel && marked && { backgroundColor: theme.backgroundElement }]}>
-                <Text
-                  style={[
-                    styles.dayText,
-                    { color: isSel ? '#fff' : enabled ? theme.text : theme.tabIconDefault },
-                    !enabled && styles.dayDisabled,
-                    isToday && !isSel && { color: theme.primary, fontWeight: '800' },
-                  ]}>
-                  {d}
-                </Text>
-                {marked && !isSel ? <View style={[styles.dot, { backgroundColor: theme.primary }]} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* 날짜 그리드 — 주 단위 flex 행 */}
+      {weeks.map((week, wi) => (
+        <View key={`w${wi}`} style={styles.weekGrid}>
+          {week.map((d, idx) => {
+            if (d == null) return <View key={`b${wi}-${idx}`} style={styles.cell} />;
+            const key = toYmd(view.y, view.m, d);
+            const enabled = enabledDays.has(key);
+            const marked = markedDays?.has(key);
+            const isSel = key === selected;
+            const isToday = key === todayYmd;
+            return (
+              <Pressable key={key} disabled={!enabled} onPress={() => onSelectDay(key)} style={styles.cell}>
+                <View style={[styles.dayInner, isSel && { backgroundColor: theme.primary }, !isSel && marked && { backgroundColor: theme.backgroundElement }]}>
+                  <Text
+                    style={[
+                      styles.dayText,
+                      { color: isSel ? '#fff' : enabled ? theme.text : theme.tabIconDefault },
+                      !enabled && styles.dayDisabled,
+                      isToday && !isSel && { color: theme.primary, fontWeight: '800' },
+                    ]}>
+                    {d}
+                  </Text>
+                  {marked && !isSel ? <View style={[styles.dot, { backgroundColor: theme.primary }]} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -107,8 +108,8 @@ const styles = StyleSheet.create({
   monthTitle: { fontSize: 16, fontWeight: '800' },
   weekRow: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
+  weekGrid: { flexDirection: 'row' },
+  cell: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
   dayInner: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 15, fontWeight: '600' },
   dayDisabled: { opacity: 0.35 },
