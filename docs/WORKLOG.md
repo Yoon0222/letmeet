@@ -14,7 +14,7 @@
 - [x] Supabase에 `0011_avatars.sql` 실행 (아바타 Storage 버킷+RLS) — 완료(업로드 라이브 검증)
 - [x] UI 리프레시: 밝은 화이트/비비드 그린 테마 + 홈 3대 진입 재설계 + 부팅 스플래시(피넛 일러스트+로딩바) — 완료
 - [x] 프로필 사진(아바타): 피넛 25종 자동배정·선택·직접 업로드 — 완료
-- [ ] **Edge Function 배포** `supabase functions deploy notify-turn` (내 경기 차례 푸시) — 사용자 · 실기기 빌드 + Android FCM 자격 필요
+- [x] **Edge Function 배포** `notify-turn`(개인/KDK 차례 푸시) + `notify-tie`(단체전 타이 푸시) — 운영·개발 배포·검증 완료 (2026-07-14)
 - [ ] 대회 **차례 알림에 코트·대기번호 포함** ("○○님, 3번 코트로 · 대기 N") — notify-turn 엣지 함수 페이로드에 court/대기번호 추가 + 배포와 함께
 - [x] 대회 2단계 — 모바일 참가 신청 화면(대회 탭/목록/상세/신청) 완료
 - [x] 앱 대진표/내 경기 열람(브래킷 트리) + 선수 앱 푸시(내 차례) 코드 — 완료
@@ -63,6 +63,16 @@
 - [ ] 상점 화면 (피클볼 용품 판매) — 로드맵 가장 마지막
 
 ---
+
+## 2026-07-14
+
+### 1.1.0 릴리스 — 대회 진행 방식 3종 + 클럽/번개 개선 + 부팅 크래시 수정 (대규모 패치)
+- **결정**: 대규모 기능 패치라 1.0.5가 아닌 **1.1.0**으로 승격. `main`은 아직 미머지(pinut-v2.0-dev 42커밋 앞섬, FF 가능).
+- **대회 진행 방식 3종 완성** (생성 시 선택, `tournaments.format`): ① **지금방식**=조별+토너먼트(기존) ② **KDK**=단식 개인 풀리그(조당 인원, buildGroups/standings 재사용, 본선 없음) ③ **단체전**=팀신청(팀명+유저검색)→관리자 승인→팀 예선리그→본선 토너먼트. 서브매치 스코어 입력·**득실 동률판정**, **오더 싸움**(주장 라인업 동시제출·블라인드 공개), **코트배정**(타이별)+타이 알림.
+- **만든 것**: `src/components/team-*.tsx`(register/lineup/bracket-view), `web-admin/app/tournaments/[id]/team/`, `lib/team-bracket.ts`, `src/app/tournament/[id].tsx`(정보/참가/대진 탭 분리), `supabase/functions/notify-tie/`. 클럽 사진·가입승인(0031/0032), 번개 게스트비·참가승인·코트사진(0033/0034), 신청 알림 트리거 pg_net(0035), 부팅 무한로딩(onAuthStateChange 교착) 수정, 탭바 안드로이드 내비 가림 수정.
+- **DB**: 마이그레이션 **0031~0041** 개발·운영 양쪽 실행·검증 완료. Edge Function `notify-turn`·`notify-tie` 운영·개발 배포·검증(200 응답).
+- **빌드**: 버전 1.0.4→**1.1.0**, `v1.1.0` 태그. EAS 프로덕션: iOS build 5(완료), Android build 7(진행중). 커밋 42개+태그 원격 푸시.
+- **메모/남은 것**: main 머지 결정 · 스토어 업로드(iOS `eas submit` / Android AAB) · 테스터 5명 더(15/20) · **버전게이트**(min_supported_version, 구버전 강제 업데이트 안내) 검토 · 미커밋 유지 중인 코덱스 파일(web-admin/landing, play-store PNG).
 
 ## 2026-07-10
 
