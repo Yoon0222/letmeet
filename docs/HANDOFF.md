@@ -23,6 +23,12 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-07-15, 클럽 가입 항상 승인제)
+
+- **클럽 가입을 항상 운영자 승인제로 변경** (커밋 3f3c93a, 0042). 생성폼 '가입 승인제' 토글 제거→안내문구, 가입 로직 항상 `status:'pending'`(플래그 무관 하드코딩), 상세 버튼 '가입 신청하기' 고정. 0042: 기존 클럽 require_approval=true 전환 + 기본값 true.
+- **DB 반영 검증**: 개발·운영 양쪽 0042 실행됨 — require_approval=false 클럽 0개(개발 2/운영 11 전부 true).
+- ⚠️ 이 변경은 **다음 빌드**부터 반영(현재 배포된 1.1.0 build7/5엔 토글 남아있음).
+
 ### Claude -> Codex (2026-07-14, 1.1.0 빌드 + Edge Function 배포)
 
 - **버전 1.1.0** (커밋+태그 v1.1.0). 프로덕션 빌드 큐: Android versionCode 7(56c7e1a9), iOS buildNumber 5(63294abc). 이번 빌드에 대회 진행방식(KDK·단체전·오더·코트배정)+클럽/번개 개선+부팅 크래시 수정 전부 포함.
