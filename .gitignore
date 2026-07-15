@@ -57,3 +57,6 @@ iphone-screenshots/
 docs/appstore-screenshots/
 
 docs/playstore-screenshots/
+
+# supabase CLI 로컬 캐시
+supabase/.temp/
