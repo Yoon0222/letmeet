@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
@@ -17,7 +17,6 @@ export default function CreateClub() {
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
   const [description, setDescription] = useState('');
-  const [requireApproval, setRequireApproval] = useState(false);
   const [saving, setSaving] = useState(false);
 
   async function onSubmit() {
@@ -35,7 +34,7 @@ export default function CreateClub() {
         name: name.trim(),
         region: region.trim(),
         description: description.trim(),
-        require_approval: requireApproval,
+        require_approval: true, // 클럽 가입은 항상 운영자 승인제
       })
       .select('id')
       .single();
@@ -70,12 +69,8 @@ export default function CreateClub() {
           maxLength={300}
           style={{ minHeight: 110, textAlignVertical: 'top' }}
         />
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>가입 승인제</Text>
-            <Text style={styles.toggleHint}>켜면 운영자가 승인해야 가입돼요.</Text>
-          </View>
-          <Switch value={requireApproval} onValueChange={setRequireApproval} trackColor={{ true: '#16C784' }} />
+        <View style={styles.noteRow}>
+          <Text style={styles.noteText}>가입은 신청 후 운영자(클럽장) 승인으로 확정돼요.</Text>
         </View>
         <Button title="클럽 만들기" onPress={onSubmit} loading={saving} style={{ marginTop: Spacing.two }} />
       </ScrollView>
@@ -86,17 +81,13 @@ export default function CreateClub() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    backgroundColor: '#FFFFFF',
+  noteRow: {
+    backgroundColor: '#F0FBF4',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
+    borderColor: '#BCE9CD',
+    borderRadius: 12,
     borderCurve: 'continuous',
     padding: Spacing.three,
   },
-  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  toggleHint: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  noteText: { fontSize: 13, color: '#16A34A', fontWeight: '600' },
 });

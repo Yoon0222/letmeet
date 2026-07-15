@@ -245,7 +245,7 @@ create table if not exists public.clubs (
   description text not null default '',
   region      text not null default '',
   image_url   text,                                       -- 클럽 대표 사진 (0031)
-  require_approval boolean not null default false,         -- 가입 승인 필요 여부 (0032)
+  require_approval boolean not null default true,          -- 가입 승인 필요 (항상 승인제, 0032/0042)
   created_at  timestamptz not null default now()
 );
 create index if not exists clubs_region_idx on public.clubs (region);

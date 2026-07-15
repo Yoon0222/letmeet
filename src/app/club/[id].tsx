@@ -67,16 +67,16 @@ export default function ClubDetail() {
   async function join() {
     if (!uid || !id || !club) return;
     setActing(true);
-    // 승인 필요 클럽이면 pending, 아니면 즉시 approved
+    // 클럽 가입은 항상 승인제 — 신청(pending) 후 운영자 승인 필요
     const { error } = await supabase
       .from('club_members')
-      .insert({ club_id: id, user_id: uid, status: club.require_approval ? 'pending' : 'approved' });
+      .insert({ club_id: id, user_id: uid, status: 'pending' });
     setActing(false);
     if (error) {
       Alert.alert('가입 실패', error.message);
       return;
     }
-    if (club.require_approval) Alert.alert('가입 신청 완료', '운영자 승인 후 가입돼요.');
+    Alert.alert('가입 신청 완료', '운영자 승인 후 가입돼요.');
     load();
   }
 
@@ -207,7 +207,6 @@ export default function ClubDetail() {
             <Text style={styles.title}>{club.name}</Text>
             <Text style={styles.meta}>
               {club.region || '지역 미설정'} · 멤버 {club.member_count}명
-              {club.require_approval ? ' · 승인제' : ''}
             </Text>
           </View>
         </View>
@@ -273,7 +272,7 @@ export default function ClubDetail() {
         ) : isApprovedMember ? (
           <Button title="클럽 탈퇴" variant="outline" onPress={confirmLeave} loading={acting} />
         ) : (
-          <Button title={club.require_approval ? '가입 신청하기' : '클럽 가입하기'} onPress={join} loading={acting} />
+          <Button title="가입 신청하기" onPress={join} loading={acting} />
         )}
       </View>
     </SafeAreaView>
