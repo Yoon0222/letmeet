@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
@@ -21,6 +21,7 @@ export function TournamentCard({
 
   return (
     <AppCard onPress={onPress} style={[styles.card, ended && styles.ended]}>
+      {t.images?.[0] ? <Image source={{ uri: t.images[0] }} style={styles.cover} /> : null}
       <View style={styles.topRow}>
         <Text style={styles.time}>{formatMeetupTime(t.start_at)}</Text>
         {registering ? (
@@ -68,6 +69,7 @@ export function TournamentCard({
 
 const styles = StyleSheet.create({
   card: { gap: AppSpacing.xs },
+  cover: { width: '100%', height: 140, borderRadius: Radius.card, borderCurve: 'continuous', backgroundColor: '#E5E7EB', marginBottom: AppSpacing.xs },
   ended: { opacity: 0.62 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm },
   time: { fontSize: 20, fontWeight: '800', color: '#111827' },

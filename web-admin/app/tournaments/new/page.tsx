@@ -46,8 +46,32 @@ function NewTournamentInner() {
   const [skillMax, setSkillMax] = useState(8.0);
   const [fee, setFee] = useState(0);
   const [description, setDescription] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // 대회 사진 업로드 (Storage tournament-images). 대회 생성 전이라 new/ 경로에 올림. 여러 장 가능.
+  async function uploadImages(files: FileList) {
+    if (files.length === 0) return;
+    setUploading(true);
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `new/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from('tournament-images').upload(path, file, { upsert: false });
+      if (upErr) {
+        alert('사진 업로드 실패: ' + upErr.message);
+        continue;
+      }
+      urls.push(supabase.storage.from('tournament-images').getPublicUrl(path).data.publicUrl);
+    }
+    setImages((prev) => [...prev, ...urls]);
+    setUploading(false);
+  }
+  const removeImage = (url: string) => setImages((prev) => prev.filter((u) => u !== url));
+  // 대표(커버)로 지정 — 해당 사진을 맨 앞으로
+  const makeCover = (url: string) => setImages((prev) => [url, ...prev.filter((u) => u !== url)]);
 
   // 코트 구성 (코트명 + 실내/실외). 대회마다 자유롭게.
   const [courts, setCourts] = useState<{ name: string; indoor: boolean }[]>([]);
@@ -139,6 +163,7 @@ function NewTournamentInner() {
         skill_max: skillMax,
         fee,
         description: description.trim(),
+        images,
       })
       .select('id')
       .single();
@@ -247,6 +272,42 @@ function NewTournamentInner() {
         <Field label="소개 (선택)">
           <textarea className={`${inputCls} min-h-24`} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="대회 방식, 상품, 준비물 등" maxLength={500} />
         </Field>
+
+        {/* 대회 사진 (여러 장) — 첫 장이 메인 커버 */}
+        <div>
+          <span className="mb-1 block text-sm font-medium text-slate-700">대회 사진 (선택, 여러 장)</span>
+          <div className="flex flex-wrap gap-3">
+            {images.map((url, i) => (
+              <div key={url} className="relative h-32 w-44 overflow-hidden rounded-xl border border-slate-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="대회 사진" className="h-full w-full object-cover" />
+                {i === 0 ? (
+                  <span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white">대표(커버)</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => makeCover(url)}
+                    className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2 py-0.5 text-xs text-white hover:bg-black/75"
+                  >
+                    커버로
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeImage(url)}
+                  className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/50 text-xs text-white hover:bg-black/70"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <label className="flex h-32 w-44 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500 hover:bg-slate-50">
+              {uploading ? '업로드 중…' : '+ 사진 추가'}
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => e.target.files && uploadImages(e.target.files)} />
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">여러 장 등록 가능. <b>첫 번째(대표) 사진이 메인 커버</b>로 앱 목록·홈·상세에 크게 노출되고, 나머지는 상세에서 넘겨볼 수 있어요. 가로형(16:9) 권장.</p>
+        </div>
 
         {/* 코트 구성 */}
         <div>

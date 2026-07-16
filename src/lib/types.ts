@@ -71,7 +71,33 @@ export type Participant = {
 
 /** 참가자 + 프로필 (조인 결과) */
 export type ParticipantWithProfile = Participant & {
-  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region' | 'dupr_rating' | 'dupr_verified'>;
+};
+
+// ---- 플레이어 리뷰 (0045) ----
+export type PlayerReview = {
+  id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  rating: number; // 1~5
+  comment: string;
+  meetup_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** player_reviews_with_reviewer 뷰 */
+export type PlayerReviewWithReviewer = PlayerReview & {
+  reviewer_nickname: string;
+  reviewer_avatar_url: string | null;
+  reviewer_skill: number;
+};
+
+/** player_review_stats 뷰 (평균·개수) */
+export type PlayerReviewStats = {
+  reviewee_id: string;
+  review_count: number;
+  avg_rating: number | null;
 };
 
 // ---- 클럽(동호회) ----
@@ -151,6 +177,7 @@ export type Tournament = {
   team_min_size: number; // 단체전: 팀당 최소 인원 (0037)
   tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
   tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)
+  images: string[]; // 대회 사진 — 첫 장이 메인 커버 (0043→0044)
   created_at: string;
 };
 
@@ -407,6 +434,12 @@ export interface Database {
         Update: WriteDefaults<Participant>;
         Relationships: [];
       };
+      player_reviews: {
+        Row: PlayerReview;
+        Insert: { reviewer_id: string; reviewee_id: string; rating: number } & WriteDefaults<PlayerReview>;
+        Update: WriteDefaults<PlayerReview>;
+        Relationships: [];
+      };
       clubs: {
         Row: Club;
         Insert: WriteDefaults<Club> & { owner_id: string; name: string };
@@ -527,9 +560,18 @@ export interface Database {
         Row: TournamentWithCounts;
         Relationships: [];
       };
+      player_reviews_with_reviewer: {
+        Row: PlayerReviewWithReviewer;
+        Relationships: [];
+      };
+      player_review_stats: {
+        Row: PlayerReviewStats;
+        Relationships: [];
+      };
     };
     Functions: {
       delete_account: { Args: Record<string, never>; Returns: undefined };
+      have_played_together: { Args: { a: string; b: string }; Returns: boolean };
       set_tie_lineup: { Args: { p_tie_match: string; p_side: string; p_players: string[] }; Returns: undefined };
       submit_tie_lineup: { Args: { p_tie: string; p_side: string }; Returns: undefined };
     };

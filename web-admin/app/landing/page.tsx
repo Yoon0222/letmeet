@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { LandingCountdown } from '@/components/landing-countdown';
 import { isConfigured, supabase } from '@/lib/supabase';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export const metadata: Metadata = {
   title: 'P!NUT | Play instant',

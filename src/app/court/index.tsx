@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CourtMap from '@/components/court-map';
 import { CourtCard } from '@/components/court-card';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { distanceKm, type LatLng } from '@/lib/geo';
 import { supabase } from '@/lib/supabase';
@@ -27,6 +28,7 @@ const RADIUS_KM = 20;
 export default function CourtListScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { session } = useAuth();
   const [rows, setRows] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,7 +128,9 @@ export default function CourtListScreen() {
         options={{
           title: '코트 예약',
           headerRight: () => (
-            <Pressable onPress={() => router.push('/court/reservations')} hitSlop={8}>
+            <Pressable
+              onPress={() => router.push(session ? '/court/reservations' : '/(auth)/sign-in')}
+              hitSlop={8}>
               <Text style={styles.headerLink}>내 예약</Text>
             </Pressable>
           ),

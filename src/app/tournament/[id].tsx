@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BracketTree } from '@/components/bracket-tree';
@@ -51,6 +51,7 @@ export default function TournamentDetail() {
   const [tab, setTab] = useState<'info' | 'prelim' | 'final' | 'register' | 'bracket'>('info');
   const [groupTab, setGroupTab] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [coverIdx, setCoverIdx] = useState(0); // 대회 사진 갤러리: 크게 볼 사진 인덱스
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
   const [teamRev, setTeamRev] = useState(0); // 단체전 오더 저장 시 대진뷰 새로고침 트리거
 
@@ -360,6 +361,20 @@ export default function TournamentDetail() {
         )}
         {(tab === 'info' || (!hasBracket && !isTeam)) && (
           <>
+            {t.images?.length ? (
+              <View style={styles.gallery}>
+                <Image source={{ uri: t.images[coverIdx] ?? t.images[0] }} style={styles.cover} />
+                {t.images.length > 1 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
+                    {t.images.map((uri, i) => (
+                      <Pressable key={`${uri}-${i}`} onPress={() => setCoverIdx(i)}>
+                        <Image source={{ uri }} style={[styles.thumb, i === coverIdx && styles.thumbActive]} />
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
+              </View>
+            ) : null}
             <View style={styles.infoCard}>
               <Info icon="time-outline" text={formatMeetupTime(t.start_at)} />
               {t.registration_deadline ? (
@@ -713,6 +728,11 @@ const styles = StyleSheet.create({
   tabUnderline: { height: 2.5, alignSelf: 'stretch', marginTop: 8, borderRadius: 2 },
   badgeRow: { flexDirection: 'row', gap: 6 },
   title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  gallery: { marginBottom: Spacing.three, gap: 8 },
+  cover: { width: '100%', height: 200, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  thumbRow: { gap: 8, paddingVertical: 2 },
+  thumb: { width: 64, height: 64, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#E5E7EB', opacity: 0.6 },
+  thumbActive: { opacity: 1, borderWidth: 2, borderColor: '#16C784' },
   infoCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,

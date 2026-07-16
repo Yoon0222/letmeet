@@ -12,7 +12,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -46,7 +45,6 @@ export default function CreateMeetup() {
   const [skillMin, setSkillMin] = useState(2.0);
   const [skillMax, setSkillMax] = useState(8.0);
   const [fee, setFee] = useState(''); // 게스트비(원). 빈값=무료
-  const [requireApproval, setRequireApproval] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null); // 코트/장소 사진 (로컬 uri, 생성 후 업로드)
   const [saving, setSaving] = useState(false);
 
@@ -124,7 +122,7 @@ export default function CreateMeetup() {
         skill_min: skillMin,
         skill_max: skillMax,
         fee: Math.max(0, parseInt(fee.replace(/[^0-9]/g, ''), 10) || 0),
-        require_approval: requireApproval,
+        require_approval: true,
       })
       .select('id')
       .single();
@@ -243,12 +241,9 @@ export default function CreateMeetup() {
           }
         />
 
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>참가 승인제</Text>
-            <Text style={styles.toggleHint}>켜면 호스트가 승인해야 참가 확정돼요.</Text>
-          </View>
-          <Switch value={requireApproval} onValueChange={setRequireApproval} trackColor={{ true: '#16C784' }} />
+        <View style={styles.approvalNote}>
+          <Ionicons name="shield-checkmark-outline" size={18} color="#16C784" />
+          <Text style={styles.approvalNoteText}>참가는 호스트 승인제예요. 신청이 오면 신청자 리뷰·DUPR을 확인한 뒤 승인할 수 있어요.</Text>
         </View>
 
         <TextField
@@ -315,19 +310,18 @@ const styles = StyleSheet.create({
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepTxt: { fontSize: 26, fontWeight: '800', color: '#16C784' },
   stepVal: { fontSize: 17, fontWeight: '700', color: '#111827' },
-  toggleRow: {
+  approvalNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#EAFBF1',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#B6ECCB',
     borderRadius: 12,
     borderCurve: 'continuous',
     padding: Spacing.three,
   },
-  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  toggleHint: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  approvalNoteText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#0F7A4D' },
   photo: { width: '100%', height: 160, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
   photoEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   photoEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },

@@ -115,7 +115,10 @@ export default function MatchesScreen() {
         />
       )}
 
-      <AppFAB onPress={() => router.push('/meetup/create')} style={styles.fab} />
+      <AppFAB
+        onPress={() => router.push(session ? '/meetup/create' : '/(auth)/sign-in')}
+        style={styles.fab}
+      />
     </SafeAreaView>
   );
 }

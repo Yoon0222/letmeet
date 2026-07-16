@@ -111,7 +111,10 @@ export default function ClubsScreen() {
         />
       )}
 
-      <AppFAB onPress={() => router.push('/club/create')} style={styles.fab} />
+      <AppFAB
+        onPress={() => router.push(session ? '/club/create' : '/(auth)/sign-in')}
+        style={styles.fab}
+      />
     </SafeAreaView>
   );
 }

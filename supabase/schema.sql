@@ -46,7 +46,7 @@ create table if not exists public.meetups (
   skill_max     numeric(3,1) not null default 8.0,
   max_players   int not null default 4 check (max_players between 2 and 32),
   fee           integer not null default 0,        -- 게스트비(원), 0=무료 (0033)
-  require_approval boolean not null default false,  -- 참가 신청 승인 필요 여부 (0033)
+  require_approval boolean not null default true,   -- 참가 신청 승인 필요 여부 (0033, 0045 항상 승인제)
   image_url     text,                              -- 코트/장소 사진 (0034)
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
@@ -365,6 +365,7 @@ create table if not exists public.tournaments (
   team_min_size         int not null default 2,               -- 단체전: 팀당 최소 인원 (0037)
   tie_singles           int not null default 2,               -- 단체전: 타이당 단식 매치 수 (0037)
   tie_doubles           int not null default 1,               -- 단체전: 타이당 복식 매치 수 (0037)
+  images                text[] not null default '{}',          -- 대회 사진(첫 장=메인 커버) (0043→0044)
   created_at            timestamptz not null default now()
 );
 create index if not exists tournaments_start_idx on public.tournaments (start_at);
@@ -598,6 +599,15 @@ select
      where e.tournament_id = t.id and e.status = 'pending') as pending_count
 from public.tournaments t
 join public.profiles p on p.id = t.organizer_id;
+
+-- tournament-images 스토리지 버킷 (공개 조회, 로그인 사용자 업로드) (0043)
+insert into storage.buckets (id, name, public) values ('tournament-images', 'tournament-images', true) on conflict (id) do nothing;
+drop policy if exists "tournament_images_read" on storage.objects;
+create policy "tournament_images_read" on storage.objects for select using (bucket_id = 'tournament-images');
+drop policy if exists "tournament_images_insert" on storage.objects;
+create policy "tournament_images_insert" on storage.objects for insert with check (bucket_id = 'tournament-images' and auth.uid() is not null);
+drop policy if exists "tournament_images_update" on storage.objects;
+create policy "tournament_images_update" on storage.objects for update using (bucket_id = 'tournament-images' and auth.uid() is not null);
 
 -- 대회 코트 구성 (코트명 + 실내/실외) — 대회마다 자유롭게 정의
 create table if not exists public.tournament_courts (
@@ -1121,3 +1131,65 @@ drop trigger if exists on_meetup_participant_pending on public.meetup_participan
 create trigger on_meetup_participant_pending
   after insert on public.meetup_participants
   for each row execute function public.notify_host_on_pending();
+
+-- ============================================================
+-- 플레이어 리뷰 (0045) — 같이 친 사람만 작성, 별점+한줄평, 프로필/승인 화면에 DUPR과 함께 표시
+-- ============================================================
+
+-- 함께 플레이 여부 (리뷰 작성 자격 게이트)
+create or replace function public.have_played_together(a uuid, b uuid)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select a <> b and (
+    exists (
+      select 1 from meetup_participants p1
+      join meetup_participants p2 on p1.meetup_id = p2.meetup_id
+      where p1.user_id = a and p1.status = 'approved'
+        and p2.user_id = b and p2.status = 'approved'
+    )
+    or exists (
+      select 1 from meetups m
+      join meetup_participants p on p.meetup_id = m.id and p.status = 'approved'
+      where (m.host_id = a and p.user_id = b) or (m.host_id = b and p.user_id = a)
+    )
+  );
+$$;
+
+create table if not exists public.player_reviews (
+  id           uuid primary key default uuid_generate_v4(),
+  reviewer_id  uuid not null references public.profiles(id) on delete cascade,
+  reviewee_id  uuid not null references public.profiles(id) on delete cascade,
+  rating       int  not null check (rating between 1 and 5),
+  comment      text not null default '',
+  meetup_id    uuid references public.meetups(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  check (reviewer_id <> reviewee_id),
+  unique (reviewer_id, reviewee_id)
+);
+create index if not exists player_reviews_reviewee_idx on public.player_reviews (reviewee_id);
+
+alter table public.player_reviews enable row level security;
+drop policy if exists "player_reviews_select" on public.player_reviews;
+create policy "player_reviews_select" on public.player_reviews for select using (true);
+drop policy if exists "player_reviews_insert" on public.player_reviews;
+create policy "player_reviews_insert" on public.player_reviews for insert
+  with check (reviewer_id = auth.uid() and public.have_played_together(auth.uid(), reviewee_id));
+drop policy if exists "player_reviews_update" on public.player_reviews;
+create policy "player_reviews_update" on public.player_reviews for update
+  using (reviewer_id = auth.uid()) with check (reviewer_id = auth.uid());
+drop policy if exists "player_reviews_delete" on public.player_reviews;
+create policy "player_reviews_delete" on public.player_reviews for delete
+  using (reviewer_id = auth.uid());
+
+create or replace view public.player_reviews_with_reviewer
+with (security_invoker = true) as
+select r.*, p.nickname as reviewer_nickname, p.avatar_url as reviewer_avatar_url, p.skill_level as reviewer_skill
+from public.player_reviews r
+join public.profiles p on p.id = r.reviewer_id;
+
+create or replace view public.player_review_stats
+with (security_invoker = true) as
+select reviewee_id, count(*)::int as review_count, round(avg(rating)::numeric, 1) as avg_rating
+from public.player_reviews
+group by reviewee_id;

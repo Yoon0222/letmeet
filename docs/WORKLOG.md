@@ -64,6 +64,42 @@
 
 ---
 
+## 2026-07-16
+
+### 번개 항상 승인제 + 플레이어 리뷰 시스템(같이 친 사람만, DUPR 표시)
+- **결정**: ① 번개 참여를 **항상 호스트 승인제**로(클럽 0042와 동일, 토글 제거). ② **플레이어 리뷰** 신설 — 같이 친 사람만 작성(별점 1~5 + 한줄평), 호스트가 신청자 리뷰·DUPR을 확인한 뒤 승인.
+- **DB (0045 — 실행 필요)**: `meetups.require_approval` 기본 true + 기존행 true. `player_reviews`(unique reviewer+reviewee, 수정 가능) + RLS(작성은 `have_played_together()` SECURITY DEFINER 게이트) + `player_reviews_with_reviewer`/`player_review_stats` 뷰. schema.sql 동기화.
+- **만든 것**: `src/app/player/[id].tsx`(신규 — 프로필+DUPR+리뷰목록+리뷰작성 모달, `have_played_together` rpc로 자격 체크), `src/app/meetup/[id].tsx`(대기 신청자 행에 DUPR·리뷰요약 + 프로필 탭 이동, 참가자 행도 프로필 링크), `src/app/meetup/create.tsx`(승인 토글→안내문), `_layout.tsx`(player 라우트 등록), 타입(PlayerReview*·rpc·참가자 프로필에 dupr). tsc·lint 통과.
+- **주의**: **0045를 dev·prod 실행** 필요. 실행 전엔 리뷰 쿼리가 빈 값으로 degrade(크래시 없음). 리뷰 작성은 같은 모임 승인 이력이 있어야 RLS 통과.
+
+### 대회 사진 다중화 — 단일 image_url → images 배열(첫 장=커버 + 나머지 갤러리)
+- **결정**: 대회 사진을 여러 장으로. 코트 사진 패턴처럼 `images text[]`, **첫 장이 메인 커버**, 나머지는 상세에서 넘겨봄. 어제 만든 단일 `image_url`(0043)을 대체.
+- **DB (0044 — 실행 필요)**: `tournaments.images text[]` 추가 + 기존 image_url 이관 + `image_url` 드롭 + 뷰 재생성. `schema.sql` 동기화. **0044를 dev·prod 실행해야** web-admin 대회 생성(images insert)이 동작.
+- **만든 것**: `web-admin/app/tournaments/new`(다중 업로드 썸네일 그리드 + "커버로 지정" + 대표 뱃지), `src/components/tournament-card.tsx`(images[0] 커버), `src/app/tournament/[id].tsx`(커버 200px + 썸네일 스트립 탭 전환 갤러리, `coverIdx` 상태), 타입 양쪽(`Tournament.images: string[]`).
+
+### 홈 "다가오는 내 일정" UI 개선 — D-day 뱃지 + 종류별 색 + 빈 상태 카드
+- **결정**: 밋밋하던 일정 카드를 예쁘게. ① 우측에 **D-day 뱃지**(오늘=그린 채움/내일/D-N) — 급한 일정 한눈에. ② 아이콘 배경을 **종류별 색**으로(대회=앰버, 번개=그린, 코트=블루). ③ 빈 상태를 회색 텍스트 → **점선 카드**(달력 아이콘+안내)로.
+- **만든 것**: `src/app/(tabs)/index.tsx` — `UpcomingItem.dday`(로드 시 오늘 자정 기준 계산), `TYPE_META`(종류별 아이콘·색), `ddayLabel`, 일정 카드/빈 상태 렌더+스타일. tsc·lint 통과, 빈 상태 웹 프리뷰 확인(일정 있는 상태는 데이터 없어 미확인).
+
+## 2026-07-15
+
+### 대회 대표 사진 (커버) — 업로드 + 앱 대형 표시
+- **결정**: 대회에도 사진 기능 추가. 클럽(0031)·번개(0034)와 동일 패턴 — 단일 `image_url` + 뷰 재생성 + `tournament-images` 스토리지 버킷. 앱에 **크게** 노출(상세 200px·카드 140px 커버).
+- **DB (0043 — 실행 필요)**: `tournaments.image_url` 추가 + `tournaments_with_counts` 뷰 재생성(t.* 고정 이슈) + `tournament-images` 버킷/RLS. `schema.sql`도 동기화.
+- **만든 것**: `web-admin/app/tournaments/new`(대회 사진 업로드 UI — new/ 경로 선업로드 후 insert에 image_url), `src/components/tournament-card.tsx`(상단 커버 140px), `src/app/tournament/[id].tsx`(정보탭 상단 커버 200px), 타입 양쪽(`Tournament.image_url`). 홈 "대회" 섹션은 TournamentCard 재사용이라 자동 반영.
+- **주의**: **0043을 dev·prod 양쪽에 먼저 실행**해야 함 — 안 하면 web-admin 대회 생성 insert가 `image_url` 컬럼 없음으로 실패. 사진 없는 기존 대회는 커버 자동 숨김(안전).
+
+### 홈 화면 개편 — 대회 섹션 추가 + 히어로/퀵액션 제거 + 헤더 "더 보기 →"
+- **결정**: ① 히어로(검은 "오늘 참가 가능한 경기") 카드가 "다가오는 내 일정" 첫 항목을 그대로 중복 표시 → **히어로 + 퀵액션 통째 제거**, 홈을 콘텐츠로 바로 시작(밀도↑). ② 공용 `SectionHeader`의 "전체보기" → **"더 보기 →"**(arrow-forward) 로 통일. ③ **"모집 중인 대회" 섹션 신설**(제목 "대회").
+- **모집 중인 대회 섹션**: `tournaments_with_counts`에서 `status='registration' + start_at>=now`, 가까운 날짜순 3개. **지역 필터 없이 전국**(대회는 빈도 낮고 원정 이벤트 → 지역 제한 시 늘 비어버림). 내가 신청한 대회는 "다가오는 내 일정"과 중복 제외. **비면 섹션 자체 숨김**. 카드는 대회 탭 `TournamentCard` 재사용.
+- **만든 것**: `src/app/(tabs)/index.tsx`(섹션·헤더·쿼리 수정, QuickAction/hero 스타일 제거). tsc·lint·웹 프리뷰 라이브 확인.
+
+### 안드로이드 R8 minify + 리소스 축소 (AAB 용량 최적화)
+- **결정**: 릴리스 빌드에 **R8 minify**(`enableMinifyInReleaseBuilds`) + **미사용 리소스 축소**(`enableShrinkResourcesInReleaseBuilds`) 적용. 자바/코틀린 미사용 클래스·리소스 제거로 AAB/APK 용량↓(라이브러리 의존성 정리).
+- **함정(중요)**: 빌드 설정의 단일 소스는 **`app.config.js`** 다. 이 동적 config가 app.json에서 `expo-build-properties`·naver 플러그인을 **필터로 제거하고 자기 버전으로 다시 추가**한다 → app.json에 build-properties 옵션을 넣어도 **전부 무시**됨(prebuild로 확인). 그래서 **app.config.js의 expo-build-properties**에 minify를 직접 넣어야 함.
+- **만든 것**: `app.config.js`의 `expo-build-properties` 블록에 `enableMinifyInReleaseBuilds`/`enableShrinkResourcesInReleaseBuilds`/`extraProguardRules`(네이버 지도 keep 룰) 추가. prebuild로 gradle.properties·proguard 반영 검증 완료. (app.json은 무변경.)
+- **주의**: R8은 **다음 프로덕션 빌드부터** 적용(현재 build 7 무관). 릴리스 후 실기기 스모크 테스트 필수 — 특히 **네이버 지도·푸시 알림·이미지 선택**(리플렉션 경로). 깨지면 keep 룰 확장.
+
 ## 2026-07-14
 
 ### 1.1.0 릴리스 — 대회 진행 방식 3종 + 클럽/번개 개선 + 부팅 크래시 수정 (대규모 패치)

@@ -6,17 +6,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
 import { MeetupCard } from '@/components/meetup-card';
+import { TournamentCard } from '@/components/tournament-card';
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { formatMeetupTime, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { ClubWithCounts, MeetupWithCounts } from '@/lib/types';
+import type { ClubWithCounts, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-type UpcomingItem = { key: string; type: 'tournament' | 'meetup' | 'court'; title: string; subtitle: string; at: number; route: string };
+type UpcomingItem = { key: string; type: 'tournament' | 'meetup' | 'court'; title: string; subtitle: string; at: number; route: string; dday: number };
+
+// 일정 종류별 아이콘·색(연한 배경 + 진한 아이콘)
+const TYPE_META: Record<UpcomingItem['type'], { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }> = {
+  tournament: { icon: 'trophy-outline', color: '#D97706', bg: '#FEF3C7' },
+  meetup: { icon: 'flash-outline', color: '#16C784', bg: '#DCFCE7' },
+  court: { icon: 'location-outline', color: '#0284C7', bg: '#E0F2FE' },
+};
+const ddayLabel = (d: number) => (d <= 0 ? '오늘' : d === 1 ? '내일' : `D-${d}`);
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -25,6 +34,7 @@ export default function HomeScreen() {
 
   const [upcoming, setUpcoming] = useState<UpcomingItem[]>([]);
   const [recommended, setRecommended] = useState<MeetupWithCounts[]>([]);
+  const [openTournaments, setOpenTournaments] = useState<TournamentWithCounts[]>([]);
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -35,7 +45,7 @@ export default function HomeScreen() {
     const now = new Date();
     const nowIso = now.toISOString();
     const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const items: UpcomingItem[] = [];
+    const items: Omit<UpcomingItem, 'dday'>[] = [];
 
     if (uid) {
       const { data: parts } = await supabase
@@ -103,8 +113,15 @@ export default function HomeScreen() {
       });
     }
 
-    items.sort((a, b) => a.at - b.at);
-    setUpcoming(items.slice(0, 4));
+    // D-day 계산 (오늘 자정 기준 남은 일수)
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const withDday: UpcomingItem[] = items.map((it) => {
+      const d = new Date(it.at);
+      const mid = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      return { ...it, dday: Math.max(0, Math.round((mid - startOfToday) / 86400000)) };
+    });
+    withDday.sort((a, b) => a.at - b.at);
+    setUpcoming(withDday.slice(0, 4));
 
     const regionPrefix = myRegion.trim().split(/\s+/)[0];
     let recQuery = supabase
@@ -118,6 +135,19 @@ export default function HomeScreen() {
     const { data: recs } = await recQuery;
     const upcomingMeetupIds = new Set(items.filter((i) => i.type === 'meetup').map((i) => i.key.slice(1)));
     setRecommended((recs ?? []).filter((m) => !upcomingMeetupIds.has(m.id)).slice(0, 3));
+
+    // 모집 중(접수중) 대회 — 지역 필터 없이 전국에서 가까운 날짜순.
+    // (대회는 빈도가 낮고 원정도 가는 이벤트라 지역 제한을 두면 늘 비어버림)
+    const { data: tours } = await supabase
+      .from('tournaments_with_counts')
+      .select('*')
+      .eq('status', 'registration')
+      .gte('start_at', nowIso)
+      .order('start_at', { ascending: true })
+      .limit(6);
+    // 이미 "다가오는 내 일정"에 뜨는 내가 신청한 대회는 제외
+    const upcomingTournamentIds = new Set(items.filter((i) => i.type === 'tournament').map((i) => i.key.slice(1)));
+    setOpenTournaments((tours ?? []).filter((t) => !upcomingTournamentIds.has(t.id)).slice(0, 3));
 
     const { data: cs } = await supabase
       .from('clubs_with_counts')
@@ -135,8 +165,6 @@ export default function HomeScreen() {
       load();
     }, [load]),
   );
-
-  const hero = upcoming[0];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -165,43 +193,49 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <AppCard disabled style={styles.hero}>
-          <Text style={styles.heroEyebrow}>오늘 참가 가능한 경기</Text>
-          <Text style={styles.heroTitle}>{hero?.title ?? '새로운 번개 모임을 찾아보세요'}</Text>
-          <Text style={styles.heroSub}>{hero?.subtitle ?? '근처 코트에서 열리는 경기를 추천해드릴게요.'}</Text>
-          <Pressable onPress={() => router.push(hero ? (hero.route as never) : '/(tabs)/matches')} style={styles.heroCta}>
-            <Text style={styles.heroCtaText}>{hero ? '일정 보기' : '모임 찾기'}</Text>
-            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-          </Pressable>
-        </AppCard>
-
-        <View style={styles.quickRow}>
-          <QuickAction icon="flash-outline" label="번개모임" onPress={() => router.push('/(tabs)/matches')} />
-          <QuickAction icon="location-outline" label="코트예약" onPress={() => router.push('/court')} />
-          <QuickAction icon="trophy-outline" label="대회" onPress={() => router.push('/(tabs)/tournaments')} />
-        </View>
-
-        <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} />
+        <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#3E63DD" bg="#E6ECFF" />
         {upcoming.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
-            {upcoming.map((item) => (
-              <AppCard key={item.key} onPress={() => router.push(item.route as never)} style={styles.scheduleCard}>
-                <View style={styles.scheduleIcon}>
-                  <Ionicons name={item.type === 'tournament' ? 'trophy-outline' : item.type === 'court' ? 'location-outline' : 'flash-outline'} size={18} color="#16C784" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.scheduleTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.scheduleSub} numberOfLines={1}>{item.subtitle}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-              </AppCard>
-            ))}
+            {upcoming.map((item) => {
+              const meta = TYPE_META[item.type];
+              const today = item.dday <= 0;
+              return (
+                <AppCard key={item.key} onPress={() => router.push(item.route as never)} style={styles.scheduleCard}>
+                  <View style={[styles.scheduleIcon, { backgroundColor: meta.bg }]}>
+                    <Ionicons name={meta.icon} size={18} color={meta.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.scheduleTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.scheduleSub} numberOfLines={1}>{item.subtitle}</Text>
+                  </View>
+                  <View style={[styles.ddayBadge, today && styles.ddayToday]}>
+                    <Text style={[styles.ddayText, today && styles.ddayTodayText]}>{ddayLabel(item.dday)}</Text>
+                  </View>
+                </AppCard>
+              );
+            })}
           </View>
         ) : (
-          <Text style={styles.placeholder}>예정된 일정이 없어요. 코트 예약, 번개 모임, 대회에 참여해보세요.</Text>
+          <View style={styles.emptyCard}>
+            <Ionicons name="calendar-outline" size={28} color="#9CA3AF" />
+            <Text style={styles.emptyTitle}>예정된 일정이 없어요</Text>
+            <Text style={styles.emptyBody}>코트 예약·번개 모임·대회에 참여하면 여기에 표시돼요.</Text>
+          </View>
         )}
 
-        <SectionHeader title="근처 추천 모임" onMore={() => router.push('/(tabs)/matches')} />
+        {/* 모집 중인 대회 — 있을 때만 노출(비면 섹션 자체 숨김) */}
+        {openTournaments.length > 0 && (
+          <>
+            <SectionHeader title="대회" onMore={() => router.push('/(tabs)/tournaments')} icon="trophy-outline" color="#D97706" bg="#FEF3C7" />
+            <View style={{ gap: Spacing.three }}>
+              {openTournaments.map((t) => (
+                <TournamentCard key={t.id} tournament={t} onPress={() => router.push(`/tournament/${t.id}`)} />
+              ))}
+            </View>
+          </>
+        )}
+
+        <SectionHeader title="근처 추천 모임" onMore={() => router.push('/(tabs)/matches')} icon="flash-outline" color="#16C784" bg="#DCFCE7" />
         {recommended.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
             {recommended.map((m) => (
@@ -212,7 +246,7 @@ export default function HomeScreen() {
           <Text style={styles.placeholder}>아직 추천할 모임이 없어요. 첫 모임을 만들어보세요.</Text>
         )}
 
-        <SectionHeader title="추천 클럽" onMore={() => router.push('/(tabs)/clubs')} />
+        <SectionHeader title="추천 클럽" onMore={() => router.push('/(tabs)/clubs')} icon="people-outline" color="#6366F1" bg="#EAEBFF" />
         {clubs.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
             {clubs.map((c) => (
@@ -227,21 +261,30 @@ export default function HomeScreen() {
   );
 }
 
-function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={styles.quick}>
-      <Ionicons name={icon} size={24} color="#16C784" />
-      <Text style={styles.quickText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function SectionHeader({ title, onMore }: { title: string; onMore: () => void }) {
+function SectionHeader({
+  title,
+  onMore,
+  icon,
+  color,
+  bg,
+}: {
+  title: string;
+  onMore: () => void;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  bg: string;
+}) {
   return (
     <View style={styles.sectionRow}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Pressable onPress={onMore} hitSlop={8}>
-        <Text style={styles.more}>전체보기</Text>
+      <View style={styles.sectionTitleRow}>
+        <View style={[styles.sectionIcon, { backgroundColor: bg }]}>
+          <Ionicons name={icon} size={16} color={color} />
+        </View>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      <Pressable onPress={onMore} hitSlop={8} style={styles.moreBtn}>
+        <Text style={styles.more}>더 보기</Text>
+        <Ionicons name="arrow-forward" size={14} color="#6B7280" />
       </Pressable>
     </View>
   );
@@ -254,21 +297,22 @@ const styles = StyleSheet.create({
   hello: { fontSize: 20, fontWeight: '800', color: '#111827' },
   sub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   iconBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
-  hero: { padding: 24, gap: 8, backgroundColor: '#111827', borderColor: '#111827' },
-  heroEyebrow: { fontSize: 13, fontWeight: '700', color: '#16C784' },
-  heroTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF' },
-  heroSub: { fontSize: 16, lineHeight: 22, color: '#D1D5DB' },
-  heroCta: { marginTop: 8, alignSelf: 'flex-start', height: 44, paddingHorizontal: 16, borderRadius: 16, backgroundColor: '#16C784', flexDirection: 'row', alignItems: 'center', gap: 8 },
-  heroCtaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-  quickRow: { flexDirection: 'row', gap: Spacing.three },
-  quick: { flex: 1, minHeight: 88, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  quickText: { fontSize: 13, fontWeight: '700', color: '#111827' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two },
-  sectionTitle: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  sectionIcon: { width: 30, height: 30, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', flexShrink: 1 },
+  moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   more: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
   scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   scheduleIcon: { width: 40, height: 40, borderRadius: 16, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
   scheduleTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
   scheduleSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  ddayBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: '#F1F5F9', minWidth: 46, alignItems: 'center' },
+  ddayText: { fontSize: 13, fontWeight: '800', color: '#64748B' },
+  ddayToday: { backgroundColor: '#16C784' },
+  ddayTodayText: { color: '#FFFFFF' },
+  emptyCard: { alignItems: 'center', gap: 6, paddingVertical: 28, paddingHorizontal: Spacing.three, borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: '#FFFFFF' },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: '#374151' },
+  emptyBody: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
   placeholder: { fontSize: 16, lineHeight: 22, color: '#6B7280' },
 });

@@ -23,6 +23,7 @@ export default function MeetupDetail() {
 
   const [meetup, setMeetup] = useState<MeetupWithCounts | null>(null);
   const [participants, setParticipants] = useState<ParticipantWithProfile[]>([]);
+  const [reviewStats, setReviewStats] = useState<Record<string, { avg: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -33,12 +34,25 @@ export default function MeetupDetail() {
       supabase.from('meetups_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('meetup_participants')
-        .select('*, profiles(id, nickname, skill_level, avatar_url, region)')
+        .select('*, profiles(id, nickname, skill_level, avatar_url, region, dupr_rating, dupr_verified)')
         .eq('meetup_id', id)
         .order('joined_at', { ascending: true }),
     ]);
     setMeetup(m ?? null);
-    setParticipants((p as unknown as ParticipantWithProfile[]) ?? []);
+    const list = (p as unknown as ParticipantWithProfile[]) ?? [];
+    setParticipants(list);
+    // 참가자·신청자의 리뷰 요약(평균·개수) — 승인 판단에 노출
+    const ids = list.map((x) => x.user_id);
+    if (ids.length > 0) {
+      const { data: st } = await supabase.from('player_review_stats').select('*').in('reviewee_id', ids);
+      const map: Record<string, { avg: number; count: number }> = {};
+      (st ?? []).forEach((s) => {
+        map[s.reviewee_id] = { avg: s.avg_rating ?? 0, count: s.review_count };
+      });
+      setReviewStats(map);
+    } else {
+      setReviewStats({});
+    }
     setLoading(false);
   }, [id]);
 
@@ -68,7 +82,11 @@ export default function MeetupDetail() {
   }, [navigation, meetup, isHost, router]);
 
   async function join() {
-    if (!uid || !id || !meetup) return;
+    if (!uid) {
+      router.push('/(auth)/sign-in');
+      return;
+    }
+    if (!id || !meetup) return;
     setActing(true);
     // 승인제면 pending, 아니면 바로 approved
     const { error } = await supabase
@@ -86,6 +104,10 @@ export default function MeetupDetail() {
   // 참가 전 게스트비·승인 여부 확인
   function confirmJoin() {
     if (!meetup) return;
+    if (!uid) {
+      router.push('/(auth)/sign-in');
+      return;
+    }
     const feeLine = meetup.fee > 0 ? `게스트비: ${meetup.fee.toLocaleString()}원\n` : '게스트비: 무료\n';
     const tailLine = meetup.require_approval ? '호스트 승인 후 참가가 확정됩니다.' : '이 모임에 참가할까요?';
     Alert.alert(meetup.require_approval ? '참가 신청' : '참가하기', `${feeLine}${tailLine}`, [
@@ -255,18 +277,30 @@ export default function MeetupDetail() {
         {isHost && pending.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>참가 신청 {pending.length}명</Text>
+            <Text style={styles.sectionHint}>신청자를 눌러 리뷰·DUPR을 확인한 뒤 승인하세요.</Text>
             <View style={{ gap: 10, marginTop: 8 }}>
-              {pending.map((p) => (
-                <View key={p.user_id} style={styles.pRow}>
-                  <Avatar nickname={p.profiles?.nickname ?? '?'} uri={p.profiles?.avatar_url} size={40} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pName}>{p.profiles?.nickname ?? '알 수 없음'}</Text>
-                    <Text style={styles.pMeta}>{p.profiles?.region || '지역 미설정'}</Text>
+              {pending.map((p) => {
+                const st = reviewStats[p.user_id];
+                const duprPart =
+                  p.profiles?.dupr_rating != null
+                    ? `DUPR ${p.profiles.dupr_rating.toFixed(1)}`
+                    : `실력 ${p.profiles?.skill_level.toFixed(1) ?? '-'}`;
+                const reviewPart = st ? `★ ${st.avg.toFixed(1)} (${st.count})` : '리뷰 없음';
+                return (
+                  <View key={p.user_id} style={styles.pRow}>
+                    <Pressable style={styles.pInfo} onPress={() => router.push(`/player/${p.user_id}` as never)}>
+                      <Avatar nickname={p.profiles?.nickname ?? '?'} uri={p.profiles?.avatar_url} size={40} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pName}>{p.profiles?.nickname ?? '알 수 없음'}</Text>
+                        <Text style={styles.pMeta}>{duprPart} · {reviewPart}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                    </Pressable>
+                    <Text onPress={() => approve(p.user_id)} style={styles.approveBtn}>승인</Text>
+                    <Text onPress={() => reject(p.user_id)} style={styles.rejectBtn}>거절</Text>
                   </View>
-                  <Text onPress={() => approve(p.user_id)} style={styles.approveBtn}>승인</Text>
-                  <Text onPress={() => reject(p.user_id)} style={styles.rejectBtn}>거절</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
         ) : null}
@@ -275,7 +309,7 @@ export default function MeetupDetail() {
           <Text style={styles.sectionTitle}>참가자 {approved.length}명</Text>
           <View style={{ gap: 10, marginTop: 8 }}>
             {approved.map((p) => (
-              <View key={p.user_id} style={styles.pRow}>
+              <Pressable key={p.user_id} style={styles.pRow} onPress={() => router.push(`/player/${p.user_id}` as never)}>
                 <Avatar nickname={p.profiles?.nickname ?? '?'} uri={p.profiles?.avatar_url} size={40} />
                 <View style={{ flex: 1 }}>
                   <View style={styles.pNameRow}>
@@ -287,7 +321,7 @@ export default function MeetupDetail() {
                 <Text style={styles.pSkill}>
                   {p.profiles ? `${p.profiles.skill_level.toFixed(1)} ${skillLabel(p.profiles.skill_level)}` : ''}
                 </Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         </View>
@@ -353,8 +387,10 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
   section: { marginTop: Spacing.two },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  sectionHint: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
   desc: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginTop: 6 },
   pRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   pNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
   pMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },

@@ -53,6 +53,7 @@ export type Tournament = {
   team_min_size: number; // 단체전: 팀당 최소 인원 (0037)
   tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
   tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)
+  images: string[]; // 대회 사진 — 첫 장이 메인 커버 (0043→0044)
   created_at: string;
 };
 

@@ -1216,3 +1216,42 @@ Production Supabase migration status check:
   - `0034_meetup_image`: `meetups.image_url`.
 - `0035_notify_join_request` cannot be fully verified through anon-column probes; it is function/trigger based. It depends on the `status` columns from `0032`/`0033`, which are present in production.
 - Production counts at check time: `profiles = 12`, `courts = 4`, `meetups = 4`, `clubs = 8`.
+
+2026-07-15 Vercel production deploy:
+
+- User decided current `pinut-v2.0-dev` web state is close enough to `1.1.0` and web files were not materially changed, so production deploy from current `web-admin` was approved.
+- Local `npm.cmd run build` had previously failed only because sandbox/network could not fetch Google Fonts; Vercel remote build completed successfully.
+- Command used from `web-admin`: `npx.cmd vercel --prod --yes`.
+- Deployment ready: `https://web-admin-fvq0eor9p-troyyoonsikshin-2301s-projects.vercel.app`.
+- Production alias applied by Vercel: `https://pinut.org`.
+- Vercel build showed `/` and `/landing` as dynamic routes.
+
+2026-07-15 resume update:
+
+- User provided `C:\Users\SEPC\Downloads\이력서_20260715.doc`.
+- The file is HTML saved with a `.doc` extension, not a binary Word document.
+- Copied original into workspace as `docs/resume-source.doc`.
+- Created updated resume as `docs/resume-updated-20260715.doc`.
+- Added recent P!NUT experience: Expo/React Native mobile app, Next.js admin web, Supabase Auth/PostgreSQL/RLS/Edge Function, Vercel deployment, Google Play closed testing, App Store Connect review preparation, data safety/privacy release work.
+- Expanded listed skills to include PostgreSQL, TypeScript, React Native, Expo, Next.js, Supabase, and Vercel.
+
+2026-07-15 web favicon update:
+
+- User noticed the browser tab icon did not show the P!NUT brand icon.
+- Rebuilt `web-admin/app/favicon.ico` from `assets/images/favicon.png`.
+- Added `web-admin/app/icon.png` so Next.js can also expose the PNG app icon metadata.
+- No deployment was run in this step.
+
+2026-07-15 landing launch day update:
+
+- User changed the official P!NUT launch target to July 31.
+- Updated `web-admin/components/landing-countdown.tsx` countdown target from `2026-07-17T12:00:00+09:00` to `2026-07-31T12:00:00+09:00`.
+- Updated displayed label from `2026.07.17 12:00 P!NUT launch goal` to `2026.07.31 12:00 P!NUT official launch`.
+- No deployment was run in this step.
+
+2026-07-15 Vercel production deploy for landing updates:
+
+- Deployed current `web-admin` to Vercel production after favicon and launch day updates.
+- Deployment ready: `https://web-admin-9fjzx757m-troyyoonsikshin-2301s-projects.vercel.app`.
+- Production alias applied by Vercel: `https://pinut.org`.
+- Vercel build completed successfully; `/`, `/landing`, and `/icon.png` were included.

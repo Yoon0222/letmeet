@@ -31,14 +31,21 @@ function RootNavigator() {
     if (initializing) return;
 
     const first = segments[0] as string | undefined;
+    const second = segments[1] as string | undefined;
     const inAuthGroup = first === '(auth)';
     const onConfigScreen = first === 'config-missing';
+    const needsAccount =
+      (first === '(tabs)' && second === 'profile') ||
+      (first === 'profile' && second === 'edit') ||
+      (first === 'meetup' && second === 'create') ||
+      (first === 'club' && second === 'create') ||
+      (first === 'court' && second === 'reservations');
 
     if (!isSupabaseConfigured) {
       if (!onConfigScreen) router.replace('/config-missing');
       return;
     }
-    if (!session && !inAuthGroup) {
+    if (!session && needsAccount) {
       router.replace('/(auth)/sign-in');
     } else if (session && (inAuthGroup || onConfigScreen)) {
       router.replace('/(tabs)');
@@ -66,6 +73,7 @@ function RootNavigator() {
       />
       <Stack.Screen name="club/[id]" options={{ headerShown: true, title: '클럽' }} />
       <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
+      <Stack.Screen name="player/[id]" options={{ headerShown: true, title: '플레이어' }} />
       <Stack.Screen name="court/index" options={{ headerShown: true, title: '코트 예약' }} />
       <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />
       <Stack.Screen name="court/[id]" options={{ headerShown: true, title: '코트' }} />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const target = new Date('2026-07-17T12:00:00+09:00').getTime();
+const target = new Date('2026-07-31T12:00:00+09:00').getTime();
 
 function getTimeLeft() {
   const now = Date.now();
@@ -39,7 +39,7 @@ export function LandingCountdown() {
       <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <p className="text-sm font-extrabold uppercase tracking-[0.22em] text-[#16C784]">Launch D-day</p>
-          <p className="mt-3 text-xl font-extrabold text-white sm:text-2xl">2026.07.17 12:00 P!NUT launch goal</p>
+          <p className="mt-3 text-xl font-extrabold text-white sm:text-2xl">2026.07.31 12:00 P!NUT official launch</p>
         </div>
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
           {units.map(([label, value]) => (

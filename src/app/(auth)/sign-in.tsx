@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -6,7 +5,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -94,19 +92,16 @@ export default function SignIn() {
             />
             <Button title={t('auth.signIn')} onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
 
-            <View style={styles.socialArea}>
-              <View style={styles.divider}>
-                <View style={styles.line} />
-                <Text style={styles.dividerText}>{t('auth.or')}</Text>
-                <View style={styles.line} />
+            {KAKAO_LOGIN_ENABLED ? (
+              <View style={styles.socialArea}>
+                <View style={styles.divider}>
+                  <View style={styles.line} />
+                  <Text style={styles.dividerText}>{t('auth.or')}</Text>
+                  <View style={styles.line} />
+                </View>
+                <KakaoButton onPress={onKakao} loading={kakaoLoading} />
               </View>
-              <View style={styles.socialRow}>
-                <SocialButton icon="logo-apple" />
-                <SocialButton icon="logo-google" />
-                {KAKAO_LOGIN_ENABLED ? null : <SocialButton icon="chatbubble-ellipses-outline" />}
-              </View>
-              {KAKAO_LOGIN_ENABLED ? <KakaoButton onPress={onKakao} loading={kakaoLoading} /> : null}
-            </View>
+            ) : null}
           </View>
 
           <View style={styles.footer}>
@@ -118,14 +113,6 @@ export default function SignIn() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
-function SocialButton({ icon }: { icon: keyof typeof Ionicons.glyphMap }) {
-  return (
-    <Pressable style={styles.socialBtn}>
-      <Ionicons name={icon} size={20} color="#111827" />
-    </Pressable>
   );
 }
 
@@ -165,18 +152,6 @@ const styles = StyleSheet.create({
   tagline: { fontSize: 16, fontWeight: '500', color: '#6B7280' },
   form: { gap: Spacing.three },
   socialArea: { gap: Spacing.three, marginTop: 8 },
-  socialRow: { flexDirection: 'row', gap: 16 },
-  socialBtn: {
-    flex: 1,
-    height: 56,
-    borderRadius: 16,
-    borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' },
   dividerText: { fontSize: 13, color: '#9CA3AF' },
