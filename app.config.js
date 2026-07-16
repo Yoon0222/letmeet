@@ -4,6 +4,9 @@
 
 const NAVER_MAVEN = 'https://repository.map.naver.com/archive/maven';
 
+// 네이버 지도 SDK는 리플렉션을 써서 R8이 지우면 안 됨 → keep 룰로 보호
+const NAVER_PROGUARD = ['-keep class com.naver.maps.** { *; }', '-dontwarn com.naver.maps.**', ''].join('\n');
+
 module.exports = ({ config }) => {
   const clientId = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID || '';
 
@@ -18,7 +21,18 @@ module.exports = ({ config }) => {
     plugins: [
       ...base,
       ['@mj-studio/react-native-naver-map', { client_id: clientId }],
-      ['expo-build-properties', { android: { extraMavenRepos: [NAVER_MAVEN] } }],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            extraMavenRepos: [NAVER_MAVEN],
+            // 릴리스 빌드 용량 최적화: R8 minify + 미사용 리소스 축소
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+            extraProguardRules: NAVER_PROGUARD,
+          },
+        },
+      ],
     ],
   };
 };
