@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
+import { CourtCard } from '@/components/court-card';
 import { EventPopup } from '@/components/event-popup';
 import { MeetupCard } from '@/components/meetup-card';
 import { TournamentCard } from '@/components/tournament-card';
@@ -14,7 +15,7 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { formatMeetupTime, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { ClubWithCounts, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
+import type { ClubWithCounts, Court, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const [recommended, setRecommended] = useState<MeetupWithCounts[]>([]);
   const [openTournaments, setOpenTournaments] = useState<TournamentWithCounts[]>([]);
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
+  const [courts, setCourts] = useState<Court[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const mySkill = profile?.skill_level ?? 3.5;
@@ -158,6 +160,18 @@ export default function HomeScreen() {
       .limit(3);
     // 회원 많은 순(동수면 최근순)으로 최대 3개 노출 — 이전엔 3개↑일 때 10명↑만 노출해 작은 클럽이 사라져 혼란 → 완화
     setClubs((cs ?? []).slice(0, 3));
+
+    // 코트 예약 — 지역 있으면 우선, 없으면 전체에서 몇 개
+    let courtQuery = supabase.from('courts').select('*').order('region', { ascending: true }).limit(6);
+    if (regionPrefix) courtQuery = courtQuery.ilike('region', `${regionPrefix}%`);
+    const { data: courtRows } = await courtQuery;
+    // 지역 필터로 비면 전체에서 채운다
+    let courtList = courtRows ?? [];
+    if (courtList.length === 0) {
+      const { data: anyCourts } = await supabase.from('courts').select('*').order('region', { ascending: true }).limit(3);
+      courtList = anyCourts ?? [];
+    }
+    setCourts(courtList.slice(0, 3));
     setRefreshing(false);
   }, [uid, myRegion]);
 
@@ -223,6 +237,18 @@ export default function HomeScreen() {
             <Text style={styles.emptyTitle}>예정된 일정이 없어요</Text>
             <Text style={styles.emptyBody}>코트 예약·번개 모임·대회에 참여하면 여기에 표시돼요.</Text>
           </View>
+        )}
+
+        {/* 코트 예약 — 둘러보고 예약하는 진입점 */}
+        <SectionHeader title="코트 예약" onMore={() => router.push('/court' as never)} icon="location-outline" color="#0284C7" bg="#E0F2FE" />
+        {courts.length > 0 ? (
+          <View style={{ gap: Spacing.three }}>
+            {courts.map((c) => (
+              <CourtCard key={c.id} court={c} onPress={() => router.push(`/court/${c.id}` as never)} />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.placeholder}>예약 가능한 코트를 준비 중이에요.</Text>
         )}
 
         {/* 모집 중인 대회 — 있을 때만 노출(비면 섹션 자체 숨김) */}
