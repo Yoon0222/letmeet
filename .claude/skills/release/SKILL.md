@@ -19,7 +19,15 @@ description: 버전 태그(vX.Y.Z)를 남기는 릴리스를 처리한다. app.j
    - 로그인 확인: `npx vercel whoami` → 이름 나오면 OK. 안 나오면 사용자에게 `npx vercel login` 안내 후 대기.
    - 배포: `npx vercel --prod --yes` (linked project `web-admin`, root dir는 Vercel 설정을 따름).
    - 성공 시 배포 URL(`https://...vercel.app`)이 출력됨 → 사용자에게 알림. 커스텀 도메인(pinut.org/admin.pinut.org)은 자동 반영.
-7. **기록**: `docs/WORKLOG.md`(worklog 스킬)와 `docs/HANDOFF.md`(handoff)에 "버전 X.Y.Z 릴리스 + Vercel 배포" 남기기.
+7. **노션 릴리스 노트 (필수)**: **"피넛 — 릴리스 노트"** (page id `3a312248-242a-81cb-a02e-d72ed027f8ba`)
+   - 맨 위 "다음 릴리스(개발 중·미배포)" 에 쌓여 있던 항목들을 **`## vX.Y.Z — YYYY-MM-DD` 섹션으로 옮겨 적는다**.
+   - 분류는 **추가 / 변경 / 수정** 3가지. 사용자가 체감하는 문장으로(내부 리팩터는 생략). DB 마이그레이션 번호 범위도 한 줄 남긴다.
+   - 상단 "스토어 현황" 표에 이번 버전 행(iOS/Android 빌드번호·상태) 추가.
+   - 심사 리젝·핫픽스면 **사유까지** 남긴다.
+8. **노션 기능 현황 상태 승격 (필수)**: **"피넛 — 구현 기능 전체 정리"** (page id `39f12248-242a-81cc-a677-dc8d30cac044`)
+   - 이번 릴리스에 포함된 기능들의 상태를 **🔵 미배포 → 🟡 테스트 배포**(TestFlight/비공개 테스트) 또는 **🟢 공개 출시**(스토어 정식 공개) 로 바꾸고, 버전 칸을 실제 버전으로 채운다.
+   - 표기: 🟢 공개 출시 · 🟡 테스트 배포 · 🟠 심사 대기 · 🔵 개발 완료·미배포 · ⚪ 보류
+9. **기록**: `docs/WORKLOG.md`(worklog 스킬)와 `docs/HANDOFF.md`(handoff)에 "버전 X.Y.Z 릴리스 + Vercel 배포" 남기기.
 
 ## 주의
 - 앱 스토어 빌드(EAS)는 별개다. 필요하면 `eas build -p android/ios --profile production` 도 안내(태그와 함께 자주 같이 감).

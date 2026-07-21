@@ -66,6 +66,23 @@
 
 ## 2026-07-16
 
+### 구글·애플 소셜 로그인 코드 연동 (플래그 게이트, 키는 콘솔 설정 대기)
+- **결정**: 구글=기존 카카오와 같은 **브라우저 OAuth**(expo-web-browser) 재사용(iOS·An 공통). 애플=iOS 심사 안전하게 **네이티브 Sign in with Apple**(`expo-apple-authentication`) → identityToken을 `signInWithIdToken`으로 교환. 구글 넣으면 애플 4.8상 애플 로그인 동반 필수라 세트로. **플래그(false) 게이트**라 콘솔 설정 전엔 버튼 안 뜸(출시된 1.1.1에 깨진 버튼 안 나감).
+- **만든 것**: `expo-apple-authentication` 설치, `app.json`(플러그인 + `ios.usesAppleSignIn`), `constants/features.ts`(GOOGLE/APPLE_LOGIN_ENABLED), `contexts/auth.tsx`(브라우저 OAuth 공통화 + signInWithGoogle/signInWithApple), `components/ui/apple-button.tsx`(iOS 전용 네이티브 버튼, 웹/An은 null), `sign-in.tsx`(애플 네이티브 버튼 + Google 버튼, 플래그·Platform 게이트). tsc·lint·**웹 export 통과**.
+- **주의(사용자 콘솔 작업)**: ① Supabase Auth에 Google·Apple provider 설정 ② Google Cloud OAuth 클라이언트 + Supabase 콜백 URL ③ Apple Developer "Sign in with Apple" capability + Services ID/Key. 끝나면 features 플래그 true + **새 iOS/An 빌드**(네이티브 애플 모듈이라 Expo Go/웹 미검증). 카카오는 비즈앱 전환까지 계속 false.
+
+### 이벤트 팝업 관리자화 — 하드코딩 → DB(등록·올리기/내리기·기간)
+- **결정**: 코덱스가 만든 홈 이벤트 팝업의 **디자인은 그대로 두고**, 문구·노출 여부·기간만 DB에서 오도록 전환. 관리자 웹에서 등록/수정/올리기·내리기/기간설정/삭제.
+- **DB (0047 — 실행 필요)**: `event_popups`(title·body·active·starts_at·ends_at·created_by) + RLS(조회 공개, 쓰기 super_admin만).
+- **만든 것**: `src/components/event-popup.tsx`(활성+기간 내 팝업 1건 조회, "오늘 하루 보지 않기"를 **팝업 id별**로 저장 → 새 팝업은 이전 숨김 영향 없음), `web-admin/app/events/`(등록·수정·올리기/내리기·기간·삭제, 상태 뱃지 노출중/예정/종료/내림) + 헤더 '이벤트' 링크(super_admin). 타입 양쪽. tsc·lint 통과.
+- **주의**: **0047 실행 + 관리자에서 팝업 등록·올리기 전까지 앱에 팝업이 안 뜬다**(하드코딩 문구 제거됨). 여러 개 활성 시 최근 생성 1건만 노출.
+
+### 번개 장소 = 등록 코트 검색 + 자유입력 + 코트 등록 요청 (외부검색 없이)
+- **결정**: 번개 만들 때 장소를 ① 등록 코트 검색(내부 courts) 우선 → 고르면 이름·지역 연결(court_id), ② 없으면 자유입력, ③ 검색에 없으면 "코트 등록 요청" → 운영자 승인 시 코트로 등록. **외부 검색 API(카카오/네이버) 안 씀** — 키·프록시·약관 회피, 코트 DB는 요청으로 유기적 성장. **번개 만들기 사진 업로드 제거**.
+- **DB (0046 — 실행 필요)**: `meetups.court_id`(nullable FK→courts; schema.sql은 courts 뒤에서 FK 추가로 순서 이슈 회피) + `court_registration_requests`(요청자·이름·주소·지역·메모·상태·court_id) + RLS(본인/운영자 조회·본인 등록·코트관리자↑ 처리).
+- **만든 것**: `src/components/court-picker.tsx`(검색 드롭다운, 타이핑=자유입력·탭=등록코트), `src/app/meetup/create.tsx`(사진 제거·CourtPicker·등록요청 모달·court_id 저장), `web-admin/app/court-requests/`(요청 목록→"코트로 등록"=courts 생성·연결/반려)+헤더 링크. 타입 양쪽. tsc·lint 통과.
+- **주의**: 0046 dev·prod 실행 필요. 승인 시 코트는 name/region/address만 생성 → 좌표·상세는 코트 관리에서 보완.
+
 ### 번개 항상 승인제 + 플레이어 리뷰 시스템(같이 친 사람만, DUPR 표시)
 - **결정**: ① 번개 참여를 **항상 호스트 승인제**로(클럽 0042와 동일, 토글 제거). ② **플레이어 리뷰** 신설 — 같이 친 사람만 작성(별점 1~5 + 한줄평), 호스트가 신청자 리뷰·DUPR을 확인한 뒤 승인.
 - **DB (0045 — 실행 필요)**: `meetups.require_approval` 기본 true + 기존행 true. `player_reviews`(unique reviewer+reviewee, 수정 가능) + RLS(작성은 `have_played_together()` SECURITY DEFINER 게이트) + `player_reviews_with_reviewer`/`player_review_stats` 뷰. schema.sql 동기화.

@@ -1255,3 +1255,33 @@ Production Supabase migration status check:
 - Deployment ready: `https://web-admin-9fjzx757m-troyyoonsikshin-2301s-projects.vercel.app`.
 - Production alias applied by Vercel: `https://pinut.org`.
 - Vercel build completed successfully; `/`, `/landing`, and `/icon.png` were included.
+
+2026-07-20 app event popup:
+
+- Added `src/components/event-popup.tsx`.
+- Popup appears on the main home screen and includes close plus `오늘 하루 보지 않기`.
+- Uses `@react-native-async-storage/async-storage` with key `pinut:event-popup:hidden-date` to suppress the popup for the current local day.
+- Wired into `src/app/(tabs)/index.tsx` via `<EventPopup />`.
+- Verification: `npx.cmd tsc --noEmit` passed.
+
+2026-07-20 event popup banner asset:
+
+- Generated a mobile popup banner image for the opening event.
+- Copy text in image: `오픈 이벤트`, `추첨을 통해 경품 증정`.
+- Saved project asset at `assets/images/event-open-prize-banner.png`.
+- Source generated image remains under `C:\Users\SEPC\.codex\generated_images\019f455b-fa34-7fa1-b667-d11c7bdeed25\call_azS8sQjK3wSm06sCqfBoJcGn.png`.
+
+2026-07-21 P!NUT document hub:
+
+- User wants project/business documents organized under `C:\Users\SEPC\Documents\P!nut`.
+- The folder was empty, so a first-level operating document structure was created:
+  - `00_Inbox`
+  - `01_Store`
+  - `02_Business`
+  - `03_Legal`
+  - `04_Sales`
+  - `05_Marketing`
+  - `06_Product`
+  - `99_Archive`
+- Subfolders were created for App Store / Google Play, business registration, tax/banking, Kakao Business, PG/payment, legal docs, court sales, meeting notes, proposals, landing, events, brand assets, roadmap, QA feedback, and release notes.
+- No existing files were moved because the folder had no visible files.
