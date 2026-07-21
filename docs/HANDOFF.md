@@ -1285,3 +1285,73 @@ Production Supabase migration status check:
   - `99_Archive`
 - Subfolders were created for App Store / Google Play, business registration, tax/banking, Kakao Business, PG/payment, legal docs, court sales, meeting notes, proposals, landing, events, brand assets, roadmap, QA feedback, and release notes.
 - No existing files were moved because the folder had no visible files.
+
+2026-07-21 Toss Payments integration scaffold:
+
+- User received business registration and started Toss Payments onboarding.
+- Implemented Toss Payments path without adding a new native SDK:
+  - App opens Toss checkout through `expo-web-browser`.
+  - Supabase Edge Functions keep the Toss secret key server-side.
+  - `src/lib/payments.ts` now supports `EXPO_PUBLIC_PAYMENT_PROVIDER=toss`.
+- Added `supabase/functions/toss-create-payment/index.ts`:
+  - Authenticates the Supabase user.
+  - Reads the pending `court_payments` row.
+  - Calls Toss Payments `POST /v1/payments` to create a checkout URL.
+- Replaced `supabase/functions/pay-verify/index.ts`:
+  - Supports `provider = toss` with Toss `POST /v1/payments/confirm`.
+  - Preserves the previous `provider = portone` verification branch.
+  - Marks `court_payments.status = paid` only after server-side amount/order verification.
+- Added web redirect relay pages for Toss `successUrl` / `failUrl`:
+  - `web-admin/app/payment/success/page.tsx`
+  - `web-admin/app/payment/fail/page.tsx`
+  - These pages redirect back to the app scheme with Toss query parameters.
+- Updated `.env.example` with public payment settings.
+- Required deployment/secrets before live use:
+  - Supabase secret: `TOSS_SECRET_KEY`
+  - Deploy functions: `toss-create-payment`, `pay-verify`
+  - App build env: `EXPO_PUBLIC_PAYMENT_PROVIDER=toss`
+  - Deploy web-admin so `/payment/success` and `/payment/fail` exist on `https://pinut.org`.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+  - `web-admin` `npm.cmd run build` passed after replacing `useSearchParams` with `window.location.search`.
+
+2026-07-21 Notion key links page:
+
+- Created a Notion page named `P!NUT 주요 사이트 모음`.
+- Page URL: `https://app.notion.com/p/3a412248242a813cb273ff6a117f307c`.
+- Included links for Toss Payments, Supabase production/test projects, App Store Connect, Apple Developer, Google Play Console, Expo/EAS, Vercel, Kakao, business/tax/legal portals, and local document paths.
+- Added a checklist for missing direct URLs: Vercel project, Expo project, GitHub repo, policy pages, Play test link, App Store public link, Kakao Developers app URL, business docs location, and support form/email.
+- Noted that secrets must not be stored in Notion; keep them in Supabase/Vercel/EAS secret managers.
+
+2026-07-21 Toss production setup progress:
+
+- Deployed Supabase Edge Functions to production project `jbvtdthtmrlndduqiikj`:
+  - `toss-create-payment`
+  - `pay-verify`
+- Vercel production deploy completed for `web-admin`.
+  - Deployment URL: `https://web-admin-72k1e7149-troyyoonsikshin-2301s-projects.vercel.app`
+  - Production alias: `https://pinut.org`
+- Verified callback pages return HTTP 200:
+  - `https://pinut.org/payment/success`
+  - `https://pinut.org/payment/fail`
+- Updated `eas.json`:
+  - development/preview keep `EXPO_PUBLIC_PAYMENT_PROVIDER=mock`.
+  - production uses `EXPO_PUBLIC_PAYMENT_PROVIDER=toss`.
+  - all profiles include payment return URL and app scheme.
+- Checked Supabase secret names for production; `TOSS_SECRET_KEY` is not registered yet.
+- Remaining before live payment testing:
+  - Register `TOSS_SECRET_KEY` in Supabase production secrets.
+  - Build/publish a new app bundle so the client contains the Toss payment code/env.
+
+### Claude -> Codex (2026-07-21, 토스 결제 리워크 — 사용자가 페이먼츠 담당 이관)
+
+- **문제 발견**: `toss-create-payment` 엣지함수가 호출하던 `POST https://api.tosspayments.com/v1/payments` (→ `checkout.url`) 는 **토스에 존재하지 않는 엔드포인트**다. 토스는 서버로 결제창 URL을 만들 수 없고, **클라이언트 SDK(`requestPayment`)로만 결제창**을 연다. (docs.tosspayments.com/reference·sdk/v2/js 로 교차확인)
+- **리워크(Path A, 호스팅 체크아웃 페이지)**:
+  - 신규 `web-admin/app/payment/checkout/page.tsx` — 토스 v2 SDK(`https://js.tosspayments.com/v2/standard`, ⚠️ `/v2` 는 403) 로드 → `TossPayments(clientKey).payment({customerKey:'ANONYMOUS'}).requestPayment({method:'CARD', amount:{value,currency:'KRW'}, orderId, orderName, successUrl, failUrl})`. 페이지 로드 시 **자동 실행**(중간 버튼 없이), `window.TossPayments` 폴링으로 준비 확인. 클라이언트 키는 `NEXT_PUBLIC_TOSS_CLIENT_KEY`.
+  - `src/lib/payments.ts` — `toss-create-payment` invoke 제거, 대신 `{BASE}/payment/checkout?orderId&amount&orderName&successUrl&failUrl` URL을 `openAuthSessionAsync` 로 연다. 리다이렉트 파싱·`pay-verify` 승인은 그대로. `EXPO_PUBLIC_PAYMENT_APP_SCHEME` 제거(미사용).
+  - **`supabase/functions/toss-create-payment/` 삭제**(불필요). ⚠️ prod에 이미 배포됐으니 Supabase에서도 삭제 가능(무해하지만 dead).
+  - `pay-verify` 는 그대로 재사용(토스 `/confirm` 승인 정확).
+- **검증**: web-admin 로컬(3100)에서 체크아웃 페이지 → **실제 토스 테스트 결제창 자동 오픈** 확인(테스트 clientKey, "실제 결제 안됨" 배지). mock 결제도 웹에서 예약 확정까지 검증(court_payments paid).
+- **남은 것(실기기 전체 왕복)**: 토스 대시보드 successUrl 도메인 등록 / web-admin 배포(체크아웃+clientKey) / **DEV** Supabase에 `pay-verify` 배포 + `TOSS_SECRET_KEY`(테스트) 등록 / 앱 dev빌드 `EXPO_PUBLIC_PAYMENT_PROVIDER=toss`. 라이브 결제는 사업자 심사 통과(개업일 2026-08-03) 후 라이브키로.
+- **코덱스에게**: 페이먼츠는 사용자가 이번엔 Claude에 맡김. `payments.ts`·`pay-verify`·`web-admin/app/payment/*` 는 위 상태가 최신이니 되돌리지 말 것.

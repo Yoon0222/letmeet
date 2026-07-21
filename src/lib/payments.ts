@@ -1,24 +1,82 @@
-// 코트 예약 결제 오케스트레이션.
-// 흐름: 주문(pending) 생성 → 슬롯 홀드 → PG 결제창 → 확정(서버 검증) → paid.
-//        실패/취소 → 슬롯 해제 + 주문 canceled/failed.
-// provider: 'mock'(개발용 자동성공) | 'portone'(실 SDK·키 필요).
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+
 import { supabase } from '@/lib/supabase';
 import type { Court } from '@/lib/types';
 
 export type PayResult = { ok: true; free?: boolean } | { ok: false; reason: 'slot' | 'canceled' | 'error'; message?: string };
 
 const PROVIDER = process.env.EXPO_PUBLIC_PAYMENT_PROVIDER ?? 'mock';
+const PAYMENT_RETURN_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_RETURN_BASE_URL ?? 'https://pinut.org/payment';
 
-/** PG 결제창 호출 추상화. 실제 결제 UI는 provider 별 구현. */
-async function launchPayment(order: { order_id: string; amount: number }): Promise<{ ok: boolean; txId?: string }> {
+type PaymentOrder = {
+  order_id: string;
+  amount: number;
+  orderName: string;
+};
+
+function buildPaymentReturnUrls() {
+  const successRedirect = Linking.createURL('payment/success');
+  const failRedirect = Linking.createURL('payment/fail');
+
+  const successUrl = new URL(`${PAYMENT_RETURN_BASE_URL}/success`);
+  successUrl.searchParams.set('redirect', successRedirect);
+
+  const failUrl = new URL(`${PAYMENT_RETURN_BASE_URL}/fail`);
+  failUrl.searchParams.set('redirect', failRedirect);
+
+  return {
+    successUrl: successUrl.toString(),
+    failUrl: failUrl.toString(),
+    successRedirect,
+  };
+}
+
+// 토스 결제창은 클라이언트 SDK 로만 열 수 있다(서버 생성 API 없음).
+// → pinut.org/payment/checkout 호스팅 페이지를 열어 거기서 requestPayment() 를 호출한다.
+function buildTossCheckoutUrl(order: PaymentOrder) {
+  const { successUrl, failUrl } = buildPaymentReturnUrls();
+  const url = new URL(`${PAYMENT_RETURN_BASE_URL}/checkout`);
+  url.searchParams.set('orderId', order.order_id);
+  url.searchParams.set('amount', String(order.amount));
+  url.searchParams.set('orderName', order.orderName);
+  url.searchParams.set('successUrl', successUrl);
+  url.searchParams.set('failUrl', failUrl);
+  return url.toString();
+}
+
+async function launchPayment(order: PaymentOrder): Promise<{ ok: boolean; txId?: string; message?: string }> {
   if (PROVIDER === 'mock') {
-    // 개발용: 결제창 없이 즉시 성공 처리 (실 PG 붙이기 전 흐름 검증용)
     return { ok: true, txId: `mock_${order.order_id}` };
   }
-  // TODO(portone): @portone/react-native-sdk requestPayment() 로 결제창 호출.
-  //   const r = await PortOne.requestPayment({ storeId, channelKey, paymentId: order.order_id, orderName, totalAmount: order.amount, ... });
-  //   return r.code == null ? { ok: true, txId: r.paymentId } : { ok: false };
-  throw new Error('PG 미설정: EXPO_PUBLIC_PAYMENT_PROVIDER=portone 및 SDK/키 설정이 필요합니다.');
+
+  if (PROVIDER !== 'toss') {
+    throw new Error('지원하지 않는 결제 제공자입니다. EXPO_PUBLIC_PAYMENT_PROVIDER를 확인해주세요.');
+  }
+
+  const { successRedirect } = buildPaymentReturnUrls();
+  const checkoutUrl = buildTossCheckoutUrl(order);
+  const result = await WebBrowser.openAuthSessionAsync(checkoutUrl, successRedirect);
+
+  if (result.type !== 'success' || !('url' in result)) {
+    return { ok: false };
+  }
+
+  const redirected = new URL(result.url);
+  const params = redirected.searchParams;
+  const code = params.get('code');
+  const failMessage = params.get('message');
+  if (code) return { ok: false, message: failMessage ?? code };
+
+  const paymentKey = params.get('paymentKey');
+  const orderId = params.get('orderId');
+  const amount = Number(params.get('amount'));
+
+  if (!paymentKey || orderId !== order.order_id || amount !== order.amount) {
+    return { ok: false, message: '결제 정보가 일치하지 않아요. 다시 시도해주세요.' };
+  }
+
+  return { ok: true, txId: paymentKey };
 }
 
 async function releaseHold(paymentId: string, status: 'canceled' | 'failed' = 'canceled') {
@@ -36,14 +94,12 @@ export async function startCourtPayment(args: {
   const { court, uid, slotDate, hours, courtUnit } = args;
   const amount = hours.length * court.hourly_price;
 
-  // 무료 코트: 결제 없이 바로 예약
   if (amount <= 0) {
     const { error } = await supabase.from('court_reservations').insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h })));
     if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? 'slot' : 'error', message: error.message };
     return { ok: true, free: true };
   }
 
-  // 1) 주문 생성(pending)
   const orderId = `ord_${uid.slice(0, 8)}_${Date.now()}`;
   const { data: pay, error: payErr } = await supabase
     .from('court_payments')
@@ -52,7 +108,6 @@ export async function startCourtPayment(args: {
     .single();
   if (payErr || !pay) return { ok: false, reason: 'error', message: payErr?.message };
 
-  // 2) 슬롯 홀드(예약 행 생성 + 주문 연결). 중복이면 이미 예약된 슬롯.
   const { error: resErr } = await supabase
     .from('court_reservations')
     .insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h, payment_id: pay.id })));
@@ -61,28 +116,35 @@ export async function startCourtPayment(args: {
     return { ok: false, reason: /duplicate|unique/i.test(resErr.message) ? 'slot' : 'error', message: resErr.message };
   }
 
-  // 3) PG 결제창
-  let res: { ok: boolean; txId?: string };
+  let payment: { ok: boolean; txId?: string; message?: string };
   try {
-    res = await launchPayment({ order_id: orderId, amount });
+    payment = await launchPayment({
+      order_id: orderId,
+      amount,
+      orderName: `피넛 코트 예약 ${hours.length}시간`,
+    });
   } catch (e) {
     await releaseHold(pay.id, 'failed');
     return { ok: false, reason: 'error', message: e instanceof Error ? e.message : String(e) };
   }
-  if (!res.ok) {
-    await releaseHold(pay.id);
-    return { ok: false, reason: 'canceled' };
+
+  if (!payment.ok) {
+    await releaseHold(pay.id, payment.message ? 'failed' : 'canceled');
+    return { ok: false, reason: payment.message ? 'error' : 'canceled', message: payment.message };
   }
 
-  // 4) 결제 확정 — 실 PG는 반드시 서버(Edge Function)에서 검증. mock은 개발용 클라이언트 처리.
   if (PROVIDER === 'mock') {
-    await supabase.from('court_payments').update({ status: 'paid', provider_tx: res.txId, paid_at: new Date().toISOString() }).eq('id', pay.id);
+    await supabase.from('court_payments').update({ status: 'paid', provider_tx: payment.txId, paid_at: new Date().toISOString() }).eq('id', pay.id);
     return { ok: true };
   }
-  const { data: verify, error: vErr } = await supabase.functions.invoke('pay-verify', { body: { order_id: orderId, paymentId: res.txId } });
+
+  const { data: verify, error: vErr } = await supabase.functions.invoke('pay-verify', {
+    body: { order_id: orderId, paymentId: payment.txId },
+  });
   if (vErr || !verify?.paid) {
     await releaseHold(pay.id, 'failed');
-    return { ok: false, reason: 'error', message: vErr?.message ?? '결제 검증에 실패했어요.' };
+    return { ok: false, reason: 'error', message: vErr?.message ?? verify?.error ?? '결제 승인에 실패했어요.' };
   }
+
   return { ok: true };
 }
