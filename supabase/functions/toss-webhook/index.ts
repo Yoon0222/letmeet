@@ -1,4 +1,4 @@
-// 토스 웹훅 — 결제 상태 변경을 서버가 직접 통보받아 court_payments 를 동기화한다.
+// 토스 웹훅 — 결제 상태 변경을 서버가 직접 통보받아 payments 를 동기화한다.
 //   앱 복귀가 막혀도(가상계좌 입금·대시보드 취소/환불 등) 서버가 진실을 반영.
 //   ⚠️ 웹훅 바디는 신뢰하지 않는다 → orderId 로 Toss API 를 재조회해 검증(멱등).
 // 배포:  supabase functions deploy toss-webhook --no-verify-jwt
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
   // 우리 주문 조회
   const { data: order } = await admin
-    .from('court_payments')
+    .from('payments')
     .select('id, amount, status')
     .eq('order_id', orderId)
     .maybeSingle();
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   if (paidOk) {
     if (order.status !== 'paid') {
       await admin
-        .from('court_payments')
+        .from('payments')
         .update({ status: 'paid', provider_tx: pay?.paymentKey ?? null, paid_at: new Date().toISOString() })
         .eq('id', order.id);
     }
@@ -61,11 +61,11 @@ Deno.serve(async (req) => {
   if (['CANCELED', 'PARTIAL_CANCELED', 'EXPIRED', 'ABORTED'].includes(status)) {
     if (order.status !== 'paid') {
       await admin.from('court_reservations').delete().eq('payment_id', order.id);
-      await admin.from('court_payments').update({ status: 'canceled' }).eq('id', order.id);
+      await admin.from('payments').update({ status: 'canceled' }).eq('id', order.id);
     } else {
       // 결제 완료 후 취소/환불 → 예약 취소 + 환불 표시
       await admin.from('court_reservations').update({ status: 'cancelled' }).eq('payment_id', order.id);
-      await admin.from('court_payments').update({ status: 'refunded' }).eq('id', order.id);
+      await admin.from('payments').update({ status: 'refunded' }).eq('id', order.id);
     }
     return json({ ok: true, status: 'canceled' });
   }

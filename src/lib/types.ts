@@ -389,16 +389,20 @@ export type CourtReservation = {
   created_at: string;
 };
 
-// ---- 코트 예약 결제 (court_payments) ----
+// ---- 결제 (payments, 0052 범용화: 코트+대회 공용) ----
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'canceled' | 'refunded';
+export type PaymentOrderType = 'court' | 'tournament';
 
-export type CourtPayment = {
+export type Payment = {
   id: string;
   order_id: string;
   user_id: string;
-  court_id: string;
+  order_type: PaymentOrderType;
+  target_id: string | null; // 대회 결제 시 tournament_id
+  order_name: string;
+  court_id: string | null; // 코트 주문
   court_unit: string;
-  slot_date: string;
+  slot_date: string | null;
   hours: number[];
   amount: number;
   status: PaymentStatus;
@@ -632,10 +636,10 @@ export interface Database {
         Update: WriteDefaults<CourtOpenDay>;
         Relationships: [];
       };
-      court_payments: {
-        Row: CourtPayment;
-        Insert: { order_id: string; user_id: string; court_id: string; slot_date: string } & WriteDefaults<CourtPayment>;
-        Update: WriteDefaults<CourtPayment>;
+      payments: {
+        Row: Payment;
+        Insert: { order_id: string; user_id: string } & WriteDefaults<Payment>;
+        Update: WriteDefaults<Payment>;
         Relationships: [];
       };
       court_blocks: {

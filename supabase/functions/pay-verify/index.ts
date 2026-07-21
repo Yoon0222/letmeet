@@ -15,7 +15,7 @@ function basicAuth(secret: string) {
 
 async function failOrder(admin: ReturnType<typeof createClient>, orderId: string) {
   await admin.from('court_reservations').delete().eq('payment_id', orderId);
-  await admin.from('court_payments').update({ status: 'failed' }).eq('id', orderId);
+  await admin.from('payments').update({ status: 'failed' }).eq('id', orderId);
 }
 
 Deno.serve(async (req) => {
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
   if (!caller.user) return json({ error: 'unauthorized' }, 401);
 
   const { data: order } = await admin
-    .from('court_payments')
+    .from('payments')
     .select('id, user_id, amount, status, provider')
     .eq('order_id', order_id)
     .maybeSingle();
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       return json({ paid: false, error: toss?.message ?? 'Toss verification mismatch', code: toss?.code });
     }
 
-    await admin.from('court_payments').update({ status: 'paid', provider_tx: paymentId, paid_at: new Date().toISOString() }).eq('id', order.id);
+    await admin.from('payments').update({ status: 'paid', provider_tx: paymentId, paid_at: new Date().toISOString() }).eq('id', order.id);
     return json({ paid: true });
   }
 
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
       return json({ paid: false, error: 'PortOne verification mismatch' });
     }
 
-    await admin.from('court_payments').update({ status: 'paid', provider_tx: paymentId, paid_at: new Date().toISOString() }).eq('id', order.id);
+    await admin.from('payments').update({ status: 'paid', provider_tx: paymentId, paid_at: new Date().toISOString() }).eq('id', order.id);
     return json({ paid: true });
   }
 

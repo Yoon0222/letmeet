@@ -752,13 +752,17 @@ create policy "open_days_write" on public.court_open_days
   with check (public.my_role() = 'super_admin' or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id));
 
 -- 코트 예약 결제(court_payments) — 0026. 주문 1건 = 슬롯 N개 결제.
-create table if not exists public.court_payments (
+-- 결제 (payments, 0052 범용화: 코트 예약 + 대회 참가비 공용)
+create table if not exists public.payments (
   id           uuid primary key default uuid_generate_v4(),
   order_id     text not null unique,
   user_id      uuid not null references public.profiles(id) on delete cascade,
-  court_id     uuid not null references public.courts(id) on delete cascade,
+  order_type   text not null default 'court' check (order_type in ('court','tournament')),
+  target_id    uuid,                                        -- 대회 결제 시 tournament_id
+  order_name   text not null default '',
+  court_id     uuid references public.courts(id) on delete cascade,   -- 코트 주문(대회는 null)
   court_unit   text not null default '',
-  slot_date    date not null,
+  slot_date    date,
   hours        int[] not null default '{}',
   amount       int not null default 0,
   status       text not null default 'pending' check (status in ('pending','paid','failed','canceled','refunded')),
@@ -767,21 +771,22 @@ create table if not exists public.court_payments (
   created_at   timestamptz not null default now(),
   paid_at      timestamptz
 );
-create index if not exists court_payments_user_idx on public.court_payments (user_id, created_at desc);
-create index if not exists court_payments_status_idx on public.court_payments (status, created_at);
-alter table public.court_payments enable row level security;
-drop policy if exists "payments_select" on public.court_payments;
-create policy "payments_select" on public.court_payments
+create index if not exists payments_user_idx on public.payments (user_id, created_at desc);
+create index if not exists payments_status_idx on public.payments (status, created_at);
+create index if not exists payments_target_idx on public.payments (order_type, target_id);
+alter table public.payments enable row level security;
+drop policy if exists "payments_select" on public.payments;
+create policy "payments_select" on public.payments
   for select using (
     auth.uid() = user_id or public.my_role() = 'super_admin'
     or auth.uid() = (select c.owner_id from public.courts c where c.id = court_id)
   );
-drop policy if exists "payments_insert_self" on public.court_payments;
-create policy "payments_insert_self" on public.court_payments for insert with check (auth.uid() = user_id);
-drop policy if exists "payments_update_self" on public.court_payments;
-create policy "payments_update_self" on public.court_payments for update using (auth.uid() = user_id);
+drop policy if exists "payments_insert_self" on public.payments;
+create policy "payments_insert_self" on public.payments for insert with check (auth.uid() = user_id);
+drop policy if exists "payments_update_self" on public.payments;
+create policy "payments_update_self" on public.payments for update using (auth.uid() = user_id);
 
-alter table public.court_reservations add column if not exists payment_id uuid references public.court_payments(id) on delete set null;
+alter table public.court_reservations add column if not exists payment_id uuid references public.payments(id) on delete set null;
 create index if not exists court_reservations_payment_idx on public.court_reservations (payment_id);
 
 -- 코트 연대관(정기 대관) — 0027. 매주 반복 예약 차단 시간대. [start_hour, end_hour)
@@ -1420,8 +1425,8 @@ declare
   v_ids uuid[];
 begin
   select array_agg(id) into v_ids
-  from public.court_payments
-  where status = 'pending'
+  from public.payments
+  where order_type = 'court' and status = 'pending'
     and created_at < now() - make_interval(mins => p_minutes);
 
   if v_ids is null then
@@ -1429,7 +1434,7 @@ begin
   end if;
 
   delete from public.court_reservations where payment_id = any(v_ids);
-  update public.court_payments set status = 'canceled' where id = any(v_ids);
+  update public.payments set status = 'canceled' where id = any(v_ids);
 
   return coalesce(array_length(v_ids, 1), 0);
 end;

@@ -81,7 +81,7 @@ async function launchPayment(order: PaymentOrder): Promise<{ ok: boolean; txId?:
 
 async function releaseHold(paymentId: string, status: 'canceled' | 'failed' = 'canceled') {
   await supabase.from('court_reservations').delete().eq('payment_id', paymentId);
-  await supabase.from('court_payments').update({ status }).eq('id', paymentId);
+  await supabase.from('payments').update({ status }).eq('id', paymentId);
 }
 
 export async function startCourtPayment(args: {
@@ -101,9 +101,10 @@ export async function startCourtPayment(args: {
   }
 
   const orderId = `ord_${uid.slice(0, 8)}_${Date.now()}`;
+  const orderName = `피넛 코트 예약 ${hours.length}시간`;
   const { data: pay, error: payErr } = await supabase
-    .from('court_payments')
-    .insert({ order_id: orderId, user_id: uid, court_id: court.id, court_unit: courtUnit, slot_date: slotDate, hours, amount, provider: PROVIDER })
+    .from('payments')
+    .insert({ order_id: orderId, user_id: uid, order_type: 'court', order_name: orderName, court_id: court.id, court_unit: courtUnit, slot_date: slotDate, hours, amount, provider: PROVIDER })
     .select('id')
     .single();
   if (payErr || !pay) return { ok: false, reason: 'error', message: payErr?.message };
@@ -112,7 +113,7 @@ export async function startCourtPayment(args: {
     .from('court_reservations')
     .insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h, payment_id: pay.id })));
   if (resErr) {
-    await supabase.from('court_payments').update({ status: 'failed' }).eq('id', pay.id);
+    await supabase.from('payments').update({ status: 'failed' }).eq('id', pay.id);
     return { ok: false, reason: /duplicate|unique/i.test(resErr.message) ? 'slot' : 'error', message: resErr.message };
   }
 
@@ -121,7 +122,7 @@ export async function startCourtPayment(args: {
     payment = await launchPayment({
       order_id: orderId,
       amount,
-      orderName: `피넛 코트 예약 ${hours.length}시간`,
+      orderName,
     });
   } catch (e) {
     await releaseHold(pay.id, 'failed');
@@ -134,7 +135,7 @@ export async function startCourtPayment(args: {
   }
 
   if (PROVIDER === 'mock') {
-    await supabase.from('court_payments').update({ status: 'paid', provider_tx: payment.txId, paid_at: new Date().toISOString() }).eq('id', pay.id);
+    await supabase.from('payments').update({ status: 'paid', provider_tx: payment.txId, paid_at: new Date().toISOString() }).eq('id', pay.id);
     return { ok: true };
   }
 
