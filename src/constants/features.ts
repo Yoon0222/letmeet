@@ -5,7 +5,8 @@
 // true 로 바꿔 로그인 화면에 버튼을 노출한다.
 
 // 카카오: account_email 동의항목은 카카오 "비즈앱 전환"(사업자 등록)이 있어야 열림.
-// 사업자 등록·비즈앱 승인 후 true 로.
+// 배선(버튼→Supabase→카카오 로그인) 검증 완료(2026-07-21). 비즈앱 전환은 개업일
+// 2026-08-03 이후 가능 → 그때 account_email 필수 동의 켜고 이 값을 true 로.
 export const KAKAO_LOGIN_ENABLED = false;
 
 // 구글: Google Cloud OAuth 클라이언트 + Supabase Google provider 설정 후 true 로.
