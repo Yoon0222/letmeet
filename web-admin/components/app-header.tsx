@@ -37,9 +37,19 @@ export function AppHeader() {
                 코트
               </Link>
             )}
+            {(role === 'super_admin' || role === 'court_manager') && (
+              <Link href="/court-requests" className="text-slate-600 hover:text-slate-900">
+                코트요청
+              </Link>
+            )}
             {role === 'super_admin' && (
               <Link href="/users" className="text-slate-600 hover:text-slate-900">
                 사용자
+              </Link>
+            )}
+            {role === 'super_admin' && (
+              <Link href="/events" className="text-slate-600 hover:text-slate-900">
+                이벤트
               </Link>
             )}
             <Link href="/reports" className="text-slate-600 hover:text-slate-900">

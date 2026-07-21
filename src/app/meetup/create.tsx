@@ -6,16 +6,18 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
+import { CourtPicker } from '@/components/court-picker';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
@@ -38,6 +40,7 @@ export default function CreateMeetup() {
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [region, setRegion] = useState('');
+  const [courtId, setCourtId] = useState<string | null>(null); // 등록 코트 연결(선택) (0046)
   const [description, setDescription] = useState('');
   const [start, setStart] = useState<Date>(defaultStart());
   const [showIosPicker, setShowIosPicker] = useState(false);
@@ -45,26 +48,33 @@ export default function CreateMeetup() {
   const [skillMin, setSkillMin] = useState(2.0);
   const [skillMax, setSkillMax] = useState(8.0);
   const [fee, setFee] = useState(''); // 게스트비(원). 빈값=무료
-  const [imageUri, setImageUri] = useState<string | null>(null); // 코트/장소 사진 (로컬 uri, 생성 후 업로드)
   const [saving, setSaving] = useState(false);
 
-  // 코트/장소 사진 선택 (업로드는 모임 생성 후)
-  async function pickImage() {
-    let ImagePicker: typeof import('expo-image-picker');
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      ImagePicker = require('expo-image-picker');
-    } catch {
-      Alert.alert('사진 첨부', '이 기능은 최신 앱 빌드에서 사용할 수 있어요.');
+  // 코트 등록 요청 모달 (검색에 없는 코트)
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqAddress, setReqAddress] = useState('');
+  const [reqNote, setReqNote] = useState('');
+  const [reqSaving, setReqSaving] = useState(false);
+
+  async function submitCourtRequest() {
+    if (!session?.user.id || !location.trim()) return;
+    setReqSaving(true);
+    const { error } = await supabase.from('court_registration_requests').insert({
+      requester_id: session.user.id,
+      name: location.trim(),
+      address: reqAddress.trim(),
+      region: region.trim(),
+      note: reqNote.trim(),
+    });
+    setReqSaving(false);
+    if (error) {
+      Alert.alert('요청 실패', error.message);
       return;
     }
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('권한 필요', '사진을 첨부하려면 갤러리 접근 권한이 필요해요.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
-    if (!result.canceled) setImageUri(result.assets[0].uri);
+    setReqOpen(false);
+    setReqAddress('');
+    setReqNote('');
+    Alert.alert('등록 요청 완료', '운영자 확인 후 코트로 등록되면 검색에 나타나요.');
   }
 
   function openPicker() {
@@ -123,6 +133,7 @@ export default function CreateMeetup() {
         skill_max: skillMax,
         fee: Math.max(0, parseInt(fee.replace(/[^0-9]/g, ''), 10) || 0),
         require_approval: true,
+        court_id: courtId,
       })
       .select('id')
       .single();
@@ -131,19 +142,6 @@ export default function CreateMeetup() {
       hide();
       Alert.alert('생성 실패', error.message);
       return;
-    }
-    // 사진 첨부 시 생성된 모임에 업로드 (실패해도 모임은 생성됨)
-    if (imageUri && data?.id) {
-      try {
-        const ext = (imageUri.split('.').pop() ?? 'jpg').toLowerCase();
-        const path = `${data.id}/cover_${Date.now()}.${ext}`;
-        const buf = await fetch(imageUri).then((r) => r.arrayBuffer());
-        await supabase.storage.from('meetup-images').upload(path, buf, { contentType: 'image/jpeg', upsert: true });
-        const url = supabase.storage.from('meetup-images').getPublicUrl(path).data.publicUrl;
-        await supabase.from('meetups').update({ image_url: url }).eq('id', data.id);
-      } catch {
-        // 사진 업로드 실패는 무시 (상세에서 다시 시도 가능)
-      }
     }
     setSaving(false);
     hide();
@@ -162,26 +160,21 @@ export default function CreateMeetup() {
           placeholder="예: 평일 저녁 즐겜 복식"
           maxLength={40}
         />
-        <TextField label="장소" value={location} onChangeText={setLocation} placeholder="예: 올림픽공원 피클볼장" />
+        <CourtPicker
+          value={{ name: location, region, courtId }}
+          onChange={(v) => {
+            setLocation(v.name);
+            setRegion(v.region);
+            setCourtId(v.courtId);
+          }}
+        />
+        {!courtId && location.trim().length > 0 ? (
+          <Pressable onPress={() => setReqOpen(true)} style={styles.reqLink}>
+            <Ionicons name="add-circle-outline" size={16} color="#16C784" />
+            <Text style={styles.reqLinkText}>이 코트가 목록에 없나요? 코트 등록 요청</Text>
+          </Pressable>
+        ) : null}
         <TextField label="지역" value={region} onChangeText={setRegion} placeholder="예: 서울 송파구" />
-
-        <View style={styles.field}>
-          <Text style={styles.label}>코트/장소 사진 (선택)</Text>
-          {imageUri ? (
-            <Pressable onPress={pickImage}>
-              <Image source={{ uri: imageUri }} style={styles.photo} />
-              <View style={styles.photoEdit}>
-                <Ionicons name="camera" size={14} color="#fff" />
-                <Text style={styles.photoEditText}>사진 변경</Text>
-              </View>
-            </Pressable>
-          ) : (
-            <Pressable onPress={pickImage} style={styles.photoEmpty}>
-              <Ionicons name="image-outline" size={22} color="#16C784" />
-              <Text style={styles.photoEmptyText}>코트/장소 사진 추가</Text>
-            </Pressable>
-          )}
-        </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>날짜 · 시간</Text>
@@ -258,6 +251,36 @@ export default function CreateMeetup() {
 
         <Button title="모임 만들기" onPress={onSubmit} loading={saving} style={{ marginTop: Spacing.two }} />
       </ScrollView>
+
+      {/* 코트 등록 요청 모달 */}
+      <Modal visible={reqOpen} transparent animationType="slide" onRequestClose={() => setReqOpen(false)}>
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>코트 등록 요청</Text>
+            <Text style={styles.modalSub}>{`'${location.trim()}' 코트를 운영자에게 등록 요청해요.`}</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="주소 (선택)"
+              placeholderTextColor="#9CA3AF"
+              value={reqAddress}
+              onChangeText={setReqAddress}
+            />
+            <TextInput
+              style={[styles.modalInput, { minHeight: 70, textAlignVertical: 'top' }]}
+              placeholder="메모 (선택) — 실내/실외, 면 수 등"
+              placeholderTextColor="#9CA3AF"
+              value={reqNote}
+              onChangeText={setReqNote}
+              multiline
+              maxLength={200}
+            />
+            <View style={styles.modalBtns}>
+              <Button title="취소" variant="secondary" onPress={() => setReqOpen(false)} style={{ flex: 1 }} />
+              <Button title={reqSaving ? '요청 중…' : '등록 요청'} onPress={submitCourtRequest} loading={reqSaving} style={{ flex: 1 }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -322,9 +345,12 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   approvalNoteText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#0F7A4D' },
-  photo: { width: '100%', height: 160, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
-  photoEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  photoEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  photoEmpty: { height: 96, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
-  photoEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
+  reqLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 },
+  reqLinkText: { fontSize: 13, fontWeight: '700', color: '#16C784' },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderCurve: 'continuous', padding: Spacing.four, gap: Spacing.three, paddingBottom: 36 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  modalSub: { fontSize: 13, color: '#6B7280' },
+  modalInput: { borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: 12, fontSize: 15, color: '#111827', backgroundColor: '#F9FAFB' },
+  modalBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
 });

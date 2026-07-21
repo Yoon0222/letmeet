@@ -165,6 +165,34 @@ export type Court = {
   created_at: string;
 };
 
+/** 코트 등록 요청 (0046) — 앱 유저가 검색에 없는 코트를 요청 */
+export type CourtRegRequestStatus = 'pending' | 'approved' | 'rejected';
+export type CourtRegistrationRequest = {
+  id: string;
+  requester_id: string;
+  name: string;
+  address: string;
+  region: string;
+  note: string;
+  status: CourtRegRequestStatus;
+  court_id: string | null;
+  created_at: string;
+};
+
+/** 이벤트 팝업 (0047) — 앱 홈에 노출. active=올리기/내리기, starts_at~ends_at=노출 기간 */
+export type EventPopup = {
+  id: string;
+  title: string;
+  body: string;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  image_url: string | null; // 배너 이미지(선택) (0048)
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** 코트 예약 가능일(오픈일) — 관리자가 연 날짜만 예약 가능 */
 export type CourtOpenDay = {
   court_id: string;
@@ -317,6 +345,18 @@ export interface Database {
         Row: Court;
         Insert: Write<Court> & { name: string };
         Update: Write<Court>;
+        Relationships: [];
+      };
+      court_registration_requests: {
+        Row: CourtRegistrationRequest;
+        Insert: Write<CourtRegistrationRequest> & { requester_id: string; name: string };
+        Update: Write<CourtRegistrationRequest>;
+        Relationships: [];
+      };
+      event_popups: {
+        Row: EventPopup;
+        Insert: Write<EventPopup> & { title: string };
+        Update: Write<EventPopup>;
         Relationships: [];
       };
       court_open_days: {

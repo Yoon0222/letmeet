@@ -51,7 +51,37 @@ export type Meetup = {
   fee: number; // 게스트비(원), 0=무료 (0033)
   require_approval: boolean; // 참가 신청 승인 필요 여부 (0033)
   image_url: string | null; // 코트/장소 사진 (0034)
+  court_id: string | null; // 등록 코트 연결(선택) (0046)
   status: MeetupStatus;
+  created_at: string;
+};
+
+// ---- 이벤트 팝업 (0047) — 관리자 웹에서 등록/올리기·내리기/기간 설정 ----
+export type EventPopupRow = {
+  id: string;
+  title: string;
+  body: string;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  image_url: string | null; // 배너 이미지(선택) (0048)
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ---- 코트 등록 요청 (0046) ----
+export type CourtRegRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export type CourtRegistrationRequest = {
+  id: string;
+  requester_id: string;
+  name: string;
+  address: string;
+  region: string;
+  note: string;
+  status: CourtRegRequestStatus;
+  court_id: string | null;
   created_at: string;
 };
 
@@ -438,6 +468,18 @@ export interface Database {
         Row: PlayerReview;
         Insert: { reviewer_id: string; reviewee_id: string; rating: number } & WriteDefaults<PlayerReview>;
         Update: WriteDefaults<PlayerReview>;
+        Relationships: [];
+      };
+      court_registration_requests: {
+        Row: CourtRegistrationRequest;
+        Insert: { requester_id: string; name: string } & WriteDefaults<CourtRegistrationRequest>;
+        Update: WriteDefaults<CourtRegistrationRequest>;
+        Relationships: [];
+      };
+      event_popups: {
+        Row: EventPopupRow;
+        Insert: { title: string } & WriteDefaults<EventPopupRow>;
+        Update: WriteDefaults<EventPopupRow>;
         Relationships: [];
       };
       clubs: {

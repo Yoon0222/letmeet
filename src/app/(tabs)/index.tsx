@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
+import { EventPopup } from '@/components/event-popup';
 import { MeetupCard } from '@/components/meetup-card';
 import { TournamentCard } from '@/components/tournament-card';
 import { AppCard } from '@/components/ui/app-card';
@@ -168,6 +169,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <EventPopup />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={

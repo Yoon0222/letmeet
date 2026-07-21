@@ -48,6 +48,7 @@ create table if not exists public.meetups (
   fee           integer not null default 0,        -- 게스트비(원), 0=무료 (0033)
   require_approval boolean not null default true,   -- 참가 신청 승인 필요 여부 (0033, 0045 항상 승인제)
   image_url     text,                              -- 코트/장소 사진 (0034)
+  court_id      uuid,                              -- 등록 코트 연결(선택) (0046). FK는 courts 정의 뒤(파일 끝)에서 추가
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
 );
@@ -1193,3 +1194,78 @@ with (security_invoker = true) as
 select reviewee_id, count(*)::int as review_count, round(avg(rating)::numeric, 1) as avg_rating
 from public.player_reviews
 group by reviewee_id;
+
+-- ============================================================
+-- 코트 등록 요청 (0046) — 검색에 없는 코트를 유저가 요청 → 운영자 승인 시 courts 에 추가
+-- ============================================================
+create table if not exists public.court_registration_requests (
+  id           uuid primary key default uuid_generate_v4(),
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  name         text not null,
+  address      text not null default '',
+  region       text not null default '',
+  note         text not null default '',
+  status       text not null default 'pending' check (status in ('pending','approved','rejected')),
+  court_id     uuid references public.courts(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists court_reg_req_status_idx on public.court_registration_requests (status);
+
+alter table public.court_registration_requests enable row level security;
+drop policy if exists "court_reg_req_select" on public.court_registration_requests;
+create policy "court_reg_req_select" on public.court_registration_requests for select
+  using (requester_id = auth.uid() or public.my_role() in ('organizer','court_manager','super_admin'));
+drop policy if exists "court_reg_req_insert" on public.court_registration_requests;
+create policy "court_reg_req_insert" on public.court_registration_requests for insert
+  with check (requester_id = auth.uid());
+drop policy if exists "court_reg_req_update" on public.court_registration_requests;
+create policy "court_reg_req_update" on public.court_registration_requests for update
+  using (public.my_role() in ('court_manager','super_admin'))
+  with check (public.my_role() in ('court_manager','super_admin'));
+
+-- meetups.court_id → courts FK (courts 가 위에서 정의된 뒤 추가; 재실행 안전)
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'meetups_court_id_fkey') then
+    alter table public.meetups
+      add constraint meetups_court_id_fkey foreign key (court_id) references public.courts(id) on delete set null;
+  end if;
+end $$;
+
+-- ============================================================
+-- 이벤트 팝업 (0047) — 관리자 웹에서 등록/올리기·내리기/기간 설정, 앱 홈에 노출
+-- ============================================================
+create table if not exists public.event_popups (
+  id         uuid primary key default uuid_generate_v4(),
+  title      text not null,
+  body       text not null default '',
+  active     boolean not null default false,
+  starts_at  timestamptz,
+  ends_at    timestamptz,
+  image_url  text,                                  -- 배너 이미지(선택) (0048)
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists event_popups_active_idx on public.event_popups (active, starts_at, ends_at);
+
+alter table public.event_popups enable row level security;
+drop policy if exists "event_popups_select" on public.event_popups;
+create policy "event_popups_select" on public.event_popups for select using (true);
+drop policy if exists "event_popups_insert" on public.event_popups;
+create policy "event_popups_insert" on public.event_popups for insert
+  with check (public.my_role() = 'super_admin');
+drop policy if exists "event_popups_update" on public.event_popups;
+create policy "event_popups_update" on public.event_popups for update
+  using (public.my_role() = 'super_admin') with check (public.my_role() = 'super_admin');
+drop policy if exists "event_popups_delete" on public.event_popups;
+create policy "event_popups_delete" on public.event_popups for delete
+  using (public.my_role() = 'super_admin');
+
+-- event-images 스토리지 버킷 (0048)
+insert into storage.buckets (id, name, public) values ('event-images', 'event-images', true) on conflict (id) do nothing;
+drop policy if exists "event_images_read" on storage.objects;
+create policy "event_images_read" on storage.objects for select using (bucket_id = 'event-images');
+drop policy if exists "event_images_insert" on storage.objects;
+create policy "event_images_insert" on storage.objects for insert with check (bucket_id = 'event-images' and auth.uid() is not null);
+drop policy if exists "event_images_update" on storage.objects;
+create policy "event_images_update" on storage.objects for update using (bucket_id = 'event-images' and auth.uid() is not null);
