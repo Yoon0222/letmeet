@@ -39,6 +39,7 @@ function RootNavigator() {
       (first === 'profile' && second === 'edit') ||
       (first === 'meetup' && second === 'create') ||
       (first === 'club' && second === 'create') ||
+      (first === 'community' && second === 'create') ||
       (first === 'court' && second === 'reservations');
 
     if (!isSupabaseConfigured) {
@@ -74,6 +75,11 @@ function RootNavigator() {
       <Stack.Screen name="club/[id]" options={{ headerShown: true, title: '클럽' }} />
       <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
       <Stack.Screen name="player/[id]" options={{ headerShown: true, title: '플레이어' }} />
+      <Stack.Screen
+        name="community/create"
+        options={{ presentation: 'modal', headerShown: true, title: '글쓰기' }}
+      />
+      <Stack.Screen name="community/[id]" options={{ headerShown: true, title: '게시글' }} />
       <Stack.Screen name="profile/connections" options={{ headerShown: true, title: '연결된 로그인' }} />
       <Stack.Screen name="court/index" options={{ headerShown: true, title: '코트 예약' }} />
       <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />

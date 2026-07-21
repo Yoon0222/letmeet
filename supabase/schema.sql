@@ -1052,7 +1052,7 @@ create policy "blocks_delete_own" on public.user_blocks for delete using (auth.u
 create table if not exists public.reports (
   id             uuid primary key default uuid_generate_v4(),
   reporter_id    uuid not null references public.profiles(id) on delete cascade,
-  target_type    text not null check (target_type in ('meetup','club','profile','tournament')),
+  target_type    text not null check (target_type in ('meetup','club','profile','tournament','community_post','community_comment','court_review')),
   target_id      uuid not null,
   target_user_id uuid references public.profiles(id) on delete set null,
   reason         text not null,
@@ -1269,3 +1269,140 @@ drop policy if exists "event_images_insert" on storage.objects;
 create policy "event_images_insert" on storage.objects for insert with check (bucket_id = 'event-images' and auth.uid() is not null);
 drop policy if exists "event_images_update" on storage.objects;
 create policy "event_images_update" on storage.objects for update using (bucket_id = 'event-images' and auth.uid() is not null);
+
+-- ============================================================
+-- 커뮤니티 (0049) — 전체 공개 게시판(카테고리별) + 글·사진·댓글·좋아요
+-- ============================================================
+create table if not exists public.community_posts (
+  id         uuid primary key default uuid_generate_v4(),
+  author_id  uuid not null references public.profiles(id) on delete cascade,
+  category   text not null default 'free'
+             check (category in ('free','question','market','review','tip')), -- 자유/질문/장터/후기/팁·정보
+  title      text not null,
+  body       text not null default '',
+  images     text[] not null default '{}',   -- 여러 장, 첫 장이 커버
+  is_pinned  boolean not null default false,  -- 운영자 공지 고정(향후)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists community_posts_category_idx on public.community_posts (category, created_at desc);
+create index if not exists community_posts_created_idx on public.community_posts (created_at desc);
+
+create table if not exists public.community_comments (
+  id         uuid primary key default uuid_generate_v4(),
+  post_id    uuid not null references public.community_posts(id) on delete cascade,
+  author_id  uuid not null references public.profiles(id) on delete cascade,
+  body       text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists community_comments_post_idx on public.community_comments (post_id, created_at);
+
+create table if not exists public.community_post_likes (
+  post_id    uuid not null references public.community_posts(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+create index if not exists community_post_likes_user_idx on public.community_post_likes (user_id);
+
+alter table public.community_posts enable row level security;
+alter table public.community_comments enable row level security;
+alter table public.community_post_likes enable row level security;
+
+drop policy if exists "community_posts_select" on public.community_posts;
+create policy "community_posts_select" on public.community_posts for select using (true);
+drop policy if exists "community_posts_insert" on public.community_posts;
+create policy "community_posts_insert" on public.community_posts for insert with check (auth.uid() = author_id);
+drop policy if exists "community_posts_update" on public.community_posts;
+create policy "community_posts_update" on public.community_posts for update using (auth.uid() = author_id) with check (auth.uid() = author_id);
+drop policy if exists "community_posts_delete" on public.community_posts;
+create policy "community_posts_delete" on public.community_posts for delete
+  using (auth.uid() = author_id or public.my_role() in ('organizer','court_manager','super_admin'));
+
+drop policy if exists "community_comments_select" on public.community_comments;
+create policy "community_comments_select" on public.community_comments for select using (true);
+drop policy if exists "community_comments_insert" on public.community_comments;
+create policy "community_comments_insert" on public.community_comments for insert with check (auth.uid() = author_id);
+drop policy if exists "community_comments_delete" on public.community_comments;
+create policy "community_comments_delete" on public.community_comments for delete
+  using (
+    auth.uid() = author_id
+    or public.my_role() in ('organizer','court_manager','super_admin')
+    or exists (select 1 from public.community_posts p where p.id = post_id and p.author_id = auth.uid())
+  );
+
+drop policy if exists "community_post_likes_select" on public.community_post_likes;
+create policy "community_post_likes_select" on public.community_post_likes for select using (true);
+drop policy if exists "community_post_likes_insert" on public.community_post_likes;
+create policy "community_post_likes_insert" on public.community_post_likes for insert with check (auth.uid() = user_id);
+drop policy if exists "community_post_likes_delete" on public.community_post_likes;
+create policy "community_post_likes_delete" on public.community_post_likes for delete using (auth.uid() = user_id);
+
+create or replace view public.community_posts_with_counts
+with (security_invoker = true)
+as
+select
+  cp.*,
+  p.nickname    as author_nickname,
+  p.avatar_url  as author_avatar_url,
+  p.skill_level as author_skill,
+  (select count(*) from public.community_post_likes l where l.post_id = cp.id) as like_count,
+  (select count(*) from public.community_comments  c where c.post_id = cp.id) as comment_count
+from public.community_posts cp
+join public.profiles p on p.id = cp.author_id;
+
+-- community-images 스토리지 버킷 (0049)
+insert into storage.buckets (id, name, public) values ('community-images', 'community-images', true) on conflict (id) do nothing;
+drop policy if exists "community_images_read" on storage.objects;
+create policy "community_images_read" on storage.objects for select using (bucket_id = 'community-images');
+drop policy if exists "community_images_insert" on storage.objects;
+create policy "community_images_insert" on storage.objects for insert with check (bucket_id = 'community-images' and auth.uid() is not null);
+
+-- ============================================================
+-- 코트 리뷰 (0050) — 별점+한줄평, 그 코트 예약한 사람만 작성
+-- ============================================================
+create or replace function public.has_reserved_court(a uuid, c uuid)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from court_reservations r
+    where r.user_id = a and r.court_id = c and r.status = 'reserved'
+  );
+$$;
+
+create table if not exists public.court_reviews (
+  id         uuid primary key default uuid_generate_v4(),
+  court_id   uuid not null references public.courts(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  rating     int  not null check (rating between 1 and 5),
+  comment    text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (court_id, user_id)
+);
+create index if not exists court_reviews_court_idx on public.court_reviews (court_id, created_at desc);
+
+alter table public.court_reviews enable row level security;
+drop policy if exists "court_reviews_select" on public.court_reviews;
+create policy "court_reviews_select" on public.court_reviews for select using (true);
+drop policy if exists "court_reviews_insert" on public.court_reviews;
+create policy "court_reviews_insert" on public.court_reviews for insert
+  with check (user_id = auth.uid() and public.has_reserved_court(auth.uid(), court_id));
+drop policy if exists "court_reviews_update" on public.court_reviews;
+create policy "court_reviews_update" on public.court_reviews for update
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "court_reviews_delete" on public.court_reviews;
+create policy "court_reviews_delete" on public.court_reviews for delete
+  using (user_id = auth.uid() or public.my_role() in ('organizer','court_manager','super_admin'));
+
+create or replace view public.court_reviews_with_author
+with (security_invoker = true) as
+select r.*, p.nickname as author_nickname, p.avatar_url as author_avatar_url, p.skill_level as author_skill
+from public.court_reviews r
+join public.profiles p on p.id = r.user_id;
+
+create or replace view public.court_review_stats
+with (security_invoker = true) as
+select court_id, count(*)::int as review_count, round(avg(rating)::numeric, 1) as avg_rating
+from public.court_reviews
+group by court_id;

@@ -413,8 +413,33 @@ export type CourtReservationWithCourt = CourtReservation & {
   courts: Pick<Court, 'id' | 'name' | 'region' | 'indoor' | 'hourly_price'>;
 };
 
+// ---- 코트 리뷰 (0050) — 별점+한줄평, 그 코트 예약자만 ----
+export type CourtReview = {
+  id: string;
+  court_id: string;
+  user_id: string;
+  rating: number; // 1~5
+  comment: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** court_reviews_with_author 뷰 */
+export type CourtReviewWithAuthor = CourtReview & {
+  author_nickname: string;
+  author_avatar_url: string | null;
+  author_skill: number;
+};
+
+/** court_review_stats 뷰 (평균·개수) */
+export type CourtReviewStats = {
+  court_id: string;
+  review_count: number;
+  avg_rating: number | null;
+};
+
 // ---- 신고·차단 (moderation) ----
-export type ReportTargetType = 'meetup' | 'club' | 'profile' | 'tournament';
+export type ReportTargetType = 'meetup' | 'club' | 'profile' | 'tournament' | 'community_post' | 'community_comment' | 'court_review';
 export type ReportStatus = 'open' | 'reviewed' | 'dismissed';
 
 export type UserBlock = {
@@ -432,6 +457,49 @@ export type Report = {
   reason: string;
   detail: string;
   status: ReportStatus;
+  created_at: string;
+};
+
+// ---- 커뮤니티 (0049) ----
+export type CommunityCategory = 'free' | 'question' | 'market' | 'review' | 'tip';
+
+export type CommunityPost = {
+  id: string;
+  author_id: string;
+  category: CommunityCategory;
+  title: string;
+  body: string;
+  images: string[]; // 여러 장, 첫 장이 커버
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** community_posts_with_counts 뷰 결과 */
+export type CommunityPostWithCounts = CommunityPost & {
+  author_nickname: string;
+  author_avatar_url: string | null;
+  author_skill: number;
+  like_count: number;
+  comment_count: number;
+};
+
+export type CommunityComment = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+};
+
+/** 댓글 + 작성자 프로필 (조인 결과) */
+export type CommunityCommentWithAuthor = CommunityComment & {
+  profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url'>;
+};
+
+export type CommunityPostLike = {
+  post_id: string;
+  user_id: string;
   created_at: string;
 };
 
@@ -588,6 +656,30 @@ export interface Database {
         Update: WriteDefaults<Report>;
         Relationships: [];
       };
+      community_posts: {
+        Row: CommunityPost;
+        Insert: { author_id: string; title: string } & WriteDefaults<CommunityPost>;
+        Update: WriteDefaults<CommunityPost>;
+        Relationships: [];
+      };
+      community_comments: {
+        Row: CommunityComment;
+        Insert: { post_id: string; author_id: string; body: string } & WriteDefaults<CommunityComment>;
+        Update: WriteDefaults<CommunityComment>;
+        Relationships: [];
+      };
+      community_post_likes: {
+        Row: CommunityPostLike;
+        Insert: { post_id: string; user_id: string };
+        Update: WriteDefaults<CommunityPostLike>;
+        Relationships: [];
+      };
+      court_reviews: {
+        Row: CourtReview;
+        Insert: { court_id: string; user_id: string; rating: number } & WriteDefaults<CourtReview>;
+        Update: WriteDefaults<CourtReview>;
+        Relationships: [];
+      };
     };
     Views: {
       meetups_with_counts: {
@@ -610,10 +702,23 @@ export interface Database {
         Row: PlayerReviewStats;
         Relationships: [];
       };
+      community_posts_with_counts: {
+        Row: CommunityPostWithCounts;
+        Relationships: [];
+      };
+      court_reviews_with_author: {
+        Row: CourtReviewWithAuthor;
+        Relationships: [];
+      };
+      court_review_stats: {
+        Row: CourtReviewStats;
+        Relationships: [];
+      };
     };
     Functions: {
       delete_account: { Args: Record<string, never>; Returns: undefined };
       have_played_together: { Args: { a: string; b: string }; Returns: boolean };
+      has_reserved_court: { Args: { a: string; c: string }; Returns: boolean };
       set_tie_lineup: { Args: { p_tie_match: string; p_side: string; p_players: string[] }; Returns: undefined };
       submit_tie_lineup: { Args: { p_tie: string; p_side: string }; Returns: undefined };
     };
