@@ -31,6 +31,19 @@
         "EXPO_PUBLIC_PAYMENT_APP_SCHEME": "pickleball://"
       }
     },
+    "dev-pay": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pjfhxkvdjipvdmfsacie.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_-WcdqpYKuPcnm4zEf2rj5Q_-vbuZtNL",
+        "EXPO_PUBLIC_PAYMENT_PROVIDER": "toss",
+        "EXPO_PUBLIC_PAYMENT_RETURN_BASE_URL": "https://pinut.org/payment",
+        "EXPO_PUBLIC_PAYMENT_APP_SCHEME": "pickleball://"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {
