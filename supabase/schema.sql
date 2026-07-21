@@ -1406,3 +1406,31 @@ with (security_invoker = true) as
 select court_id, count(*)::int as review_count, round(avg(rating)::numeric, 1) as avg_rating
 from public.court_reviews
 group by court_id;
+
+-- ============================================================
+-- 미결제 홀드 자동정리 (0051) — pending 주문+홀드 N분 후 해제(유령 슬롯 방지)
+-- pg_cron 스케줄은 마이그레이션 0051 주석 참고.
+-- ============================================================
+create or replace function public.release_stale_court_holds(p_minutes int default 15)
+returns int
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_ids uuid[];
+begin
+  select array_agg(id) into v_ids
+  from public.court_payments
+  where status = 'pending'
+    and created_at < now() - make_interval(mins => p_minutes);
+
+  if v_ids is null then
+    return 0;
+  end if;
+
+  delete from public.court_reservations where payment_id = any(v_ids);
+  update public.court_payments set status = 'canceled' where id = any(v_ids);
+
+  return coalesce(array_length(v_ids, 1), 0);
+end;
+$$;
