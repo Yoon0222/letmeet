@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CourtReviews } from '@/components/court-reviews';
 import { MonthCalendar } from '@/components/month-calendar';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
@@ -297,6 +298,13 @@ export default function CourtDetail() {
               })}
             </View>
           </>
+        ) : null}
+
+        {/* 코트 리뷰 (0050) — 자체 완결 컴포넌트 */}
+        {id ? (
+          <View style={{ marginTop: Spacing.four }}>
+            <CourtReviews courtId={id} />
+          </View>
         ) : null}
       </ScrollView>
 
