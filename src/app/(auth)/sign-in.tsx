@@ -1,10 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,10 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppleButton } from '@/components/ui/apple-button';
 import { Button } from '@/components/ui/button';
 import { KakaoButton } from '@/components/ui/kakao-button';
 import { TextField } from '@/components/ui/text-field';
-import { KAKAO_LOGIN_ENABLED } from '@/constants/features';
+import { APPLE_LOGIN_ENABLED, GOOGLE_LOGIN_ENABLED, KAKAO_LOGIN_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useI18n } from '@/contexts/i18n';
@@ -24,12 +28,16 @@ import type { TranslationKey } from '@/i18n/translations';
 
 export default function SignIn() {
   const { t } = useI18n();
-  const { signIn, signInWithKakao } = useAuth();
+  const { signIn, signInWithKakao, signInWithGoogle, signInWithApple } = useAuth();
   const { withLoading } = useLoading();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [kakaoLoading, setKakaoLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const showApple = APPLE_LOGIN_ENABLED && Platform.OS === 'ios';
+  const anySocial = showApple || GOOGLE_LOGIN_ENABLED || KAKAO_LOGIN_ENABLED;
 
   async function onKakao() {
     setKakaoLoading(true);
@@ -39,6 +47,27 @@ export default function SignIn() {
       Alert.alert(t('auth.kakaoFailed'), translateAuthError(e?.message, t));
     } finally {
       setKakaoLoading(false);
+    }
+  }
+
+  async function onGoogle() {
+    setGoogleLoading(true);
+    try {
+      await withLoading(signInWithGoogle());
+    } catch (e: any) {
+      Alert.alert(t('auth.signInFailed'), translateAuthError(e?.message, t));
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
+  async function onApple() {
+    try {
+      await withLoading(signInWithApple());
+    } catch (e: any) {
+      // 사용자가 애플 시트를 취소하면 에러로 보지 않음
+      if (e?.code === 'ERR_REQUEST_CANCELED' || /cancel/i.test(e?.message ?? '')) return;
+      Alert.alert(t('auth.signInFailed'), translateAuthError(e?.message, t));
     }
   }
 
@@ -92,14 +121,27 @@ export default function SignIn() {
             />
             <Button title={t('auth.signIn')} onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
 
-            {KAKAO_LOGIN_ENABLED ? (
+            {anySocial ? (
               <View style={styles.socialArea}>
                 <View style={styles.divider}>
                   <View style={styles.line} />
                   <Text style={styles.dividerText}>{t('auth.or')}</Text>
                   <View style={styles.line} />
                 </View>
-                <KakaoButton onPress={onKakao} loading={kakaoLoading} />
+                {showApple ? <AppleButton onPress={onApple} /> : null}
+                {GOOGLE_LOGIN_ENABLED ? (
+                  <Pressable onPress={onGoogle} style={styles.googleBtn} disabled={googleLoading}>
+                    {googleLoading ? (
+                      <ActivityIndicator color="#111827" />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={20} color="#111827" />
+                        <Text style={styles.googleText}>Google로 계속하기</Text>
+                      </>
+                    )}
+                  </Pressable>
+                ) : null}
+                {KAKAO_LOGIN_ENABLED ? <KakaoButton onPress={onKakao} loading={kakaoLoading} /> : null}
               </View>
             ) : null}
           </View>
@@ -155,6 +197,19 @@ const styles = StyleSheet.create({
   divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' },
   dividerText: { fontSize: 13, color: '#9CA3AF' },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  googleText: { fontSize: 15, fontWeight: '700', color: '#111827' },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   footerText: { color: '#6B7280' },
   link: { fontWeight: '700', color: '#16C784' },

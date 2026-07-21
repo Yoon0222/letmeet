@@ -21,11 +21,15 @@ export default function ProfileScreen() {
   const { t, language, languages, languageLabels, setLanguage } = useI18n();
   const { session, profile, signOut, deleteAccount } = useAuth();
   const [myMeetups, setMyMeetups] = useState<MeetupWithCounts[]>([]);
+  const [reviewStat, setReviewStat] = useState<{ avg: number; count: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const uid = session?.user.id;
     if (!uid) return;
+    // 받은 리뷰 요약(평균·개수)
+    const { data: rs } = await supabase.from('player_review_stats').select('*').eq('reviewee_id', uid).maybeSingle();
+    setReviewStat(rs ? { avg: rs.avg_rating ?? 0, count: rs.review_count } : null);
     const { data: parts } = await supabase
       .from('meetup_participants')
       .select('meetup_id')
@@ -88,6 +92,32 @@ export default function ProfileScreen() {
 
         <ProfileSummaryCard profile={profile} meetupCount={myMeetups.length} />
 
+        {/* 받은 리뷰 — 요약 + 탭하면 전체 리뷰(플레이어 화면) */}
+        <AppCard onPress={() => router.push(`/player/${session?.user.id}` as never)} style={styles.reviewRow}>
+          <View style={styles.reviewIcon}>
+            <Ionicons name="star" size={18} color="#F5A623" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reviewTitle}>받은 리뷰</Text>
+            <Text style={styles.reviewSub}>
+              {reviewStat ? `평균 ★ ${reviewStat.avg.toFixed(1)} · ${reviewStat.count}개` : '아직 받은 리뷰가 없어요'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        </AppCard>
+
+        {/* 연결된 로그인 관리 */}
+        <AppCard onPress={() => router.push('/profile/connections')} style={styles.reviewRow}>
+          <View style={[styles.reviewIcon, { backgroundColor: '#EAF1FF' }]}>
+            <Ionicons name="link-outline" size={18} color="#2D6BD6" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reviewTitle}>연결된 로그인</Text>
+            <Text style={styles.reviewSub}>이메일·구글 등 로그인 수단 관리</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        </AppCard>
+
         <AppCard disabled style={styles.languageCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.languageTitle}>{t('profile.language')}</Text>
@@ -142,6 +172,10 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  reviewRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  reviewIcon: { width: 40, height: 40, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
+  reviewTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
+  reviewSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   languageCard: {
     flexDirection: 'row',
     alignItems: 'center',

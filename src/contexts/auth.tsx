@@ -27,6 +27,8 @@ interface AuthContextValue {
   signUp: (email: string, password: string, nickname: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithKakao: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -132,11 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }, []);
 
-  const signInWithKakao = useCallback(async () => {
+  // 브라우저 기반 OAuth 공통 (카카오·구글). 웹=전체 리다이렉트, 네이티브=인앱 브라우저 후 code 교환.
+  const signInWithBrowserOAuth = useCallback(async (provider: 'kakao' | 'google') => {
     if (Platform.OS === 'web') {
       // 웹: 전체 페이지 리다이렉트 후 detectSessionInUrl 이 세션을 복원
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'kakao',
+        provider,
         options: { redirectTo: window.location.origin },
       });
       if (error) throw error;
@@ -145,11 +148,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 네이티브: 인앱 브라우저로 열고, 돌아온 URL 의 code 를 세션으로 교환
     const redirectTo = Linking.createURL('auth-callback');
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'kakao',
+      provider,
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error) throw error;
-    if (!data?.url) throw new Error('카카오 인증 URL 을 받지 못했습니다.');
+    if (!data?.url) throw new Error('인증 URL 을 받지 못했습니다.');
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
     if (result.type !== 'success' || !result.url) return; // 사용자가 취소
@@ -158,6 +161,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
       if (exErr) throw exErr;
     }
+  }, []);
+
+  const signInWithKakao = useCallback(() => signInWithBrowserOAuth('kakao'), [signInWithBrowserOAuth]);
+  const signInWithGoogle = useCallback(() => signInWithBrowserOAuth('google'), [signInWithBrowserOAuth]);
+
+  // 애플: iOS 네이티브 Sign in with Apple → identityToken 을 Supabase 로 교환
+  const signInWithApple = useCallback(async () => {
+    if (Platform.OS !== 'ios') throw new Error('Apple 로그인은 iOS 에서만 지원돼요.');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const AppleAuthentication = require('expo-apple-authentication') as typeof import('expo-apple-authentication');
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    if (!credential.identityToken) throw new Error('Apple 인증 토큰을 받지 못했습니다.');
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: credential.identityToken,
+    });
+    if (error) throw error;
   }, []);
 
   const signOut = useCallback(async () => {
@@ -185,11 +210,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signIn,
       signInWithKakao,
+      signInWithGoogle,
+      signInWithApple,
       signOut,
       deleteAccount,
       refreshProfile,
     }),
-    [session, profile, initializing, signUp, signIn, signInWithKakao, signOut, deleteAccount, refreshProfile],
+    [session, profile, initializing, signUp, signIn, signInWithKakao, signInWithGoogle, signInWithApple, signOut, deleteAccount, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
