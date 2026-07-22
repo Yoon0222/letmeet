@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { ActivityIndicator, Alert, Linking, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import { WebView, type WebViewNavigation } from 'react-native-webview';
 
 import { supabase } from '@/lib/supabase';
 
@@ -43,18 +43,11 @@ export default function PaymentWebview() {
     setTimeout(() => Alert.alert('결제 실패', msg), 300);
   }
 
-  // WebView 가 이동하려는 URL 을 가로챈다. success/fail 은 앱 내부에서 처리(로드 차단).
-  function onRequest(req: { url: string }): boolean {
-    const url = req.url;
-
-    // 카드사 앱·간편결제 앱 스킴(intent://, supertoss:// 등)은 외부 앱으로 넘긴다
-    if (!/^https?:/i.test(url) && !url.startsWith('about:') && !url.startsWith('blob:') && !url.startsWith('data:')) {
-      Linking.openURL(url).catch(() => {});
-      return false;
-    }
+  // success/fail URL 이면 앱 내부에서 처리하고 true 반환(= 가로챔). 아니면 false.
+  function handleReturn(url: string): boolean {
+    if (handled.current) return true;
 
     if (url.startsWith(successUrl)) {
-      if (handled.current) return false;
       handled.current = true;
       (async () => {
         const paymentKey = qp(url, 'paymentKey');
@@ -68,20 +61,34 @@ export default function PaymentWebview() {
           finishFail(data?.error ?? error?.message ?? '결제 승인에 실패했어요.');
         }
       })();
-      return false;
+      return true;
     }
 
     if (url.startsWith(failUrl)) {
-      if (handled.current) return false;
       handled.current = true;
       (async () => {
         await releaseHold();
         finishFail(qp(url, 'message') ?? '결제가 취소됐어요.');
       })();
-      return false;
+      return true;
     }
 
-    return true;
+    return false;
+  }
+
+  // 이동 직전 가로채기(+ 카드사·간편결제 앱 스킴은 외부 앱으로)
+  function onRequest(req: { url: string }): boolean {
+    const url = req.url;
+    if (!/^https?:/i.test(url) && !url.startsWith('about:') && !url.startsWith('blob:') && !url.startsWith('data:')) {
+      Linking.openURL(url).catch(() => {});
+      return false;
+    }
+    return !handleReturn(url); // 가로챘으면 로드 차단(false)
+  }
+
+  // 백업: 리다이렉트가 onRequest 를 안 거치는 경우(안드로이드 302/JS) 여기서 잡는다
+  function onNav(state: WebViewNavigation) {
+    handleReturn(state.url);
   }
 
   return (
@@ -89,6 +96,8 @@ export default function PaymentWebview() {
       <WebView
         source={{ uri: checkoutUrl }}
         onShouldStartLoadWithRequest={onRequest}
+        onNavigationStateChange={onNav}
+        setSupportMultipleWindows={false}
         javaScriptEnabled
         domStorageEnabled
         originWhitelist={['*']}
