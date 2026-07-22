@@ -80,6 +80,7 @@ function RootNavigator() {
         options={{ presentation: 'modal', headerShown: true, title: '글쓰기' }}
       />
       <Stack.Screen name="community/[id]" options={{ headerShown: true, title: '게시글' }} />
+      <Stack.Screen name="payment/webview" options={{ headerShown: true, title: '결제' }} />
       <Stack.Screen name="profile/connections" options={{ headerShown: true, title: '연결된 로그인' }} />
       <Stack.Screen name="court/index" options={{ headerShown: true, title: '코트 예약' }} />
       <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />

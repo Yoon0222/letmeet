@@ -173,16 +173,32 @@ export default function CourtDetail() {
     if (!result.ok) {
       if (result.reason === 'slot') Alert.alert('예약 실패', '방금 다른 분이 예약한 시간이 있어요. 다시 선택해주세요.');
       else if (result.reason === 'error') Alert.alert('결제 실패', result.message ?? '잠시 후 다시 시도해주세요.');
-      // 'canceled'(사용자가 결제창 닫음)는 조용히 넘어감
-    } else {
-      const hoursText = [...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ');
+      loadReservations(selectedDate);
+      return;
+    }
+    // 유료(toss) → 인앱 WebView 결제 화면으로. 승인·확정은 그 화면이 처리한다.
+    if ('webview' in result) {
       setPicked([]);
       setAnchor(null);
-      Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`, [
-        { text: '계속 예약', style: 'cancel' },
-        { text: '내 예약 보기', onPress: () => router.push('/court/reservations') },
-      ]);
+      router.push({
+        pathname: '/payment/webview',
+        params: {
+          orderId: result.webview.orderId,
+          amount: String(result.webview.amount),
+          orderName: result.webview.orderName,
+          pid: result.webview.paymentId,
+        },
+      } as never);
+      return;
     }
+    // 무료·mock 즉시 확정
+    const hoursText = [...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ');
+    setPicked([]);
+    setAnchor(null);
+    Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`, [
+      { text: '계속 예약', style: 'cancel' },
+      { text: '내 예약 보기', onPress: () => router.push('/court/reservations') },
+    ]);
     loadReservations(selectedDate);
   }
 
