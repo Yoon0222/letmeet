@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, Linking, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
@@ -90,6 +90,14 @@ export default function PaymentWebview() {
   function onNav(state: WebViewNavigation) {
     handleReturn(state.url);
   }
+
+  // 결제 미완료로 화면을 벗어나면(뒤로가기 등) 홀드된 예약을 해제한다(유령 예약 방지).
+  useEffect(() => {
+    return () => {
+      if (!handled.current) releaseHold();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
