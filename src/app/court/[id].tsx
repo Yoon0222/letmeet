@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CourtReviews } from '@/components/court-reviews';
+import { PAYMENTS_ENABLED } from '@/constants/features';
 import { MonthCalendar } from '@/components/month-calendar';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
@@ -203,6 +204,8 @@ export default function CourtDetail() {
   }
 
   const total = picked.length * court.hourly_price;
+  // 결제 미오픈(토스 심사 중): 유료 코트 예약(결제)만 막고, 무료 코트는 그대로 예약.
+  const paymentBlocked = !PAYMENTS_ENABLED && court.hourly_price > 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -327,14 +330,16 @@ export default function CourtDetail() {
       <View style={styles.actionBar}>
         <Button
           title={
-            picked.length === 0
-              ? '시간을 선택하세요'
-              : total > 0
-                ? `${total.toLocaleString()}원 결제하기`
-                : `${picked.length}시간 예약하기`
+            paymentBlocked
+              ? '유료 코트 예약은 곧 오픈됩니다'
+              : picked.length === 0
+                ? '시간을 선택하세요'
+                : total > 0
+                  ? `${total.toLocaleString()}원 결제하기`
+                  : `${picked.length}시간 예약하기`
           }
           onPress={reserve}
-          disabled={picked.length === 0}
+          disabled={paymentBlocked || picked.length === 0}
           loading={booking}
         />
       </View>
