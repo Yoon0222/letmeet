@@ -159,7 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const code = Linking.parse(result.url).queryParams?.code;
     if (typeof code === 'string') {
       const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-      if (exErr) throw exErr;
+      // 딥링크(auth-callback)에서 코드가 먼저 교환됐을 수 있음(경쟁) →
+      // 실패해도 세션이 이미 생겼으면 성공으로 간주(불필요한 "로그인 실패" 알림 방지)
+      if (exErr) {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) throw exErr;
+      }
     }
   }, []);
 
