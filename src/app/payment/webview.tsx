@@ -76,9 +76,28 @@ export default function PaymentWebview() {
     return false;
   }
 
-  // 이동 직전 가로채기(+ 카드사·간편결제 앱 스킴은 외부 앱으로)
+  // 안드로이드 앱 실행 URL(intent://) → 앱 스킴으로 변환해 열기(카카오페이·앱카드 등)
+  function openIntent(url: string) {
+    const scheme = url.match(/scheme=([^;]+)/)?.[1];
+    const pkg = url.match(/package=([^;]+)/)?.[1];
+    const fallback = url.match(/S\.browser_fallback_url=([^;]+)/)?.[1];
+    const appUrl = scheme ? url.replace(/^intent:\/\//i, `${scheme}://`).split('#Intent')[0] : null;
+    const openFallback = () => {
+      if (fallback) Linking.openURL(decodeURIComponent(fallback)).catch(() => {});
+      else if (pkg) Linking.openURL(`market://details?id=${pkg}`).catch(() => {});
+    };
+    if (appUrl) Linking.openURL(appUrl).catch(openFallback);
+    else openFallback();
+  }
+
+  // 이동 직전 가로채기(+ 카드사·간편결제 앱 실행)
   function onRequest(req: { url: string }): boolean {
     const url = req.url;
+    if (url.startsWith('intent://')) {
+      openIntent(url);
+      return false;
+    }
+    // 그 외 앱 스킴(kakaotalk://, supertoss://, ispmobile:// 등) → 외부 앱
     if (!/^https?:/i.test(url) && !url.startsWith('about:') && !url.startsWith('blob:') && !url.startsWith('data:')) {
       Linking.openURL(url).catch(() => {});
       return false;
