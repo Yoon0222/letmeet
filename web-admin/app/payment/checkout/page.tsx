@@ -18,6 +18,7 @@ type TossPaymentsFn = (clientKey: string) => {
       orderName: string;
       successUrl: string;
       failUrl: string;
+      card?: { appScheme?: string };
     }) => Promise<void>;
   };
 };
@@ -103,6 +104,8 @@ export default function PaymentCheckoutPage() {
         orderName: params.orderName,
         successUrl: params.successUrl,
         failUrl: params.failUrl,
+        // 앱카드·카카오페이 등 결제앱에서 상점(피넛) 앱으로 복귀할 스킴
+        card: { appScheme: 'pickleball://' },
       });
     } catch (e) {
       // 사용자가 결제창을 닫으면 여기로 온다(정상 취소).
