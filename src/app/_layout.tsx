@@ -17,6 +17,7 @@ import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { I18nProvider } from '@/contexts/i18n';
 import { LoadingProvider } from '@/contexts/loading';
+import { NotificationsProvider } from '@/contexts/notifications';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
@@ -76,6 +77,7 @@ function RootNavigator() {
         <Stack.Screen name="court/index" options={{ headerShown: true, title: '코트 예약' }} />
         <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />
         <Stack.Screen name="court/[id]" options={{ headerShown: true, title: '코트' }} />
+        <Stack.Screen name="notifications" options={{ headerShown: true, title: '알림' }} />
         <Stack.Screen
           name="profile/edit"
           options={{ presentation: 'modal', headerShown: true, title: '프로필 수정' }}
@@ -101,11 +103,13 @@ export default function RootLayout() {
         <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
           <I18nProvider>
             <AuthProvider>
-              <LoadingProvider>
-                <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
-                  <RootNavigator />
-                </View>
-              </LoadingProvider>
+              <NotificationsProvider>
+                <LoadingProvider>
+                  <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
+                    <RootNavigator />
+                  </View>
+                </LoadingProvider>
+              </NotificationsProvider>
             </AuthProvider>
           </I18nProvider>
           <StatusBar style="auto" />

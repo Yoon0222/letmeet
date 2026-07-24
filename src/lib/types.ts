@@ -507,6 +507,37 @@ export type CommunityPostLike = {
   created_at: string;
 };
 
+// ---- 알림 ----
+export type NotificationType =
+  | 'join_request'
+  | 'join_approved'
+  | 'comment'
+  | 'match_turn'
+  | 'tie'
+  | 'system';
+
+// 대상 종류 — 탭했을 때 이동할 화면을 정한다.
+export type NotificationTargetType =
+  | 'meetup'
+  | 'club'
+  | 'community_post'
+  | 'tournament'
+  | 'court';
+
+// DOM/expo 의 Notification 과 충돌을 피해 AppNotification 으로 명명.
+export type AppNotification = {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  target_type: NotificationTargetType | null;
+  target_id: string | null;
+  actor_id: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 // ---- Supabase generic Database 타입 (createClient 제네릭용) ----
 type WriteDefaults<T> = Partial<T>;
 
@@ -684,6 +715,13 @@ export interface Database {
         Update: WriteDefaults<CourtReview>;
         Relationships: [];
       };
+      notifications: {
+        Row: AppNotification;
+        // 클라이언트는 직접 insert 하지 않는다(발송은 push_notify 함수). 타입만 유지.
+        Insert: { user_id: string; type: NotificationType; title: string } & WriteDefaults<AppNotification>;
+        Update: WriteDefaults<AppNotification>;
+        Relationships: [];
+      };
     };
     Views: {
       meetups_with_counts: {
@@ -723,6 +761,7 @@ export interface Database {
       delete_account: { Args: Record<string, never>; Returns: undefined };
       have_played_together: { Args: { a: string; b: string }; Returns: boolean };
       has_reserved_court: { Args: { a: string; c: string }; Returns: boolean };
+      mark_notifications_read: { Args: { p_ids?: string[] | null }; Returns: undefined };
       set_tie_lineup: { Args: { p_tie_match: string; p_side: string; p_players: string[] }; Returns: undefined };
       submit_tie_lineup: { Args: { p_tie: string; p_side: string }; Returns: undefined };
     };
