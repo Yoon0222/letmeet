@@ -28,6 +28,8 @@
 - [ ] **prod 마이그레이션 0043~0052 일괄 실행** — 심사/사용 전 필수. `scratchpad/PROD_v2.0_migrations.sql` 준비됨(2026-07-24 확인: 전부 미실행)
 - [ ] ⚠️ **5.1.1(v) 재리젝 리스크 점검** — v1.0.4 는 "비계정 기능에 로그인 강제"로 리젝됨. `ee4bf61` 로 게스트 열람을 다시 없앴으므로, **이 커밋이 심사 제출 빌드에 포함됐는지** 확인 필요. 포함 시 동일 사유 재리젝 가능
 - [ ] 결제 스테일 홀드 자동정리 스케줄 — `pg_cron` 활성화 + `release_stale_court_holds` 5분 주기 등록
+- [ ] 🔴 **알림 기능 prod 배포** — SQL(0053~0055) + Edge Function(notify-turn/tie) + 앱, **한 세트로**. 절차: `docs/PROD_NOTIFICATIONS_DEPLOY.md` (dev는 2026-07-25 적용·검증 완료)
+- [ ] 🔒 **prod `release_stale_court_holds` 권한 회수** — 지금도 열려 있어 결제·예약 일괄취소 가능. 알림 배포와 무관하게 먼저 실행 가능
 - [ ] 대회 참가비 결제 + 대기승격 결제 (Phase 2) — 결제=즉시확정, 정원초과=waitlist(무결제)→승격 시 결제. 결제 엔진 완주 검증 후 착수
 - [ ] `.env` 임시 toss → 결제 테스트 끝나면 mock 복귀 (`.env.premockbak`)
 - [ ] 노션 페이지·`docs` 브랜드 "피넛" 통일 (로드맵/todo/개인정보처리방침)
@@ -68,6 +70,17 @@
 - [ ] 편의: 코트 디렉토리·리뷰 · 날씨 · 더치페이 · 카톡 공유/캘린더
 - [ ] 수익화: 프리미엄 · 대회 참가비 · 상점 수수료 · 광고
 - [ ] 상점 화면 (피클볼 용품 판매) — 로드맵 가장 마지막
+
+---
+
+## 2026-07-25
+
+### 인앱 알림 센터 + 대회 알림 통합 + 보안 수정
+- **결정**: 푸시가 "쏘고 끝"이라 기록이 없어 종 뱃지를 못 셌다 → **중앙 `notifications` 테이블 + 단일 발송 함수 `push_notify()`** (행 저장 + Expo 푸시 동시)로 통일. 대회 알림(notify-turn/tie)도 Expo 직접 발송에서 이 함수 경유로 전환해 종에 쌓이게 함.
+- **만든 것**: `0053`(테이블·RLS·트리거·RPC·realtime) / `0054`(보안 권한회수) / `0055`(service_role 재부여) · `src/contexts/notifications.tsx`(실시간 구독+푸시탭 딥링크) · `src/components/ui/notification-bell.tsx` · `src/app/notifications.tsx` · 홈 종 연결(`(tabs)/index.tsx`) · Edge Function 2종 개편.
+- **잡은 버그 3개**: ① 웹에서 `getLastNotificationResponseAsync` 크래시(호출 미가드) ② **읽음이 서버에 저장 안 됨** — supabase 쿼리 빌더는 lazy라 `await/then` 없이는 요청이 안 나감 ③ 🔒 **`push_notify`·`release_stale_court_holds`를 anon도 호출 가능**(함수 생성 시 PUBLIC 기본 부여) — 가짜 푸시·결제 일괄취소 벡터.
+- **검증**: dev 적용·배포 후 실호출 — notify-turn/tie 각각 `{"sent":2,"failed":[]}`, anon은 `42501` 차단, 웹 프리뷰에서 종 뱃지 5→4 반영 확인.
+- **메모/주의**: 🔴 **prod 미적용** — `docs/PROD_NOTIFICATIONS_DEPLOY.md` 체크리스트대로 SQL(0053~0055)+함수배포+앱배포를 **한 세트로** 해야 함. prod의 `release_stale_court_holds`는 지금도 열려 있어 revoke 한 줄만 먼저 실행해도 됨.
 
 ---
 
