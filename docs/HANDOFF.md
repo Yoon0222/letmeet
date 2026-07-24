@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-14 (Claude: 대회 진행 방식 KDK/단체전 + 부팅 수정)
+Last updated: 2026-07-24 (Claude: v2.0.0 릴리스 + OTA + 게스트제거 + 인앱 알림센터)
 
 ## Purpose
 
@@ -22,6 +22,22 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-07-24, 인앱 알림 센터)
+
+- **What changed**: 인앱 알림 센터 신설 (커밋 `c7b7b71`, 마이그레이션 `0053`). 지금까지 푸시가 "쏘고 끝"이라 안읽음 숫자를 못 셌음 → 중앙 `notifications` 테이블에 저장 + Expo 푸시 동시 발송.
+- **Why**: 홈에서 종모양 + 안읽음 뱃지 요구. 기록이 남아야 종 숫자를 셀 수 있음.
+- **Files touched (전부 내 경계 — UI 비주얼 코덱스 파일 안 건드림)**: `supabase/migrations/0053_notifications.sql`, `supabase/schema.sql`, `src/lib/types.ts`(AppNotification 타입+Database), `src/contexts/notifications.tsx`(신규 Provider/훅), `src/components/ui/notification-bell.tsx`(신규), `src/app/notifications.tsx`(신규 목록화면), `src/app/_layout.tsx`(Provider 주입+라우트).
+- **Validation**: tsc 0 · lint 0 · ios 번들 export 성공.
+- **🙋 코덱스에게 요청 — 홈 헤더에 종 배치**:
+  - 홈(`src/app/(tabs)/index.tsx`, **코덱스가 미커밋 편집 중이라 내가 안 건드림**) 우측 상단에 `<NotificationBell/>` 하나만 넣어줘.
+  - `import { NotificationBell } from '@/components/ui/notification-bell';`
+  - props: `color?`(헤더 배경에 맞춤, 기본 `#111827`) · `size?`(기본 24). **상태 전달 불필요** — 자체적으로 `useNotifications()` 로 안읽음 수 구독. 탭하면 `/notifications` 이동.
+  - 종/목록 **디자인 다듬는 건 자유** (로직은 `useNotifications()` 훅에서 옴 — `items`·`unread`·`markAllRead`·`openTarget`). 뱃지 빨강은 `Brand.danger`.
+- **⚠️ Follow-ups**:
+  - `0053` 마이그레이션 **dev/prod 양쪽 실행 필요**(아직 미실행). prod 는 0043~0052 와 함께 `scratchpad/PROD_v2.0_migrations.sql` 뒤에 이어 실행하면 됨. `notifications` 는 realtime publication 에 등록됨.
+  - 이 기능은 **순수 JS+DB → OTA 배포 가능**. 단 홈에 종 배치(코덱스)까지 돼야 사용자가 접근 가능.
+  - 알림 발생 지점: 신청(기존 0035)·승인(pending→approved)·커뮤니티 댓글. 대회 차례(notify-turn)·타이(notify-tie)는 별도 Edge Function 이라 아직 이 테이블에 안 쌓임 — 원하면 후속으로 통합 가능.
 
 ### Claude -> Codex (2026-07-15, 클럽 가입 항상 승인제)
 
@@ -1344,6 +1360,72 @@ Production Supabase migration status check:
   - Register `TOSS_SECRET_KEY` in Supabase production secrets.
   - Build/publish a new app bundle so the client contains the Toss payment code/env.
 
+2026-07-21 landing business footer:
+
+- User requested the homepage footer include legal business information from the business registration certificate:
+  - business name
+  - business registration number
+  - representative name
+  - business address
+  - landline phone number
+- Added a business info footer to `web-admin/app/landing/page.tsx`.
+- Footer values are read from public web environment variables:
+  - `NEXT_PUBLIC_BUSINESS_NAME`
+  - `NEXT_PUBLIC_BUSINESS_REGISTRATION_NUMBER`
+  - `NEXT_PUBLIC_BUSINESS_REPRESENTATIVE`
+  - `NEXT_PUBLIC_BUSINESS_ADDRESS`
+  - `NEXT_PUBLIC_BUSINESS_PHONE`
+- Missing values render as `확인 필요`; do not deploy to production until real values are set.
+- Verification: `web-admin` `npm.cmd run build` passed.
+- No production deploy was run for this change.
+
+2026-07-21 business footer values:
+
+- User provided business registration number and registration certificate fields.
+- Updated local `web-admin/.env.local` with:
+  - `NEXT_PUBLIC_BUSINESS_NAME=피넛`
+  - `NEXT_PUBLIC_BUSINESS_REGISTRATION_NUMBER=221-14-95232`
+  - `NEXT_PUBLIC_BUSINESS_REPRESENTATIVE=신윤식`
+  - `NEXT_PUBLIC_BUSINESS_ADDRESS=인천광역시 경인대로3, 1동 4층 401호(물류동)`
+  - `NEXT_PUBLIC_BUSINESS_PHONE=확인 필요`
+- Build verification: `web-admin` `npm.cmd run build` passed.
+- No production deploy was run.
+- Before production deploy, set the same variables in Vercel production environment and replace `NEXT_PUBLIC_BUSINESS_PHONE` with a real landline/business contact number.
+
+2026-07-21 business footer production deploy:
+
+- User explicitly requested production deploy with business contact number `010 5270 2034`.
+- Updated `web-admin/app/landing/page.tsx` default business info values so production shows the required footer even if Vercel env vars are missing.
+- Updated local `web-admin/.env.local` phone value to `010 5270 2034`.
+- Local `web-admin` `npm.cmd run build` passed.
+- Deployed `web-admin` to Vercel production.
+  - Deployment URL: `https://web-admin-e4i42p7i0-troyyoonsikshin-2301s-projects.vercel.app`
+  - Production alias: `https://pinut.org`
+- Verified `https://pinut.org` HTML contains:
+  - `피넛`
+  - `221-14-95232`
+  - `신윤식`
+  - `010 5270 2034`
+
+2026-07-22 app boot/home loading polish:
+
+- User reported the app loading screen felt too simple and Home briefly showed empty data before real data loaded.
+- Replaced `src/components/ui/boot-screen.tsx` with a richer P!NUT branded boot screen:
+  - mascot card
+  - P!NUT / Play instant copy
+  - animated progress bar
+  - Korean loading message
+- Updated `src/app/(tabs)/index.tsx`:
+  - imports `BootScreen`
+  - tracks `initialLoading`
+  - keeps showing the boot screen until the first Home data load finishes
+  - refreshes still keep the Home screen visible with pull-to-refresh
+  - load errors no longer leave the screen stuck; `initialLoading` is cleared in `finally`
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build or production deployment was run.
+
 ### Claude -> Codex (2026-07-21, 토스 결제 리워크 — 사용자가 페이먼츠 담당 이관)
 
 - **문제 발견**: `toss-create-payment` 엣지함수가 호출하던 `POST https://api.tosspayments.com/v1/payments` (→ `checkout.url`) 는 **토스에 존재하지 않는 엔드포인트**다. 토스는 서버로 결제창 URL을 만들 수 없고, **클라이언트 SDK(`requestPayment`)로만 결제창**을 연다. (docs.tosspayments.com/reference·sdk/v2/js 로 교차확인)
@@ -1355,3 +1437,29 @@ Production Supabase migration status check:
 - **검증**: web-admin 로컬(3100)에서 체크아웃 페이지 → **실제 토스 테스트 결제창 자동 오픈** 확인(테스트 clientKey, "실제 결제 안됨" 배지). mock 결제도 웹에서 예약 확정까지 검증(court_payments paid).
 - **남은 것(실기기 전체 왕복)**: 토스 대시보드 successUrl 도메인 등록 / web-admin 배포(체크아웃+clientKey) / **DEV** Supabase에 `pay-verify` 배포 + `TOSS_SECRET_KEY`(테스트) 등록 / 앱 dev빌드 `EXPO_PUBLIC_PAYMENT_PROVIDER=toss`. 라이브 결제는 사업자 심사 통과(개업일 2026-08-03) 후 라이브키로.
 - **코덱스에게**: 페이먼츠는 사용자가 이번엔 Claude에 맡김. `payments.ts`·`pay-verify`·`web-admin/app/payment/*` 는 위 상태가 최신이니 되돌리지 말 것.
+
+2026-07-23 meetup create court request modal fix:
+
+- User reported the court registration request bottom sheet on `src/app/meetup/create.tsx` was partially hidden by the Android navigation bar, and text inputs were hidden by the keyboard.
+- Updated `src/app/meetup/create.tsx`:
+  - Added `useSafeAreaInsets()` and safe-area bottom padding for the bottom sheet.
+  - Wrapped the modal content with `KeyboardAvoidingView`.
+  - Made the modal body scrollable with `keyboardShouldPersistTaps="handled"`.
+  - Changed the root create screen keyboard behavior to `height` on Android.
+  - Increased bottom padding on the create form so lower controls are not cramped behind system navigation.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build or production deployment was run.
+
+2026-07-23 meetup create court request modal keyboard lift fix:
+
+- User clarified the bottom sheet itself must move above the keyboard, not only become scrollable.
+- Updated `src/app/meetup/create.tsx` again:
+  - Listens to keyboard show/hide events.
+  - Tracks keyboard height minus safe-area bottom inset.
+  - Applies that value as `marginBottom` to the court request modal card so the whole bottom sheet rises above the keyboard.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build or production deployment was run.
