@@ -118,7 +118,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       if (!n.read_at) {
         const now = new Date().toISOString();
         setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: now } : x)));
-        supabase.rpc('mark_notifications_read', { p_ids: [n.id] });
+        // ⚠️ supabase 쿼리 빌더는 lazy — then/await 로 소비해야 실제 요청이 나간다.
+        //    (예전엔 호출만 하고 버려서 읽음 처리가 서버에 저장되지 않았음)
+        void supabase
+          .rpc('mark_notifications_read', { p_ids: [n.id] })
+          .then(({ error }) => {
+            if (error) console.warn('[notifications] 읽음 처리 실패:', error.message);
+          });
       }
       const href = targetHref(n.target_type, n.target_id);
       if (href) router.push(href as never);
