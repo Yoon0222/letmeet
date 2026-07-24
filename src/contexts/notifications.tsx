@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 
 import { useAuth } from '@/contexts/auth';
 import { supabase } from '@/lib/supabase';
@@ -126,9 +127,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   );
 
   // 푸시 알림을 탭했을 때(백그라운드/종료 상태 포함) 대상 화면으로 이동.
-  // expo-notifications 가 없는 런타임(웹/옛 빌드)에서 크래시나지 않도록 안전 로드.
+  // 네이티브 전용 — 웹에선 expo-notifications 의 응답 API 가 없어(호출 시 throw) 스킵한다.
+  // 모듈/메서드 부재(옛 빌드 등)에도 크래시나지 않도록 로드·호출 모두 try/catch.
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || Platform.OS === 'web') return;
     let Notifications: typeof import('expo-notifications') | null = null;
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -137,6 +139,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!Notifications) return;
+    const notif = Notifications;
 
     const go = (data: unknown) => {
       const d = (data ?? {}) as { target_type?: NotificationTargetType; target_id?: string };
@@ -144,15 +147,20 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       if (href) router.push(href as never);
     };
 
-    // 앱이 종료 상태에서 알림 탭으로 열렸을 때
-    Notifications.getLastNotificationResponseAsync().then((res) => {
-      if (res) go(res.notification.request.content.data);
-    });
-    // 실행/백그라운드 중 알림 탭
-    const sub = Notifications.addNotificationResponseReceivedListener((res) => {
-      go(res.notification.request.content.data);
-    });
-    return () => sub.remove();
+    let sub: { remove: () => void } | undefined;
+    try {
+      // 앱이 종료 상태에서 알림 탭으로 열렸을 때
+      notif.getLastNotificationResponseAsync().then((res) => {
+        if (res) go(res.notification.request.content.data);
+      });
+      // 실행/백그라운드 중 알림 탭
+      sub = notif.addNotificationResponseReceivedListener((res) => {
+        go(res.notification.request.content.data);
+      });
+    } catch {
+      // 미지원 런타임 — 무시(딥링크만 비활성, 앱은 정상)
+    }
+    return () => sub?.remove();
   }, [uid, router]);
 
   const value = useMemo(
