@@ -7,6 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "pickleball",
     "userInterfaceStyle": "automatic",
+    "updates": {
+      "url": "https://u.expo.dev/f6baa6d2-506e-487e-a65d-fa041c68e960",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.pinut.app",

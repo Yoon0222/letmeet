@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "android": {
         "buildType": "apk"
       },
@@ -20,6 +21,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       },
@@ -33,6 +35,7 @@
     },
     "dev-pay": {
       "distribution": "internal",
+      "channel": "dev-pay",
       "android": {
         "buildType": "apk"
       },
@@ -46,6 +49,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://jbvtdthtmrlndduqiikj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_daAIr4VpcBjpfGmzx38dAA__yevC6La",
