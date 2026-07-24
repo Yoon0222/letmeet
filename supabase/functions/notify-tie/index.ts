@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
   // 2) 타이 + 대회(주최자) 조회
   const { data: tie } = await admin
     .from('tournament_ties')
-    .select('team1_id, team2_id, court_id, tournaments(organizer_id)')
+    .select('tournament_id, team1_id, team2_id, court_id, tournaments(organizer_id)')
     .eq('id', tie_id)
     .maybeSingle();
   if (!tie) return json({ error: 'tie not found' }, 404);
@@ -58,29 +58,27 @@ Deno.serve(async (req) => {
   const userIds = [...new Set((members ?? []).map((m) => m.user_id))];
   if (userIds.length === 0) return json({ sent: 0, note: 'no members' });
 
-  // 5) push_token 수집 → Expo 푸시 발송
-  const { data: profiles } = await admin.from('profiles').select('push_token').in('id', userIds);
-  const tokens = (profiles ?? []).map((p) => p.push_token).filter(Boolean) as string[];
-  if (tokens.length === 0) return json({ sent: 0, note: 'no push tokens' });
-
-  // 6) 코트 이름(있으면)
+  // 5) 코트 이름(있으면)
   let courtName = '';
   if (tie.court_id) {
     const { data: c } = await admin.from('tournament_courts').select('name').eq('id', tie.court_id).maybeSingle();
     courtName = c?.name ? ` (${c.name} 코트)` : '';
   }
 
-  const messages = tokens.map((to) => ({
-    to,
-    sound: 'default',
-    title: '우리 팀 차례예요',
-    body: `곧 팀 경기가 시작됩니다${courtName}. 코트로 이동해 주세요!`,
-  }));
-  const res = await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(messages),
-  });
-  const result = await res.json().catch(() => null);
-  return json({ sent: tokens.length, result });
+  // 6) push_notify 로 발송 — 알림함(종 뱃지)에 저장 + push_token 있으면 Expo 푸시.
+  //    예전엔 Expo 로 직접 쐈지만, 그러면 기록이 남지 않아 앱 알림 목록에 안 쌓였다.
+  const results = await Promise.all(
+    userIds.map((uid) =>
+      admin.rpc('push_notify', {
+        p_user: uid,
+        p_type: 'tie',
+        p_title: '우리 팀 차례예요',
+        p_body: `곧 팀 경기가 시작됩니다${courtName}. 코트로 이동해 주세요!`,
+        p_target_type: 'tournament',
+        p_target_id: tie.tournament_id,
+      }),
+    ),
+  );
+  const failed = results.filter((r) => r.error).map((r) => r.error?.message);
+  return json({ sent: userIds.length - failed.length, failed });
 });
