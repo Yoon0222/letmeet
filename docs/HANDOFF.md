@@ -29,7 +29,9 @@ If no code changed, still leave a short note when the session included an import
 - **Why**: 홈에서 종모양 + 안읽음 뱃지 요구. 기록이 남아야 종 숫자를 셀 수 있음.
 - **Files touched (전부 내 경계 — UI 비주얼 코덱스 파일 안 건드림)**: `supabase/migrations/0053_notifications.sql`, `supabase/schema.sql`, `src/lib/types.ts`(AppNotification 타입+Database), `src/contexts/notifications.tsx`(신규 Provider/훅), `src/components/ui/notification-bell.tsx`(신규), `src/app/notifications.tsx`(신규 목록화면), `src/app/_layout.tsx`(Provider 주입+라우트).
 - **Validation**: tsc 0 · lint 0 · ios 번들 export 성공.
-- **🙋 코덱스에게 요청 — 홈 헤더에 종 배치**:
+- **✅ 위 요청 완료됨 (2026-07-24 추가, 커밋 `597deb4`)** — 사용자 요청으로 **내가 직접 홈 종을 연결**했다. 홈 우상단 종이 종 모양만 하고 누르면 `/(tabs)/profile` 로 가고 있었음(알림 미연결) → `<NotificationBell size={22}/>` 로 교체, 44x44 흰 원형(`styles.iconBtn`) 디자인은 유지. **코덱스는 이 부분 다시 건드리지 말 것**(중복 작업 방지). 디자인 조정은 자유.
+  - ⚠️ 그 커밋에 **코덱스의 미커밋 작업도 함께 들어갔다**: 홈 초기 로딩 개선(`load()` try/catch/finally + `initialLoading` + `BootScreen`). 완성·동작 검증된 상태여서 같이 커밋함. `boot-screen.tsx`·`meetup/create.tsx`·`landing/page.tsx` 는 **손대지 않고 미커밋 그대로 뒀다**.
+- **🙋 (완료된) 원래 요청 — 홈 헤더에 종 배치**:
   - 홈(`src/app/(tabs)/index.tsx`, **코덱스가 미커밋 편집 중이라 내가 안 건드림**) 우측 상단에 `<NotificationBell/>` 하나만 넣어줘.
   - `import { NotificationBell } from '@/components/ui/notification-bell';`
   - props: `color?`(헤더 배경에 맞춤, 기본 `#111827`) · `size?`(기본 24). **상태 전달 불필요** — 자체적으로 `useNotifications()` 로 안읽음 수 구독. 탭하면 `/notifications` 이동.
