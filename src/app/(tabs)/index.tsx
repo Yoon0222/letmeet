@@ -11,6 +11,8 @@ import { MeetupCard } from '@/components/meetup-card';
 import { TournamentCard } from '@/components/tournament-card';
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
+import { BootScreen } from '@/components/ui/boot-screen';
+import { NotificationBell } from '@/components/ui/notification-bell';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { formatMeetupTime, skillLabel } from '@/lib/format';
@@ -39,16 +41,18 @@ export default function HomeScreen() {
   const [openTournaments, setOpenTournaments] = useState<TournamentWithCounts[]>([]);
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const mySkill = profile?.skill_level ?? 3.5;
   const myRegion = profile?.region ?? '';
 
   const load = useCallback(async () => {
-    const now = new Date();
-    const nowIso = now.toISOString();
-    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const items: Omit<UpcomingItem, 'dday'>[] = [];
+    try {
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const items: Omit<UpcomingItem, 'dday'>[] = [];
 
     if (uid) {
       const { data: parts } = await supabase
@@ -171,8 +175,13 @@ export default function HomeScreen() {
       const { data: anyCourts } = await supabase.from('courts').select('*').order('region', { ascending: true }).limit(3);
       courtList = anyCourts ?? [];
     }
-    setCourts(courtList.slice(0, 3));
-    setRefreshing(false);
+      setCourts(courtList.slice(0, 3));
+    } catch (error) {
+      console.warn('[home] load failed:', error);
+    } finally {
+      setRefreshing(false);
+      setInitialLoading(false);
+    }
   }, [uid, myRegion]);
 
   useFocusEffect(
@@ -180,6 +189,10 @@ export default function HomeScreen() {
       load();
     }, [load]),
   );
+
+  if (initialLoading) {
+    return <BootScreen message="홈 데이터를 불러오고 있어요" />;
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -204,9 +217,9 @@ export default function HomeScreen() {
             <Text style={styles.hello} numberOfLines={1}>안녕하세요, {profile?.nickname ?? '피넛'}님</Text>
             <Text style={styles.sub} numberOfLines={1}>{myRegion || '지역 미설정'} · 실력 {mySkill.toFixed(1)} {skillLabel(mySkill)}</Text>
           </View>
-          <Pressable hitSlop={10} onPress={() => router.push('/(tabs)/profile')} style={styles.iconBtn}>
-            <Ionicons name="notifications-outline" size={22} color="#111827" />
-          </Pressable>
+          <View style={styles.iconBtn}>
+            <NotificationBell size={22} />
+          </View>
         </View>
 
         <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#3E63DD" bg="#E6ECFF" />
