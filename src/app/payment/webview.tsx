@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, Linking, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
+import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 

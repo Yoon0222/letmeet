@@ -3,7 +3,8 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import type { UserIdentity } from '@supabase/supabase-js';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { APPLE_LOGIN_ENABLED, GOOGLE_LOGIN_ENABLED, KAKAO_LOGIN_ENABLED } from '@/constants/features';

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, type AlertButton, Pressable } from 'react-native';
+import { type AlertButton, Pressable } from 'react-native';
+import { AppAlert as Alert } from '@/lib/feedback';
 
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';

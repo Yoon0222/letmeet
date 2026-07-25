@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BootScreen } from '@/components/ui/boot-screen';
+import { FeedbackHost } from '@/components/ui/feedback-host';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { I18nProvider } from '@/contexts/i18n';
@@ -107,6 +108,7 @@ export default function RootLayout() {
                 <LoadingProvider>
                   <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
                     <RootNavigator />
+                    <FeedbackHost />
                   </View>
                 </LoadingProvider>
               </NotificationsProvider>

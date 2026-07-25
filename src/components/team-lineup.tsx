@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppAlert as Alert } from '@/lib/feedback';
 
 import { Badge } from '@/components/ui/badge';
 import { Spacing } from '@/constants/theme';

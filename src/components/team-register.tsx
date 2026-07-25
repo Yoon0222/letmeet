@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppAlert as Alert } from '@/lib/feedback';
 
 import { TeamLineup } from '@/components/team-lineup';
 import { Avatar } from '@/components/ui/avatar';
