@@ -11,6 +11,7 @@ import { TextField } from '@/components/ui/text-field';
 import { PEANUT_AVATARS, peanutFromUrl, peanutUrl } from '@/constants/avatars';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { verifyDupr } from '@/lib/dupr';
 import { skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { PLAY_STYLE_LABELS, type PlayStyle } from '@/lib/types';
@@ -28,6 +29,30 @@ export default function EditProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [linkingDupr, setLinkingDupr] = useState(false);
+
+  // DUPR ID 로 레이팅 불러오기(Level A). 서버가 검증·저장하고, 프로필을 새로고침한다.
+  async function linkDupr() {
+    const id = duprId.trim();
+    if (!id || linkingDupr) return;
+    setLinkingDupr(true);
+    // dupr_id 를 먼저 저장해 둔다(서버가 프로필 값으로도 조회 가능하도록)
+    if (session?.user.id) {
+      await supabase.from('profiles').update({ dupr_id: id }).eq('id', session.user.id);
+    }
+    const { ok, result, error } = await verifyDupr(id);
+    setLinkingDupr(false);
+    if (!ok) {
+      Alert.alert('DUPR 연동 실패', error ?? '다시 시도해 주세요.');
+      return;
+    }
+    await refreshProfile();
+    const parts = [
+      result?.doubles != null ? `복식 ${result.doubles.toFixed(1)}` : null,
+      result?.singles != null ? `단식 ${result.singles.toFixed(1)}` : null,
+    ].filter(Boolean);
+    Alert.alert('DUPR 연동 완료', parts.length ? parts.join(' · ') : '레이팅을 불러왔어요.');
+  }
 
   // 갤러리에서 사진 선택 → Storage 업로드 → profiles.avatar_url 갱신
   async function pickAvatar() {
@@ -229,7 +254,28 @@ export default function EditProfile() {
           onChangeText={setDuprId}
           placeholder="예: 1234567"
           autoCapitalize="none"
-          hint="지금은 표시용이며, 추후 DUPR 연동 시 자동으로 검증됩니다"
+          hint="DUPR ID 를 입력하고 아래 '레이팅 불러오기'를 누르면 공식 레이팅이 표시돼요"
+        />
+        {profile?.dupr_status === 'linked' || profile?.dupr_status === 'verified' ? (
+          <View style={styles.duprStatus}>
+            <Ionicons
+              name={profile.dupr_status === 'verified' ? 'shield-checkmark' : 'link'}
+              size={16}
+              color="#16A34A"
+            />
+            <Text style={styles.duprStatusText}>
+              {profile.dupr_status === 'verified' ? 'DUPR 인증됨' : 'DUPR 연동됨'}
+              {profile.dupr_doubles != null ? ` · 복식 ${profile.dupr_doubles.toFixed(1)}` : ''}
+              {profile.dupr_singles != null ? ` · 단식 ${profile.dupr_singles.toFixed(1)}` : ''}
+            </Text>
+          </View>
+        ) : null}
+        <Button
+          title="DUPR 레이팅 불러오기"
+          variant="outline"
+          onPress={linkDupr}
+          loading={linkingDupr}
+          disabled={!duprId.trim()}
         />
 
         <Button title="저장" onPress={onSave} loading={saving} style={{ marginTop: Spacing.two }} />
@@ -241,6 +287,8 @@ export default function EditProfile() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F6F7F9' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  duprStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 },
+  duprStatusText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
   avatarWrap: { alignItems: 'center', gap: 8, marginBottom: Spacing.two },
   avatarBadge: {
     position: 'absolute',

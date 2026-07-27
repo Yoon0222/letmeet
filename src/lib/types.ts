@@ -27,13 +27,26 @@ export type Profile = {
   bio: string;
   avatar_url: string | null;
   push_token: string | null;
-  // DUPR 연동 대비 (추후 파트너 API 로 검증)
+  // DUPR 연동 (0056). status: none=미연동 / linked=레이팅표시(A) / verified=소유인증(B)
   dupr_id: string | null;
-  dupr_rating: number | null;
-  dupr_verified: boolean;
+  dupr_rating: number | null; // 대표(복식 우선) — 표시용
+  dupr_doubles: number | null;
+  dupr_singles: number | null;
+  dupr_status: 'none' | 'linked' | 'verified';
+  dupr_synced_at: string | null;
+  dupr_verified: boolean; // = (dupr_status === 'verified'), 하위호환 유지
   role: UserRole;
   created_at: string;
   updated_at: string;
+};
+
+export type DuprLevel = 'linked' | 'verified';
+export type DuprVerifyResult = {
+  ok: true;
+  level: DuprLevel;
+  name: string | null;
+  doubles: number | null;
+  singles: number | null;
 };
 
 export type Meetup = {
