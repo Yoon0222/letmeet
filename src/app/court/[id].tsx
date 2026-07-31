@@ -178,12 +178,12 @@ export default function CourtDetail() {
       loadReservations(selectedDate);
       return;
     }
-    // 유료(toss) → 인앱 WebView 결제 화면으로. 승인·확정은 그 화면이 처리한다.
+    // 유료(toss) → 네이티브 결제수단 선택 화면으로. 수단 선택 후 WebView 로 결제 진행.
     if ('webview' in result) {
       setPicked([]);
       setAnchor(null);
       router.push({
-        pathname: '/payment/webview',
+        pathname: '/payment/method',
         params: {
           orderId: result.webview.orderId,
           amount: String(result.webview.amount),

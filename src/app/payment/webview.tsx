@@ -18,7 +18,14 @@ function qp(url: string, key: string): string | null {
 }
 
 export default function PaymentWebview() {
-  const params = useLocalSearchParams<{ orderId?: string; amount?: string; orderName?: string; pid?: string }>();
+  const params = useLocalSearchParams<{
+    orderId?: string;
+    amount?: string;
+    orderName?: string;
+    pid?: string;
+    method?: string;
+    easyPay?: string;
+  }>();
   const router = useRouter();
   const handled = useRef(false);
 
@@ -26,12 +33,15 @@ export default function PaymentWebview() {
   const amount = String(params.amount ?? '');
   const orderName = String(params.orderName ?? '피넛 코트 예약');
   const pid = String(params.pid ?? '');
+  const method = String(params.method ?? 'CARD');
+  const easyPay = String(params.easyPay ?? '');
 
   const successUrl = `${BASE}/success`;
   const failUrl = `${BASE}/fail`;
   const checkoutUrl =
     `${BASE}/checkout?orderId=${encodeURIComponent(orderId)}&amount=${encodeURIComponent(amount)}` +
-    `&orderName=${encodeURIComponent(orderName)}&successUrl=${encodeURIComponent(successUrl)}&failUrl=${encodeURIComponent(failUrl)}`;
+    `&orderName=${encodeURIComponent(orderName)}&successUrl=${encodeURIComponent(successUrl)}&failUrl=${encodeURIComponent(failUrl)}` +
+    `&method=${encodeURIComponent(method)}&easyPay=${encodeURIComponent(easyPay)}`;
 
   async function releaseHold() {
     if (!pid) return;
