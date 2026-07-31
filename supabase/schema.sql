@@ -1732,8 +1732,10 @@ alter table public.tournaments
 comment on column public.tournaments.court_assign_mode is
   'auto=자동배정(수동수정 가능) / manual=완전 수동';
 
--- tournaments_with_counts 뷰 재생성 (court_assign_mode 포함 — t.* 고정 이슈)
-create or replace view public.tournaments_with_counts
+-- tournaments_with_counts 뷰 재생성 (court_assign_mode 포함 — t.* 고정 이슈).
+-- 컬럼 순서 변경으로 create or replace 가 거부(42P16)되므로 drop 후 재생성.
+drop view if exists public.tournaments_with_counts;
+create view public.tournaments_with_counts
 with (security_invoker = true)
 as
 select

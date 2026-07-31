@@ -9,8 +9,10 @@ comment on column public.tournaments.court_assign_mode is
   'auto=자동배정(수동수정 가능) / manual=완전 수동';
 
 -- ⚠️ tournaments_with_counts 뷰는 t.* 가 생성 시점에 고정되므로, 새 컬럼이
---    자동 반영되지 않는다(0038 이슈 동일). 뷰를 재생성해 court_assign_mode 포함.
-create or replace view public.tournaments_with_counts
+--    자동 반영되지 않는다(0038 이슈 동일). 새 컬럼이 t.* 중간에 끼어 컬럼 순서가
+--    바뀌면 create or replace 가 거부되므로(42P16), drop 후 재생성한다.
+drop view if exists public.tournaments_with_counts;
+create view public.tournaments_with_counts
 with (security_invoker = true)
 as
 select
