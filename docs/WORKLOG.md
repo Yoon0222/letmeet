@@ -75,6 +75,11 @@
 
 ## 2026-08-04
 
+### 🚀 iOS 정식 출시 + 알림/카카오 prod 반영
+- **iOS 정식 출시 완료**(build 9, NSMotion 문구 수정본). Android 는 DUNS 발급 대기(조직계정 전환 시 14일 클로즈드테스트 면제 노림). DUPR 파트너 심사 진행 중.
+- **알림 prod 반영**: `0053~0056` 운영 Supabase 실행 + `notify-turn`/`notify-tie` prod 배포 → 출시 앱의 알림 센터·대회 알림 작동. 검증: notifications 테이블·dupr_status 컬럼 존재, push_notify·release_stale_court_holds anon 차단(401) 확인.
+- **카카오 OTA**: `eas update --channel production "카카오 로그인 추가"` 게시(runtime 2.0.0, iOS+Android) → 출시 앱에 카카오 버튼 추가. `.env.production` 으로 prod DB 값 고정(개발 DB 유입 방지).
+
 ### 카카오 로그인 활성화
 - **결정**: 비즈앱 전환 완료(피넛·ID 1503167) + 동의항목(닉네임·프로필사진·account_email) 전부 '필수 동의' 확인 → 예전 KOE205(이메일 필수동의 불가) 원인 해소. 소셜 로그인을 이메일·구글·애플·**카카오** 4종으로 개방.
 - **만든 것**: `KAKAO_LOGIN_ENABLED` false→true (`src/constants/features.ts`, 커밋 `c72a246`). 배선(signInWithKakao·KakaoButton)은 기존 완비.
