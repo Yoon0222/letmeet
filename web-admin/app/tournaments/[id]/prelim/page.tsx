@@ -100,8 +100,8 @@ export default function PrelimTab() {
     }
     const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
     await supabase.from('tournament_matches').update({ score1: s1, score2: s2, winner_id, status: 'done' }).eq('id', m.id);
-    // 경기가 끝나 코트가 비면 대기 경기를 자동 투입(미확정)
-    if (courts.length > 0) await autoAdvanceCourts(id);
+    // 경기가 끝나 코트가 비면 대기 경기를 자동 투입(미확정) — 자동배정 모드에서만
+    if (courts.length > 0 && t?.court_assign_mode === 'auto') await autoAdvanceCourts(id);
     reload();
   }
 

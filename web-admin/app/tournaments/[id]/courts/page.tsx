@@ -8,6 +8,7 @@ import { useSession } from '@/lib/use-session';
 import type { TournamentMatch } from '@/lib/types';
 
 import { useTournament } from '../_ctx';
+import { CourtManager } from './CourtManager';
 
 // 경기 라벨 (예선 3조 / 본선 4강 …)
 function matchLabel(m: TournamentMatch): string {
@@ -119,15 +120,36 @@ export default function CourtsTab() {
     reload();
   }
 
+  // 코트가 없으면: 코트 관리 폼만 노출(여기서 코트를 추가하면 배정 UI 가 나타남)
   if (courts.length === 0) {
-    return <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">등록된 코트가 없어요. 대회 생성 시 코트를 구성하면 여기서 경기별로 배정할 수 있어요.</div>;
+    return (
+      <div className="space-y-3">
+        <CourtManager tournamentId={t.id} courts={courts} canEdit={isOrganizer} reload={reload} />
+        {!isOrganizer && (
+          <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+            등록된 코트가 없어요.
+          </div>
+        )}
+      </div>
+    );
   }
   if (remaining.length === 0) {
-    return <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">배정할 잔여 경기가 없어요. (예선/본선 대진을 먼저 생성하세요)</div>;
+    return (
+      <div className="space-y-3">
+        <CourtManager tournamentId={t.id} courts={courts} canEdit={isOrganizer} reload={reload} />
+        <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+          배정할 잔여 경기가 없어요. (예선/본선 대진을 먼저 생성하세요)
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="space-y-3">
+      <CourtManager tournamentId={t.id} courts={courts} canEdit={isOrganizer} reload={reload} />
+      <div className="text-xs text-slate-400">
+        배정 방식: <b className="text-slate-600">{t.court_assign_mode === 'auto' ? '자동(수동수정 가능)' : '완전 수동'}</b>
+      </div>
       {/* 요약 + 자동 배정 */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="text-sm text-slate-600">

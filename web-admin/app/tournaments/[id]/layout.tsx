@@ -36,8 +36,9 @@ function Header() {
   const tabs = [
     { href: base, label: '신청현황' },
     ...progressTabs,
-    // 코트배정 탭은 개인 경기(tournament_matches) 전용 — 단체전은 '팀 대진' 탭에서 타이별 배정
-    ...(courts.length > 0 && t.format !== 'team' ? [{ href: `${base}/courts`, label: '코트배정' }] : []),
+    // 코트배정 탭은 개인 경기(tournament_matches) 전용 — 단체전은 '팀 대진' 탭에서 타이별 배정.
+    // 코트가 0개여도 노출(주최자가 이 탭에서 코트를 추가할 수 있어야 함 — 닭-달걀 방지).
+    ...(t.format !== 'team' ? [{ href: `${base}/courts`, label: '코트배정' }] : []),
   ];
 
   async function endTournament() {

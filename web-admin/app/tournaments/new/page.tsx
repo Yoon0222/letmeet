@@ -75,6 +75,8 @@ function NewTournamentInner() {
 
   // 코트 구성 (코트명 + 실내/실외). 대회마다 자유롭게.
   const [courts, setCourts] = useState<{ name: string; indoor: boolean }[]>([]);
+  // 코트 배정 방식: auto=자동배정(수동수정 가능) / manual=완전 수동
+  const [courtMode, setCourtMode] = useState<'auto' | 'manual'>('auto');
   const [numCount, setNumCount] = useState(4);
   const [letterCount, setLetterCount] = useState(4);
   const [manualName, setManualName] = useState('');
@@ -164,6 +166,7 @@ function NewTournamentInner() {
         fee,
         description: description.trim(),
         images,
+        court_assign_mode: courtMode,
       })
       .select('id')
       .single();
@@ -307,6 +310,32 @@ function NewTournamentInner() {
             </label>
           </div>
           <p className="mt-1 text-xs text-slate-400">여러 장 등록 가능. <b>첫 번째(대표) 사진이 메인 커버</b>로 앱 목록·홈·상세에 크게 노출되고, 나머지는 상세에서 넘겨볼 수 있어요. 가로형(16:9) 권장.</p>
+        </div>
+
+        {/* 코트 배정 방식 */}
+        <div>
+          <span className="mb-1 block text-sm font-medium text-slate-700">코트 배정 방식</span>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {([
+              { v: 'auto', t: '자동 배정', d: '진행하며 빈 코트에 자동 배정 · 수동 변경 가능' },
+              { v: 'manual', t: '완전 수동', d: '경기마다 운영자가 직접 코트 지정' },
+            ] as const).map((o) => (
+              <button
+                type="button"
+                key={o.v}
+                onClick={() => setCourtMode(o.v)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-left ${
+                  courtMode === o.v
+                    ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500'
+                    : 'border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <span className="block text-sm font-semibold text-slate-800">{o.t}</span>
+                <span className="block text-xs text-slate-500">{o.d}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-400">코트를 등록해야 배정 기능을 쓸 수 있어요. 생성 후에도 코트배정 탭에서 코트를 추가할 수 있어요.</p>
         </div>
 
         {/* 코트 구성 */}
