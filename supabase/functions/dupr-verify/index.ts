@@ -98,8 +98,20 @@ Deno.serve(async (req) => {
   const caller = userData?.user;
   if (!caller) return json({ error: 'unauthorized' }, 401);
 
-  // 2) 조회할 DUPR ID
   const body = await req.json().catch(() => ({}));
+
+  // 1.5) SSO 설정 요청 — iframe 용 base64(clientKey) + SSO base 를 돌려준다.
+  //      (clientKey 는 iframe URL 에 노출되는 공개값. clientSecret 은 절대 안 준다.)
+  if (body?.config === true) {
+    const key = Deno.env.get('DUPR_CLIENT_KEY');
+    if (!key) return json({ error: 'dupr_not_configured' }, 503);
+    return json({
+      clientKeyB64: btoa(key),
+      ssoBase: Deno.env.get('DUPR_SSO_BASE') ?? 'https://uat.dupr.gg/login-external-app',
+    });
+  }
+
+  // 2) 조회할 DUPR ID
   let duprId: string | undefined = body?.dupr_id;
   if (!duprId) {
     const { data: prof } = await admin.from('profiles').select('dupr_id').eq('id', caller.id).maybeSingle();

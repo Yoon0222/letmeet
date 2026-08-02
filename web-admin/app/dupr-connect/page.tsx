@@ -9,8 +9,16 @@
 // iframe URL 의 clientKey 는 base64(clientKey) — secret 아님, 클라이언트 노출 OK(DUPR 설계).
 import { useEffect, useMemo, useState } from 'react';
 
-const SSO_BASE = process.env.NEXT_PUBLIC_DUPR_SSO_BASE ?? 'https://uat.dupr.gg/login-external-app';
-const CLIENT_KEY = process.env.NEXT_PUBLIC_DUPR_CLIENT_KEY ?? '';
+// clientKey(base64)/ssoBase 는 앱이 서버(Supabase 시크릿)에서 받아 URL 로 넘겨준다.
+// (웹에 키를 중복 저장하지 않음. base64(clientKey) 는 iframe URL 에 노출되는 공개값.)
+function getUrlParams() {
+  if (typeof window === 'undefined') return { ck: '', sso: '' };
+  const p = new URLSearchParams(window.location.search);
+  return {
+    ck: p.get('ck') ?? '',
+    sso: p.get('sso') ?? 'https://uat.dupr.gg/login-external-app',
+  };
+}
 
 // deno/next 브라우저에서 message 이벤트의 페이로드는 event.data 또는 event 자체에 있을 수 있어 둘 다 본다.
 type SsoPayload = { duprId?: string; userToken?: string; refreshToken?: string; stats?: unknown };
@@ -26,12 +34,14 @@ function extract(e: MessageEvent): SsoPayload | null {
 export default function DuprConnectPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'done' | 'error'>('loading');
   const [msg, setMsg] = useState('');
-  const src = useMemo(() => (CLIENT_KEY ? `${SSO_BASE}/${btoa(CLIENT_KEY)}` : ''), []);
+  // ck 는 이미 base64(clientKey) 이므로 그대로 iframe 경로에 붙인다.
+  const { ck, sso } = useMemo(getUrlParams, []);
+  const src = useMemo(() => (ck ? `${sso}/${ck}` : ''), [ck, sso]);
 
   useEffect(() => {
-    if (!CLIENT_KEY) {
+    if (!ck) {
       setStatus('error');
-      setMsg('DUPR 연동 설정(NEXT_PUBLIC_DUPR_CLIENT_KEY)이 없어요.');
+      setMsg('DUPR 연동 설정이 없어요. 앱에서 다시 시도해 주세요.');
       return;
     }
     setStatus('ready');

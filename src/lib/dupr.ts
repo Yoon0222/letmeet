@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import type { DuprVerifyResult } from '@/lib/types';
 
+// SSO iframe 용 설정(공개값 base64(clientKey) + SSO base)을 서버(시크릿)에서 받아온다.
+export async function getDuprSsoConfig(): Promise<{ clientKeyB64: string; ssoBase: string } | null> {
+  const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { config: true } });
+  if (error || !data?.clientKeyB64) return null;
+  return { clientKeyB64: data.clientKeyB64, ssoBase: data.ssoBase };
+}
+
 // DUPR ID 로 레이팅을 불러와 본인 프로필에 연동. 서버(dupr-verify)가 처리한다.
 // verified=true 면 SSO 동의를 거친 소유 인증(Level B) → dupr_status='verified' 로 저장.
 export async function verifyDupr(

@@ -1,15 +1,16 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { useAuth } from '@/contexts/auth';
-import { verifyDupr } from '@/lib/dupr';
+import { getDuprSsoConfig, verifyDupr } from '@/lib/dupr';
 import { AppAlert as Alert } from '@/lib/feedback';
 
-// DUPR 계정 연결(SSO). web-admin/dupr-connect 페이지(DUPR 로그인 iframe)를 앱 안 WebView 로 열고,
-// 로그인+동의 완료 시 페이지가 postMessage 로 보낸 duprId 를 받아 dupr-verify 로 레이팅을 저장한다.
+// DUPR 계정 연결(SSO). base64(clientKey)/ssoBase 는 서버(Supabase 시크릿)에서 받아
+// web-admin/dupr-connect 페이지에 URL 로 넘긴다(웹에 키를 중복 저장하지 않음).
+// 그 페이지가 DUPR 로그인 iframe 을 띄우고, 완료 시 duprId 를 postMessage 로 돌려준다.
 const CONNECT_URL = process.env.EXPO_PUBLIC_DUPR_CONNECT_URL ?? 'https://pinut.org/dupr-connect';
 
 export default function DuprConnectScreen() {
@@ -17,6 +18,21 @@ export default function DuprConnectScreen() {
   const { refreshProfile } = useAuth();
   const handled = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [uri, setUri] = useState<string | null>(null);
+  const [configErr, setConfigErr] = useState<string | null>(null);
+
+  // 서버에서 SSO 설정 받아 웹뷰 URL 구성
+  useEffect(() => {
+    (async () => {
+      const cfg = await getDuprSsoConfig();
+      if (!cfg) {
+        setConfigErr('DUPR 연동이 아직 준비 중이에요. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      const q = `ck=${encodeURIComponent(cfg.clientKeyB64)}&sso=${encodeURIComponent(cfg.ssoBase)}`;
+      setUri(`${CONNECT_URL}?${q}`);
+    })();
+  }, []);
 
   async function onMessage(e: WebViewMessageEvent) {
     if (handled.current) return;
@@ -47,23 +63,38 @@ export default function DuprConnectScreen() {
     setTimeout(() => Alert.alert('DUPR 연결 완료', parts.length ? `인증됐어요 · ${parts.join(' · ')}` : 'DUPR 계정이 연결됐어요.'), 300);
   }
 
+  if (configErr) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <Text style={styles.errText}>{configErr}</Text>
+      </SafeAreaView>
+    );
+  }
+  if (!uri) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <ActivityIndicator color="#16C784" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <WebView
-        source={{ uri: CONNECT_URL }}
+        source={{ uri }}
         onMessage={onMessage}
         javaScriptEnabled
         domStorageEnabled
         originWhitelist={['*']}
         startInLoadingState
         renderLoading={() => (
-          <View style={styles.center}>
+          <View style={styles.overlay}>
             <ActivityIndicator color="#16C784" />
           </View>
         )}
       />
       {saving ? (
-        <View style={styles.center}>
+        <View style={styles.overlay}>
           <ActivityIndicator color="#16C784" size="large" />
         </View>
       ) : null}
@@ -73,5 +104,7 @@ export default function DuprConnectScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  center: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.85)' },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.85)' },
+  errText: { color: '#6B7280', fontSize: 15, textAlign: 'center', padding: 24 },
 });
