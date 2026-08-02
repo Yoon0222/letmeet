@@ -80,6 +80,7 @@ function RootNavigator() {
         <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />
         <Stack.Screen name="court/[id]" options={{ headerShown: true, title: '코트' }} />
         <Stack.Screen name="notifications" options={{ headerShown: true, title: '알림' }} />
+        <Stack.Screen name="dupr-connect" options={{ headerShown: true, title: 'DUPR 연결' }} />
         <Stack.Screen
           name="profile/edit"
           options={{ presentation: 'modal', headerShown: true, title: '프로필 수정' }}

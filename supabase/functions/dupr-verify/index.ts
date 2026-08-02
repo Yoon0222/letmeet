@@ -118,6 +118,9 @@ Deno.serve(async (req) => {
   }
 
   // 5) 본인 프로필에 저장 (service_role → protect_dupr 트리거 통과)
+  //    verified=true(SSO 동의 경유) → 소유 인증. 아니면 표시 연동.
+  const isVerified = body?.verified === true;
+  const status = isVerified ? 'verified' : 'linked';
   const primary = ratings.doubles ?? ratings.singles;
   await admin
     .from('profiles')
@@ -126,10 +129,11 @@ Deno.serve(async (req) => {
       dupr_doubles: ratings.doubles,
       dupr_singles: ratings.singles,
       dupr_rating: primary,
-      dupr_status: 'linked',
+      dupr_status: status,
+      dupr_verified: isVerified,
       dupr_synced_at: new Date().toISOString(),
     })
     .eq('id', caller.id);
 
-  return json({ ok: true, level: 'linked', ...ratings });
+  return json({ ok: true, level: status, ...ratings });
 });

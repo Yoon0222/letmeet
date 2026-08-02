@@ -1,12 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import type { DuprVerifyResult } from '@/lib/types';
 
-// DUPR ID 로 레이팅을 불러와 본인 프로필에 연동(Level A). 서버(dupr-verify)가 처리한다.
+// DUPR ID 로 레이팅을 불러와 본인 프로필에 연동. 서버(dupr-verify)가 처리한다.
+// verified=true 면 SSO 동의를 거친 소유 인증(Level B) → dupr_status='verified' 로 저장.
 export async function verifyDupr(
   duprId: string,
+  verified = false,
 ): Promise<{ ok: boolean; result?: DuprVerifyResult; error?: string }> {
   const { data, error } = await supabase.functions.invoke('dupr-verify', {
-    body: { dupr_id: duprId.trim() },
+    body: { dupr_id: duprId.trim(), verified },
   });
 
   // 서버가 4xx/5xx 로 준 에러 메시지 최대한 사람 친화적으로.
