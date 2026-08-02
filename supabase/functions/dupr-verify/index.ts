@@ -92,16 +92,11 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const admin = createClient(url, serviceKey);
 
-  // 1) 호출자 인증
-  const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
-  const { data: userData } = await admin.auth.getUser(jwt);
-  const caller = userData?.user;
-  if (!caller) return json({ error: 'unauthorized' }, 401);
-
   const body = await req.json().catch(() => ({}));
 
-  // 1.5) SSO 설정 요청 — iframe 용 base64(clientKey) + SSO base 를 돌려준다.
-  //      (clientKey 는 iframe URL 에 노출되는 공개값. clientSecret 은 절대 안 준다.)
+  // 0) SSO 설정 요청 — iframe 용 base64(clientKey) + SSO base 를 돌려준다.
+  //    clientKey 는 iframe URL 에 그대로 노출되는 공개값이라 인증 이전에 처리한다
+  //    (세션 전파 지연에도 SSO 화면이 견고하도록). clientSecret 은 절대 안 준다.
   if (body?.config === true) {
     const key = Deno.env.get('DUPR_CLIENT_KEY');
     if (!key) return json({ error: 'dupr_not_configured' }, 503);
@@ -110,6 +105,12 @@ Deno.serve(async (req) => {
       ssoBase: Deno.env.get('DUPR_SSO_BASE') ?? 'https://uat.dupr.gg/login-external-app',
     });
   }
+
+  // 1) 호출자 인증 — 조회/검증 요청은 로그인 필요
+  const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
+  const { data: userData } = await admin.auth.getUser(jwt);
+  const caller = userData?.user;
+  if (!caller) return json({ error: 'unauthorized' }, 401);
 
   // 2) 조회할 DUPR ID
   let duprId: string | undefined = body?.dupr_id;
