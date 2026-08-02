@@ -75,6 +75,12 @@
 
 ## 2026-08-04
 
+### DUPR SSO 연결 — 전 구간 검증 + iframe 안정화
+- **결정**: DUPR Level A(ID 직접조회)는 동의 없으면 403이라 불가 → **Level B(SSO 동의 후 검증)** 로 확정. 연결 흐름: 앱 WebView → `pinut.org/dupr-connect`(iframe에 DUPR 로그인) → 동의 → duprId postMessage → `dupr-verify`로 레이팅 저장(verified).
+- **만든 것/고친 것**: `dupr-verify` — `config`(base64 clientKey) 브랜치를 caller 인증 **이전**으로 이동(공개값이라 게이팅 불필요·세션 지연에도 견고). `web-admin/dupr-connect` — URL 파라미터를 `useEffect`에서 상태로 읽어 iframe src를 클라이언트에서 확정(SSR 빈 src에 묶여 DUPR가 안 뜨던 문제 해결). 커밋 `fb6ab65`, Vercel prod 배포.
+- **검증**: DUPR SSO 로그인 폼 정상(clientKey SSO 등록됨) · DUPR 응답에 X-Frame-Options/CSP 없음(iframe 허용) · `pinut.org/dupr-connect?ck=…`에서 iframe이 **DUPR cross-origin 콘텐츠 로드** 확인. 남은 검증은 **앱 로그인 후 실제 계정 연결 1회**(비번 입력이라 사장님 몫).
+- **메모**: prod 전환 시 운영 Supabase에 `DUPR_*` 시크릿 설정 + `dupr-verify` prod 배포 필요(현재 dev만). UAT clientKey 형태가 `test-ck-…`라 토스 키와 헷갈리지 말 것 — 파트너 토큰(tokenOk) 검증된 DUPR 키가 맞음.
+
 ### 🚀 iOS 정식 출시 + 알림/카카오 prod 반영
 - **iOS 정식 출시 완료**(build 9, NSMotion 문구 수정본). Android 는 DUNS 발급 대기(조직계정 전환 시 14일 클로즈드테스트 면제 노림). DUPR 파트너 심사 진행 중.
 - **알림 prod 반영**: `0053~0056` 운영 Supabase 실행 + `notify-turn`/`notify-tie` prod 배포 → 출시 앱의 알림 센터·대회 알림 작동. 검증: notifications 테이블·dupr_status 컬럼 존재, push_notify·release_stale_court_holds anon 차단(401) 확인.
