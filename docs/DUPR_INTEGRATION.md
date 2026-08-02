@@ -18,16 +18,11 @@
 ### 1) 마이그레이션 실행 (dev·prod)
 `supabase/migrations/0056_dupr_integration.sql` — 컬럼 + 보안 트리거.
 
-### 2) 시크릿 등록
-DUPR 이 주는 방식에 따라 둘 중 하나:
+### 2) 시크릿 등록 (DUPR = ClientKey + ClientSecret 방식 확정)
 ```bash
-# (a) 고정 Bearer 토큰을 주는 경우
-supabase secrets set DUPR_API_BASE=https://backend.mydupr.com
-supabase secrets set DUPR_BEARER=<토큰>
-
-# (b) client key/secret 방식
-supabase secrets set DUPR_API_BASE=https://backend.mydupr.com
-supabase secrets set DUPR_CLIENT_KEY=<키> DUPR_CLIENT_SECRET=<시크릿>
+supabase secrets set DUPR_API_BASE=https://uat.mydupr.com/api   # UAT (운영은 운영 URL)
+supabase secrets set DUPR_CLIENT_KEY=<ClientKey> DUPR_CLIENT_SECRET=<ClientSecret>
+# (선택) supabase secrets set DUPR_API_VERSION=v1.0
 ```
 (dev: `--project-ref pjfhxkvdjipvdmfsacie` / prod: `jbvtdthtmrlndduqiikj`)
 
@@ -36,13 +31,13 @@ supabase secrets set DUPR_CLIENT_KEY=<키> DUPR_CLIENT_SECRET=<시크릿>
 supabase functions deploy dupr-verify --project-ref <ref>
 ```
 
-### 4) ⚠️ 파트너 문서로 확정할 것 (현재 코드는 추정)
-`supabase/functions/dupr-verify/index.ts` 의 TODO(dupr):
-- **토큰 발급 경로/바디** (`getDuprToken`) — 실제 auth 엔드포인트
-- **조회 엔드포인트** (`lookupPlayer`) — get-player / search 경로·바디
-- **응답 필드명** (`parseRatings`) — doubles/singles 위치
-
-문서 받으면 이 3곳만 실제 값으로 맞추면 됨. 파싱은 방어적으로 여러 후보를 훑게 해둠.
+### 4) ✅ 실제 API 스펙으로 확정 완료 (2026-08, OpenAPI 확인)
+`uat.mydupr.com/api/v3/api-docs` 로 확인해 함수를 실제 값으로 맞춤:
+- **인증** `POST {BASE}/auth/{version}/token`, 헤더 `x-authorization: base64(ClientKey:ClientSecret)`, 바디 없음 → `{ result: { token, expiry } }`
+- **조회** `GET {BASE}/user/{version}/{id}` → `{ result: { ratings:{doubles,singles}, fullName } }`
+- **검색** `POST {BASE}/user/{version}/search` `{query,offset,limit}` → `{ result:{ hits:[...] } }`
+- **레이팅**: `ratings.doubles`/`ratings.singles` 는 문자열("3.5"/"NR") → 함수가 parseFloat + 범위검증
+- version 기본 `v1.0`
 
 ### 5) 검증
 dev 함수 배포 후, 앱 프로필 편집 → DUPR ID 입력 → "레이팅 불러오기":

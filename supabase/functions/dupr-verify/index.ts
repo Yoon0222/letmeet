@@ -4,13 +4,16 @@
 //
 // 보안: DUPR 파트너 키는 이 함수(서버)에서만 쓴다. 앱에 절대 노출하지 않는다.
 // 배포:  supabase functions deploy dupr-verify
-// 시크릿(키 승인 후 사장님이 등록):
-//   supabase secrets set DUPR_API_BASE=https://backend.mydupr.com
-//   supabase secrets set DUPR_BEARER=<파트너 발급 토큰>     (또는 아래 키/시크릿)
-//   supabase secrets set DUPR_CLIENT_KEY=... DUPR_CLIENT_SECRET=...
+// 시크릿(사장님이 등록):
+//   supabase secrets set DUPR_API_BASE=https://uat.mydupr.com/api   (UAT / 운영은 운영 URL)
+//   supabase secrets set DUPR_CLIENT_KEY=<ClientKey> DUPR_CLIENT_SECRET=<ClientSecret>
+//   (선택) supabase secrets set DUPR_API_VERSION=v1.0
 //
-// ⚠️ DUPR 파트너 문서가 승인과 함께 오면, 아래 (a)토큰 발급 방식과
-//    (b)조회 엔드포인트/응답 필드명을 실제 스펙에 맞춰 확정해야 한다(현재는 최선의 추정).
+// DUPR 스펙(OpenAPI 확인, 2026-08):
+//   인증  POST {BASE}/auth/{version}/token  헤더 x-authorization: base64(ClientKey:ClientSecret)
+//         → { result: { token, expiry } }
+//   조회  GET  {BASE}/user/{version}/{id}         → { result: { ratings:{doubles,singles}, fullName } }
+//   검색  POST {BASE}/user/{version}/search {query,offset,limit} → { result:{ hits:[...] } }
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CORS = {
@@ -18,82 +21,64 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  });
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
 
-const DUPR_BASE = Deno.env.get('DUPR_API_BASE') ?? 'https://backend.mydupr.com';
+const BASE = (Deno.env.get('DUPR_API_BASE') ?? 'https://uat.mydupr.com/api').replace(/\/$/, '');
+const VERSION = Deno.env.get('DUPR_API_VERSION') ?? 'v1.0';
 
-// (a) DUPR 파트너 인증 토큰 확보. 파트너가 고정 Bearer 를 주면 그걸 쓰고,
-//     client key/secret 방식이면 로그인 엔드포인트로 교환한다.
-//     ⚠️ 실제 경로/필드는 파트너 문서로 확정 필요.
+// 파트너 토큰 발급: x-authorization = base64(ClientKey:ClientSecret)
 async function getDuprToken(): Promise<string | null> {
-  const bearer = Deno.env.get('DUPR_BEARER');
-  if (bearer) return bearer;
-
   const key = Deno.env.get('DUPR_CLIENT_KEY');
   const secret = Deno.env.get('DUPR_CLIENT_SECRET');
   if (!key || !secret) return null;
-
   try {
-    // TODO(dupr): 실제 토큰 발급 엔드포인트로 교체 (파트너 문서 확인).
-    const res = await fetch(`${DUPR_BASE}/auth/v1/token`, {
+    const res = await fetch(`${BASE}/auth/${VERSION}/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientKey: key, clientSecret: secret }),
+      headers: { 'x-authorization': btoa(`${key}:${secret}`), 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
-    return data?.result?.token ?? data?.token ?? data?.accessToken ?? null;
+    return data?.result?.token ?? null;
   } catch {
     return null;
   }
 }
 
-// (b) DUPR ID/이름으로 플레이어 조회 → 복식/단식 레이팅 파싱.
-//     응답 필드명은 방어적으로 여러 후보를 훑는다(문서 확정 시 정리).
-function parseRatings(player: Record<string, unknown> | null) {
-  if (!player) return null;
+// ratings.doubles / ratings.singles 는 문자열("3.521" 또는 "NR"). 유효 범위만 숫자로.
+function num(v: unknown): number | null {
+  const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN;
+  return Number.isFinite(n) && n >= 2 && n <= 8 ? Math.round(n * 10) / 10 : null;
+}
+function parseUser(user: Record<string, unknown> | null) {
+  if (!user) return null;
   // deno-lint-ignore no-explicit-any
-  const p = player as any;
-  const ratings = p.ratings ?? p.rating ?? p;
-  const num = (v: unknown) => {
-    const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN;
-    return Number.isFinite(n) && n >= 2 && n <= 8 ? Math.round(n * 10) / 10 : null;
-  };
-  return {
-    name: p.fullName ?? p.name ?? null,
-    doubles: num(ratings?.doubles ?? ratings?.doublesRating ?? p.doubles),
-    singles: num(ratings?.singles ?? ratings?.singlesRating ?? p.singles),
-  };
+  const u = user as any;
+  const r = u.ratings ?? {};
+  return { name: u.fullName ?? null, doubles: num(r.doubles), singles: num(r.singles) };
 }
 
 async function lookupPlayer(token: string, duprId: string) {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  const isNumericId = /^\d+$/.test(duprId.trim());
-
+  const id = duprId.trim();
   try {
-    if (isNumericId) {
-      // TODO(dupr): get-player 경로 확정
-      const res = await fetch(`${DUPR_BASE}/player/v1/${duprId.trim()}`, { headers });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        return parseRatings(data?.result ?? data);
-      }
+    // 1) DUPR ID 로 직접 조회
+    const res = await fetch(`${BASE}/user/${VERSION}/${encodeURIComponent(id)}`, { headers });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      const parsed = parseUser(data?.result ?? data);
+      if (parsed && (parsed.doubles != null || parsed.singles != null)) return parsed;
     }
-    // 이름/이메일 검색 → 첫 결과
-    // TODO(dupr): search 경로/바디 확정
-    const res = await fetch(`${DUPR_BASE}/player/v1/search`, {
+    // 2) 이름/이메일 검색 → 첫 결과
+    const sres = await fetch(`${BASE}/user/${VERSION}/search`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ query: duprId.trim(), limit: 1 }),
+      body: JSON.stringify({ query: id, offset: 0, limit: 1 }),
     });
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    const first = (data?.result?.hits ?? data?.result ?? data?.hits ?? [])[0] ?? null;
-    return parseRatings(first);
+    if (!sres.ok) return null;
+    const sdata = await sres.json().catch(() => null);
+    const first = (sdata?.result?.hits ?? sdata?.hits ?? [])[0] ?? null;
+    return parseUser(first);
   } catch {
     return null;
   }
@@ -113,7 +98,7 @@ Deno.serve(async (req) => {
   const caller = userData?.user;
   if (!caller) return json({ error: 'unauthorized' }, 401);
 
-  // 2) 조회할 DUPR ID (요청 바디 우선, 없으면 프로필의 dupr_id)
+  // 2) 조회할 DUPR ID
   const body = await req.json().catch(() => ({}));
   let duprId: string | undefined = body?.dupr_id;
   if (!duprId) {
@@ -122,11 +107,9 @@ Deno.serve(async (req) => {
   }
   if (!duprId) return json({ error: 'dupr_id required' }, 400);
 
-  // 3) DUPR 토큰 (키 미설정이면 아직 준비 단계)
+  // 3) DUPR 토큰
   const token = await getDuprToken();
-  if (!token) {
-    return json({ error: 'dupr_not_configured', message: 'DUPR 파트너 키가 아직 설정되지 않았습니다.' }, 503);
-  }
+  if (!token) return json({ error: 'dupr_not_configured', message: 'DUPR 파트너 키가 설정되지 않았거나 인증에 실패했어요.' }, 503);
 
   // 4) 조회 + 파싱
   const ratings = await lookupPlayer(token, duprId);
@@ -134,7 +117,7 @@ Deno.serve(async (req) => {
     return json({ error: 'not_found', message: 'DUPR 에서 레이팅을 찾지 못했어요. ID 를 확인해 주세요.' }, 404);
   }
 
-  // 5) 본인 프로필에 저장 (service_role 이라 protect_dupr 트리거 통과)
+  // 5) 본인 프로필에 저장 (service_role → protect_dupr 트리거 통과)
   const primary = ratings.doubles ?? ratings.singles;
   await admin
     .from('profiles')
@@ -143,7 +126,7 @@ Deno.serve(async (req) => {
       dupr_doubles: ratings.doubles,
       dupr_singles: ratings.singles,
       dupr_rating: primary,
-      dupr_status: 'linked', // 소유 인증(B)이 아니라 표시 연동(A)
+      dupr_status: 'linked',
       dupr_synced_at: new Date().toISOString(),
     })
     .eq('id', caller.id);
