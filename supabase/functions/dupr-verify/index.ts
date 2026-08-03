@@ -163,6 +163,38 @@ async function subscribeRating(token: string, duprId: string): Promise<boolean> 
   }
 }
 
+// 동의 철회/연결 해제 처리 — DUPR 데이터 접근 불가 상태를 우리 DB 에 반영.
+//   프로필을 미연동으로 리셋 + 자격/토큰 제거 + 구독 해제 + 캐시 히스토리 삭제.
+//   (게이트가 자연히 재연결을 유도하고, 남의 DUPR 데이터를 더는 표시하지 않는다.)
+// deno-lint-ignore no-explicit-any
+async function disconnectDupr(admin: any, userId: string, duprId: string | null, token: string | null) {
+  if (token && duprId) {
+    try {
+      await fetch(`${BASE}/user/${VERSION}/subscribe/webhook-event`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duprIds: [duprId], topic: 'RATING' }),
+      });
+    } catch { /* 구독 해제 실패는 무시 */ }
+  }
+  await admin.from('dupr_credentials').delete().eq('user_id', userId);
+  await admin.from('dupr_rating_history').delete().eq('user_id', userId);
+  await admin
+    .from('profiles')
+    .update({
+      dupr_status: 'none',
+      dupr_verified: false,
+      dupr_basic: false,
+      dupr_premium: false,
+      dupr_rating: null,
+      dupr_doubles: null,
+      dupr_singles: null,
+      dupr_synced_at: new Date().toISOString(),
+      dupr_entitlements_synced_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+}
+
 // deno-lint-ignore no-explicit-any
 async function saveHistory(admin: any, userId: string, points: HistPoint[]) {
   if (points.length === 0) return;
@@ -255,6 +287,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!cred?.access_token) return json({ error: 'no_credentials', message: 'DUPR 재연결이 필요해요.' }, 400);
 
+    // 철회/구독해제에 필요한 dupr_id
+    const { data: meProf } = await admin.from('profiles').select('dupr_id').eq('id', caller.id).maybeSingle();
+    const myDuprId: string | null = meProf?.dupr_id ?? null;
+
     let access = cred.access_token as string;
     let refresh = (cred.refresh_token ?? null) as string | null;
     const subFetch = () =>
@@ -266,20 +302,33 @@ Deno.serve(async (req) => {
       const rr = await fetch(`${PUBLIC_BASE}/auth/${VERSION}/refresh`, {
         headers: { Authorization: `Bearer ${access}`, 'x-refresh-token': refresh },
       });
-      if (!rr.ok) return json({ error: 'reconnect_required', message: 'DUPR 재연결이 필요해요.' }, 401);
-      const rd = await rr.json().catch(() => null);
+      const rd = rr.ok ? await rr.json().catch(() => null) : null;
       const na = rd?.result?.accessToken;
-      const nr = rd?.result?.refreshToken;
-      if (!na) return json({ error: 'reconnect_required' }, 401);
+      if (!na) {
+        // refresh 토큰도 만료 → 재연결 필요. 데이터는 보존하되 자격만 내려 게이트가 재연결 유도.
+        await admin
+          .from('profiles')
+          .update({ dupr_basic: false, dupr_entitlements_synced_at: new Date().toISOString() })
+          .eq('id', caller.id);
+        return json({ ok: true, reconnect_required: true, basic: false });
+      }
       access = na;
-      refresh = nr ?? refresh;
+      refresh = rd.result.refreshToken ?? refresh;
       await admin
         .from('dupr_credentials')
         .update({ access_token: access, refresh_token: refresh, updated_at: new Date().toISOString() })
         .eq('user_id', caller.id);
       sres = await subFetch();
     }
+
+    // 동의 철회 = 유효한 토큰인데도 403(접근 거부) → 연결 해제 처리
+    if (sres.status === 403) {
+      const ptoken = await getDuprToken();
+      await disconnectDupr(admin, caller.id, myDuprId, ptoken);
+      return json({ ok: true, revoked: true, basic: false });
+    }
     if (!sres.ok) return json({ error: 'entitlements_failed', status: sres.status }, 502);
+
     const sdata = await sres.json().catch(() => null);
     const subs = sdata?.subscriptions ?? sdata?.result?.subscriptions ?? sdata;
     const ent = parseEntitlements(subs);
