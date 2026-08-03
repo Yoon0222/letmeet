@@ -75,6 +75,10 @@
 
 ## 2026-08-04
 
+### DUPR 동의 철회 처리 — 기능 개발 완료
+- **결정/구현**: DUPR 요건 "동의 철회 시 데이터 접근 불가 처리". 감지=24h 자격 재조회 때 public API가 **403(유효 토큰인데 접근거부)=철회** → `disconnectDupr`(RATING 구독해제 + dupr_credentials/rating_history 삭제 + 프로필 미연동 리셋). **refresh 만료=재연결 필요**는 데이터 보존하고 `dupr_basic`만 내려 게이트가 재연결 유도. 게이트가 자동으로 재연결 요구 → 추가 UI 불필요. dev 배포.
+- **의의**: 이걸로 **DUPR 심사 요건 기능 개발이 사실상 완료**. 남은 건 개발 아님(재연결 실검증·리뷰어 테스트 방법·제출 이메일·지원메일 실동작). 선택 미구현: 단체전(tie) 제출·user/invite.
+
 ### DUPR 토큰 refresh + 자격 24h 재조회 (운영요건 마무리)
 - **확정**: DUPR SSO 문서에서 refresh/자격 조회 경로 확인 — public API `api.uat.dupr.gg`(운영 `api.dupr.gg`): `GET /auth/{v}/refresh`(Bearer+헤더 x-refresh-token→토큰 쌍 회전), `POST /subscription/active`(user token→자격), `GET /public/user/info`. 파트너 API(uat.mydupr.com)와 별개. UAT 토큰수명 access7일/refresh30일.
 - **만든 것**: `dupr-verify` entitlements 액션(저장 토큰으로 자격조회, 401이면 refresh 후 재시도·회전저장 → dupr_basic/premium 갱신). 앱 `maybeSyncEntitlements`(24h 초과만) → auth 컨텍스트 프로필 로드 시 백그라운드 동기화. `DUPR_PUBLIC_BASE` 분리.
