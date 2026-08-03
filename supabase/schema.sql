@@ -19,16 +19,35 @@ create table if not exists public.profiles (
   bio         text not null default '',
   avatar_url  text,
   push_token  text,                                -- Expo 푸시 토큰(내 경기 알림용)
-  -- DUPR 연동 대비 (현재는 자가입력, 추후 파트너 API 로 검증)
-  dupr_id       text,                              -- 사용자의 DUPR 계정 ID
-  dupr_rating   numeric(3,1),                      -- DUPR 레이팅 (검증 시 채워짐)
-  dupr_verified boolean not null default false,    -- API 로 검증되었는지 여부
+  -- DUPR 연동 (0056/0058). status: none=미연동 / linked=레이팅표시 / verified=소유인증
+  dupr_id        text,                             -- 사용자의 DUPR 계정 ID(6자리 공개코드)
+  dupr_rating    numeric(3,1),                     -- 대표(복식 우선) 표시용
+  dupr_doubles   numeric(3,1),                     -- 복식 레이팅
+  dupr_singles   numeric(3,1),                     -- 단식 레이팅
+  dupr_status    text not null default 'none' check (dupr_status in ('none','linked','verified')),
+  dupr_synced_at timestamptz,                      -- 마지막 동기화 시각
+  dupr_verified  boolean not null default false,   -- = (dupr_status='verified'), 하위호환
+  dupr_public    boolean not null default false,   -- 레이팅 그래프 공개 여부(본인은 항상 봄)
   -- 권한(역할): player < organizer < court_manager < super_admin. 부여는 super_admin 만.
   role        text not null default 'player'
               check (role in ('player', 'organizer', 'court_manager', 'super_admin')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- DUPR 레이팅 히스토리 캐시(0058) — 그래프용. 서버(service_role)만 채운다.
+create table if not exists public.dupr_rating_history (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  match_id    bigint,
+  doubles     numeric(4,3),
+  singles     numeric(4,3),
+  recorded_at timestamptz not null,
+  created_at  timestamptz not null default now(),
+  unique (user_id, match_id, recorded_at)
+);
+create index if not exists dupr_rating_history_user_time
+  on public.dupr_rating_history (user_id, recorded_at);
 
 -- ============================================================
 -- 2) meetups : 번개 모임
@@ -143,6 +162,15 @@ create policy "profiles_update_own" on public.profiles
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
+
+-- dupr_rating_history: 본인 것은 항상, 남의 것은 공개(dupr_public)일 때만. 쓰기는 service_role 전용.
+alter table public.dupr_rating_history enable row level security;
+drop policy if exists dupr_history_select on public.dupr_rating_history;
+create policy dupr_history_select on public.dupr_rating_history
+  for select using (
+    user_id = auth.uid()
+    or exists (select 1 from public.profiles p where p.id = dupr_rating_history.user_id and p.dupr_public = true)
+  );
 
 -- 권한(역할) 헬퍼 + super_admin 역할 부여 + 자기 role 변경 차단
 create or replace function public.my_role()

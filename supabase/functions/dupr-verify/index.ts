@@ -58,18 +58,25 @@ function parseUser(user: Record<string, unknown> | null) {
   return { name: u.fullName ?? null, doubles: num(r.doubles), singles: num(r.singles) };
 }
 
-async function lookupPlayer(token: string, duprId: string) {
+// 유저를 찾으면 레이팅이 없어도(NR/null) found=true 로 돌려준다.
+// (레이팅 유무는 연결 성공 여부와 별개 — 미채점 계정도 정상 연결.)
+type Found = { found: true; name: string | null; doubles: number | null; singles: number | null };
+async function lookupPlayer(token: string, duprId: string): Promise<Found | null> {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const id = duprId.trim();
   try {
-    // 1) DUPR ID 로 직접 조회
+    // 1) DUPR ID 로 직접 조회 — 200 이면 유저 존재로 간주(레이팅 없어도 OK)
     const res = await fetch(`${BASE}/user/${VERSION}/${encodeURIComponent(id)}`, { headers });
     if (res.ok) {
       const data = await res.json().catch(() => null);
-      const parsed = parseUser(data?.result ?? data);
-      if (parsed && (parsed.doubles != null || parsed.singles != null)) return parsed;
+      const u = data?.result ?? data;
+      // deno-lint-ignore no-explicit-any
+      const any = u as any;
+      if (any && (any.id || any.fullName || any.ratings)) {
+        return { found: true, ...parseUser(any) };
+      }
     }
-    // 2) 이름/이메일 검색 → 첫 결과
+    // 2) 이름 검색 → 첫 결과(직접 조회가 안 됐을 때만)
     const sres = await fetch(`${BASE}/user/${VERSION}/search`, {
       method: 'POST',
       headers,
@@ -78,10 +85,59 @@ async function lookupPlayer(token: string, duprId: string) {
     if (!sres.ok) return null;
     const sdata = await sres.json().catch(() => null);
     const first = (sdata?.result?.hits ?? sdata?.hits ?? [])[0] ?? null;
-    return parseUser(first);
+    if (!first) return null;
+    return { found: true, ...parseUser(first) };
   } catch {
     return null;
   }
+}
+
+// 경기별 레이팅 변화(그래프용). POST /history?duprId=&offset=&limit=
+// 응답: { result: [{ matchId, singles, doubles, created(epoch), ... }] } 또는 { result: { results:[...] } }
+type HistPoint = { matchId: number | null; doubles: number | null; singles: number | null; at: string };
+async function fetchHistory(token: string, duprId: string): Promise<HistPoint[]> {
+  try {
+    const url = `${BASE}/history?duprId=${encodeURIComponent(duprId.trim())}&offset=0&limit=100`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    const rows: unknown[] = data?.result?.results ?? data?.result ?? data?.results ?? [];
+    if (!Array.isArray(rows)) return [];
+    const toIso = (created: unknown): string | null => {
+      const n = typeof created === 'number' ? created : Number(created);
+      if (!Number.isFinite(n)) return null;
+      const ms = n < 1e12 ? n * 1000 : n; // 초/밀리초 자동 판별
+      return new Date(ms).toISOString();
+    };
+    return rows
+      // deno-lint-ignore no-explicit-any
+      .map((r: any) => ({
+        matchId: r?.matchId != null ? Number(r.matchId) : null,
+        doubles: num(r?.doubles),
+        singles: num(r?.singles),
+        at: toIso(r?.created),
+      }))
+      .filter((r): r is HistPoint => r.at != null && (r.doubles != null || r.singles != null));
+  } catch {
+    return [];
+  }
+}
+
+// deno-lint-ignore no-explicit-any
+async function saveHistory(admin: any, userId: string, points: HistPoint[]) {
+  if (points.length === 0) return;
+  const rows = points.map((p) => ({
+    user_id: userId,
+    match_id: p.matchId,
+    doubles: p.doubles,
+    singles: p.singles,
+    recorded_at: p.at,
+  }));
+  // 같은 (user,match,시각) 중복은 무시. 캐시라 실패해도 치명적이지 않음.
+  await admin.from('dupr_rating_history').upsert(rows, { onConflict: 'user_id,match_id,recorded_at', ignoreDuplicates: true });
 }
 
 Deno.serve(async (req) => {
@@ -124,23 +180,30 @@ Deno.serve(async (req) => {
   const token = await getDuprToken();
   if (!token) return json({ error: 'dupr_not_configured', message: 'DUPR 파트너 키가 설정되지 않았거나 인증에 실패했어요.' }, 503);
 
-  // 4) 조회 + 파싱
-  const ratings = await lookupPlayer(token, duprId);
-  if (!ratings || (ratings.doubles == null && ratings.singles == null)) {
-    return json({ error: 'not_found', message: 'DUPR 에서 레이팅을 찾지 못했어요. ID 를 확인해 주세요.' }, 404);
+  // 2.5) 히스토리 새로고침만 요청 — 캐시 갱신 후 개수 반환(그래프 수동 새로고침용)
+  if (body?.history === true) {
+    const pts = await fetchHistory(token, duprId);
+    await saveHistory(admin, caller.id, pts);
+    return json({ ok: true, count: pts.length });
+  }
+
+  // 4) 조회 — 유저가 존재하면 레이팅이 없어도(NR) 연결 성공. 아예 못 찾을 때만 실패.
+  const found = await lookupPlayer(token, duprId);
+  if (!found) {
+    return json({ error: 'not_found', message: 'DUPR 에서 계정을 찾지 못했어요. ID 를 확인해 주세요.' }, 404);
   }
 
   // 5) 본인 프로필에 저장 (service_role → protect_dupr 트리거 통과)
   //    verified=true(SSO 동의 경유) → 소유 인증. 아니면 표시 연동.
   const isVerified = body?.verified === true;
   const status = isVerified ? 'verified' : 'linked';
-  const primary = ratings.doubles ?? ratings.singles;
+  const primary = found.doubles ?? found.singles ?? null;
   await admin
     .from('profiles')
     .update({
       dupr_id: duprId,
-      dupr_doubles: ratings.doubles,
-      dupr_singles: ratings.singles,
+      dupr_doubles: found.doubles,
+      dupr_singles: found.singles,
       dupr_rating: primary,
       dupr_status: status,
       dupr_verified: isVerified,
@@ -148,5 +211,10 @@ Deno.serve(async (req) => {
     })
     .eq('id', caller.id);
 
-  return json({ ok: true, level: status, ...ratings });
+  // 6) 그래프용 히스토리도 함께 캐시(있으면). 실패해도 연결은 성공 처리.
+  const hist = await fetchHistory(token, duprId);
+  await saveHistory(admin, caller.id, hist);
+
+  // unrated: 계정은 연결됐지만 아직 레이팅이 없는 상태(NR)
+  return json({ ok: true, level: status, name: found.name, doubles: found.doubles, singles: found.singles, unrated: found.doubles == null && found.singles == null });
 });

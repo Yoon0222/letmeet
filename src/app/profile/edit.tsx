@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 
 import { Avatar } from '@/components/ui/avatar';
@@ -27,6 +27,24 @@ export default function EditProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duprPublic, setDuprPublic] = useState(profile?.dupr_public ?? false);
+
+  // DUPR 그래프 공개 여부 — 사용자 설정값이라 바로 저장(보호 컬럼 아님).
+  async function toggleDuprPublic(next: boolean) {
+    const uid = session?.user.id;
+    if (!uid) return;
+    setDuprPublic(next); // 낙관적
+    const { error } = await supabase
+      .from('profiles')
+      .update({ dupr_public: next, updated_at: new Date().toISOString() })
+      .eq('id', uid);
+    if (error) {
+      setDuprPublic(!next);
+      Alert.alert('변경 실패', error.message);
+      return;
+    }
+    await refreshProfile();
+  }
 
   // 갤러리에서 사진 선택 → Storage 업로드 → profiles.avatar_url 갱신
   async function pickAvatar() {
@@ -240,6 +258,22 @@ export default function EditProfile() {
             variant="outline"
             onPress={() => router.push('/dupr-connect' as never)}
           />
+          {profile?.dupr_status === 'verified' ? (
+            <View style={styles.duprToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.duprToggleLabel}>레이팅 그래프 공개</Text>
+                <Text style={styles.duprHint}>
+                  {duprPublic ? '다른 사람도 내 프로필에서 그래프를 볼 수 있어요.' : '나만 볼 수 있어요(공개 프로필엔 숨김).'}
+                </Text>
+              </View>
+              <Switch
+                value={duprPublic}
+                onValueChange={toggleDuprPublic}
+                trackColor={{ true: '#16C784', false: '#D1D5DB' }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          ) : null}
         </View>
 
         <Button title="저장" onPress={onSave} loading={saving} style={{ marginTop: Spacing.two }} />
@@ -255,6 +289,8 @@ const styles = StyleSheet.create({
   duprHint: { fontSize: 12, color: '#9CA3AF', lineHeight: 17 },
   duprStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   duprStatusText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
+  duprToggleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one },
+  duprToggleLabel: { fontSize: 14, fontWeight: '700', color: '#374151' },
   avatarWrap: { alignItems: 'center', gap: 8, marginBottom: Spacing.two },
   avatarBadge: {
     position: 'absolute',

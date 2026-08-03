@@ -36,18 +36,20 @@ export default function DuprConnectScreen() {
 
   async function onMessage(e: WebViewMessageEvent) {
     if (handled.current) return;
-    let data: { type?: string; duprId?: string } | null = null;
+    let data: { type?: string; duprId?: string; id?: string } | null = null;
     try {
       data = JSON.parse(e.nativeEvent.data);
     } catch {
       return;
     }
-    if (data?.type !== 'dupr-sso' || !data.duprId) return;
+    // DUPR SSO 는 6자리 duprId(공개 코드)를 준다. 없으면 내부 id 로 폴백.
+    const candidate = data?.duprId ?? data?.id;
+    if (data?.type !== 'dupr-sso' || !candidate) return;
     handled.current = true;
     setSaving(true);
 
-    // 동의 완료 → 파트너 API 로 이제 레이팅 조회 가능. verified 로 저장.
-    const { ok, result, error } = await verifyDupr(data.duprId, true);
+    // 동의 완료 → 파트너 API 로 이제 조회 가능. verified 로 저장.
+    const { ok, result, error } = await verifyDupr(candidate, true);
     setSaving(false);
     if (!ok) {
       Alert.alert('DUPR 연결 실패', error ?? '다시 시도해 주세요.');
@@ -60,7 +62,11 @@ export default function DuprConnectScreen() {
       result?.singles != null ? `단식 ${result.singles.toFixed(1)}` : null,
     ].filter(Boolean);
     router.back();
-    setTimeout(() => Alert.alert('DUPR 연결 완료', parts.length ? `인증됐어요 · ${parts.join(' · ')}` : 'DUPR 계정이 연결됐어요.'), 300);
+    // 레이팅이 아직 없는(NR) 계정도 연결은 성공 — 그에 맞는 안내.
+    const doneMsg = parts.length
+      ? `인증됐어요 · ${parts.join(' · ')}`
+      : '인증됐어요 · 아직 DUPR 레이팅이 없어요(경기 후 반영)';
+    setTimeout(() => Alert.alert('DUPR 연결 완료', doneMsg), 300);
   }
 
   if (configErr) {

@@ -5,6 +5,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, Text
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DuprRatingCard } from '@/components/dupr-rating-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,9 @@ export default function PlayerProfile() {
           </View>
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
         </View>
+
+        {/* DUPR 레이팅 추이 — 사용자가 공개로 설정한 경우에만 */}
+        {profile.dupr_public ? <DuprRatingCard userId={id} /> : null}
 
         {/* 리뷰 요약 */}
         <View style={styles.summaryCard}>

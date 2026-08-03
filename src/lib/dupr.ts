@@ -1,5 +1,40 @@
 import { supabase } from '@/lib/supabase';
+import type { DuprPoint } from '@/components/ui/dupr-rating-chart';
 import type { DuprVerifyResult } from '@/lib/types';
+
+// 프로필 그래프용 히스토리(캐시 테이블 dupr_rating_history). 시간 오름차순.
+export async function getDuprHistory(userId: string): Promise<DuprPoint[]> {
+  const { data, error } = await supabase
+    .from('dupr_rating_history')
+    .select('recorded_at, doubles, singles')
+    .eq('user_id', userId)
+    .order('recorded_at', { ascending: true });
+  if (error || !data) return [];
+  return data.map((r) => ({
+    at: new Date(r.recorded_at).getTime(),
+    doubles: r.doubles,
+    singles: r.singles,
+  }));
+}
+
+// 서버에 히스토리 새로고침 요청(DUPR /history → 캐시 upsert). 갱신된 개수 반환.
+export async function refreshDuprHistory(): Promise<number> {
+  const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { history: true } });
+  if (error || !data?.ok) return 0;
+  return data.count ?? 0;
+}
+
+// 샘플 히스토리 — 실제 연동 전 차트 UI 확인용(개발/프리뷰에서만 사용).
+export const SAMPLE_DUPR_HISTORY: DuprPoint[] = [
+  { at: Date.parse('2026-02-05'), doubles: 3.21, singles: 3.05 },
+  { at: Date.parse('2026-03-01'), doubles: 3.28, singles: 3.09 },
+  { at: Date.parse('2026-03-22'), doubles: 3.35, singles: 3.04 },
+  { at: Date.parse('2026-04-14'), doubles: 3.4, singles: 3.18 },
+  { at: Date.parse('2026-05-06'), doubles: 3.52, singles: 3.22 },
+  { at: Date.parse('2026-05-28'), doubles: 3.58, singles: 3.31 },
+  { at: Date.parse('2026-06-20'), doubles: 3.66, singles: 3.35 },
+  { at: Date.parse('2026-07-18'), doubles: 3.74, singles: 3.42 },
+];
 
 // SSO iframe 용 설정(공개값 base64(clientKey) + SSO base)을 서버(시크릿)에서 받아온다.
 export async function getDuprSsoConfig(): Promise<{ clientKeyB64: string; ssoBase: string } | null> {

@@ -35,6 +35,7 @@ export type Profile = {
   dupr_status: 'none' | 'linked' | 'verified';
   dupr_synced_at: string | null;
   dupr_verified: boolean; // = (dupr_status === 'verified'), 하위호환 유지
+  dupr_public: boolean; // 레이팅 그래프 공개 여부(0058). 본인은 항상 봄, 남은 이 값이 true 일 때만.
   role: UserRole;
   created_at: string;
   updated_at: string;
@@ -47,6 +48,18 @@ export type DuprVerifyResult = {
   name: string | null;
   doubles: number | null;
   singles: number | null;
+  unrated?: boolean; // 계정은 연결됐지만 아직 레이팅 없음(NR)
+};
+
+// DUPR 레이팅 히스토리 캐시(0058) — 그래프용 스냅샷.
+export type DuprRatingHistoryRow = {
+  id: number;
+  user_id: string;
+  match_id: number | null;
+  doubles: number | null;
+  singles: number | null;
+  recorded_at: string;
+  created_at: string;
 };
 
 export type Meetup = {
@@ -562,6 +575,12 @@ export interface Database {
         Row: Profile;
         Insert: WriteDefaults<Profile> & { id: string; nickname: string };
         Update: WriteDefaults<Profile>;
+        Relationships: [];
+      };
+      dupr_rating_history: {
+        Row: DuprRatingHistoryRow;
+        Insert: WriteDefaults<DuprRatingHistoryRow> & { user_id: string; recorded_at: string };
+        Update: WriteDefaults<DuprRatingHistoryRow>;
         Relationships: [];
       };
       meetups: {

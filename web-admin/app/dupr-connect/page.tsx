@@ -20,13 +20,19 @@ function getUrlParams() {
   };
 }
 
-// deno/next 브라우저에서 message 이벤트의 페이로드는 event.data 또는 event 자체에 있을 수 있어 둘 다 본다.
-type SsoPayload = { duprId?: string; userToken?: string; refreshToken?: string; stats?: unknown };
+// deno/next 브라우저에서 message 이벤트의 페이로드는 event.data(객체 또는 JSON 문자열)에 있다.
+type SsoPayload = { duprId?: string; id?: string; userToken?: string; refreshToken?: string; stats?: unknown };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function coerce(raw: any): any {
+  if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return {}; } }
+  return raw ?? {};
+}
 function extract(e: MessageEvent): SsoPayload | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const d: any = e.data && (e.data.duprId || e.data.userToken) ? e.data : (e as any);
-  if (d && (d.duprId || d.userToken)) {
-    return { duprId: d.duprId, userToken: d.userToken, refreshToken: d.refreshToken, stats: d.stats };
+  const d = coerce(e.data);
+  // 중첩 케이스(d.data)도 본다.
+  const s = d && (d.duprId || d.id || d.userToken) ? d : coerce(d?.data);
+  if (s && (s.duprId || s.id || s.userToken)) {
+    return { duprId: s.duprId, id: s.id != null ? String(s.id) : undefined, userToken: s.userToken, refreshToken: s.refreshToken, stats: s.stats };
   }
   return null;
 }

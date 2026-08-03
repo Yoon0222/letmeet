@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DuprRatingCard } from '@/components/dupr-rating-card';
 import { MeetupCard } from '@/components/meetup-card';
 import { ProfileSummaryCard } from '@/components/profile-summary-card';
 import { AppCard } from '@/components/ui/app-card';
@@ -92,6 +93,9 @@ export default function ProfileScreen() {
         <AppHeader title={t('profile.title')} rightIcon="create-outline" onRightPress={() => router.push('/profile/edit')} />
 
         <ProfileSummaryCard profile={profile} meetupCount={myMeetups.length} />
+
+        {/* DUPR 레이팅 추이 — 본인은 항상 봄(개발/프리뷰는 샘플로 미리보기) */}
+        {session?.user.id ? <DuprRatingCard userId={session.user.id} allowSample /> : null}
 
         {/* 받은 리뷰 — 요약 + 탭하면 전체 리뷰(플레이어 화면) */}
         <AppCard onPress={() => router.push(`/player/${session?.user.id}` as never)} style={styles.reviewRow}>
