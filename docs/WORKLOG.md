@@ -75,6 +75,12 @@
 
 ## 2026-08-04
 
+### DUPR 전 구간 실계정 검증 (E2E)
+- **결정/검증**: 두 번째 UAT 계정 player2(troy=`4L4E72`) SSO 연결 → 실계정 2개 확보. `JZKMXM` vs `4L4E72` **실제 match/create 3판 등록 성공**(matchCode 발급). 둘 다 RATING 웹훅 구독 → 재계산 후 **웹훅이 실제로 날아와 두 프로필 `dupr_synced_at` 동시 갱신**(관리자의 합성값 3.7이 실데이터 null로 덮임) = 등록→재계산→웹훅→프로필 갱신 전 구간 확인.
+- **한계**: 두 계정 다 NR(무레이팅)이라 서로만 쳐서는 숫자 레이팅 미확립(rated anchor 없음) → 그래프 라인은 실계정으론 아직 안 나옴. **코드 문제 아님**(합성 데이터론 그래프 정상). 실서비스(레이팅 있는 선수)에선 숫자 흐름.
+- **주의(협업)**: 코덱스가 내정보 프로필(`(tabs)/profile.tsx`)을 다크 리디자인하며 `DuprRatingCard` 삽입부 제거(대신 rating 요약 카드). 차트/카드 컴포넌트는 다크로 리스타일해 유지 → **그래프 카드 재배치는 코덱스와 조율 필요**(현재 그래프는 공개프로필 player/[id]에만).
+- **메모**: dupr-verify `setup` 액션에 일괄구독(subscribeIds) 상시 추가(운영 초기용). 검증용 search/matchTest 임시코드는 제거.
+
 ### DUPR 인증 경기 — 대회 (3단계)
 - **만든 것**: 대회 생성 인증토글(web-admin `tournaments/new`), 참가 게이트(`tournament/[id]` verified만)+배지, 결과확정 시 **자동 DUPR 등록**(`web-admin/lib/dupr.ts submitTournamentMatch` → 예선/본선 saveScore 훅). 복식은 `tournament_entries.partner_id`로 파트너 해석. tournaments_with_counts 뷰 재생성(0059).
 - **결정**: DB 트리거(서비스키 DB 내장) 대신 **관리자 세션에서 dupr-match 호출**(안전·비차단·멱등). 단식·복식 개별경기(조별+토너먼트) 자동등록. 단체전(tie_matches)은 구조 달라 후속.
