@@ -77,6 +77,21 @@ curl -X POST ".../functions/v1/dupr-verify" -H "Authorization: Bearer <anon>" \
 - 등록 `200 registered ok` · 잘못된 시크릿 `401` · 정상 이벤트 `200 + 프로필/히스토리 갱신`(합성 6포인트로 그래프 실데이터 확인).
 - ⚠️ dev 의 `관리자`(JZKMXM) 프로필엔 테스트용 합성 레이팅/히스토리가 들어있음(실데이터 아님).
 
+## 운영키(Production Key) 심사 — 요건 & 전환 (2026-08-03)
+
+발급: `tech@mydupr.com` 로 (1) 플랫폼 URL (2) 테스트계정 (3) 요건 충족 요약+테스트 절차 이메일 → 심사 영업일 10일 → 통과 시 운영키.
+
+**요건 현황** (GitBook `dupr-raas` 기준): SSO전용연결·레이팅표시·웹훅·경기CRUD(권한자만)·**엔티틀먼트(BASIC_L1) 게이팅**·**SSO토큰 저장+refresh**·**자격 24h 재조회**·**지원/분쟁 창구** → 전부 구현 완료. (남은 실무: SUPPORT_EMAIL 도메인 메일 실동작, 실사용 검증)
+
+**운영 전환 시 바꿀 것** (env/시크릿):
+- `DUPR_API_BASE` = `https://api.mydupr.com/api` (또는 DUPR 안내 운영 URL)
+- `DUPR_SSO_BASE` = `https://dashboard.dupr.com/login-external-app` (UAT: uat.dupr.gg)
+- `DUPR_PUBLIC_BASE` = `https://api.dupr.gg` (UAT: api.uat.dupr.gg)
+- `DUPR_CLIENT_KEY`/`SECRET` = 운영키, `DUPR_WEBHOOK_SECRET` 재생성 + `setup register` 로 운영 웹훅 URL 등록
+- 운영 토큰수명: access 30일 / refresh 90일 (UAT 7/30)
+
+**API Access 제약(문서)**: 미연결 유저는 User Details/Match History 403, search 는 연결유저만, rating 구독은 미연결 시 400, 미연결 선수 경기데이터는 "A DUPR User" 로 마스킹. (경기 제출은 미연결자도 가능하나 결과조회는 연결 후) → 우리는 연결(verified)+BASIC 게이트라 안전.
+
 ## Level B — 소유 인증(OAuth) (후속)
 DB(`dupr_status='verified'`)와 UI 배지("DUPR 인증됨")는 준비됨.
 실제 흐름(DUPR 로그인 → 본인 계정 연결)은 **DUPR 파트너 OAuth 스펙**이 있어야

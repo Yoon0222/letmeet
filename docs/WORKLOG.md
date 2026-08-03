@@ -75,6 +75,12 @@
 
 ## 2026-08-04
 
+### DUPR 토큰 refresh + 자격 24h 재조회 (운영요건 마무리)
+- **확정**: DUPR SSO 문서에서 refresh/자격 조회 경로 확인 — public API `api.uat.dupr.gg`(운영 `api.dupr.gg`): `GET /auth/{v}/refresh`(Bearer+헤더 x-refresh-token→토큰 쌍 회전), `POST /subscription/active`(user token→자격), `GET /public/user/info`. 파트너 API(uat.mydupr.com)와 별개. UAT 토큰수명 access7일/refresh30일.
+- **만든 것**: `dupr-verify` entitlements 액션(저장 토큰으로 자격조회, 401이면 refresh 후 재시도·회전저장 → dupr_basic/premium 갱신). 앱 `maybeSyncEntitlements`(24h 초과만) → auth 컨텍스트 프로필 로드 시 백그라운드 동기화. `DUPR_PUBLIC_BASE` 분리.
+- **메모**: esm.sh 가 supabase-js@2 를 2.112.0(denonext 빌드 깨짐)으로 잡아 배포 실패 → **3함수 모두 @2.45.0 핀**. 운영 전환 URL(dashboard.dupr.com / api.dupr.gg)·요건 현황은 `docs/DUPR_INTEGRATION.md`.
+- **운영키 요건**: 전부 구현 완료(제출 준비). 남은 실무: SUPPORT_EMAIL 도메인메일 실동작, 재연결 실검증.
+
 ### DUPR 운영키 요건 3종 — 엔티틀먼트 · SSO토큰 · 지원창구
 - **배경**: DUPR RaaS 운영키는 tech@mydupr.com 이메일 심사(영업일 10일). GitBook 요건 확인 결과 우리가 이미 충족(SSO·레이팅·웹훅·경기CRUD)한 것 외에 **엔티틀먼트 게이팅·SSO토큰 저장·지원창구**가 미비 → 구현.
 - **엔티틀먼트**: SSO subscriptions 에서 BASIC_L1/PREMIUM_L1(active) 파싱 → `profiles.dupr_basic/premium`(0061, protect_dupr 보호). 인증 번개/대회 참가 게이트 + `dupr-match` 등록 게이트에 **모든 선수 BASIC_L1 필수** 반영. (BASIC_L1=일반 활성회원, SSO 응답에 이미 옴)
