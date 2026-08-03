@@ -75,6 +75,11 @@
 
 ## 2026-08-04
 
+### DUPR 경기 수정/삭제 동기화 (match update·delete)
+- **만든 것**: 0060(meetup_matches/tournament_matches.dupr_match_code — create 응답 matchCode 저장). `dupr-match`: 이미 등록된 경기 재제출→match/update(matchId=code), 아니면 create(matchCode 저장). action:'delete'→match/delete+skipped. 대회 submitTournamentMatch 멱등가드 제거(점수수정 재저장 시 자동 update). 번개 경기기록 화면 삭제버튼(deleteMeetupMatch: DUPR삭제+로컬삭제).
+- **검증**: 실계정 경기로 DUPR **update 200 SUCCESS · delete 200 SUCCESS** 직접 확인. tsc(모바일+웹)·lint 통과. 임시 matchOp 테스트코드 제거.
+- **남음**: dev 에 0060 실행. 번개 경기 '수정'은 UI 미구현(삭제 후 재기록으로 대체) — 필요시 편집 UI 추가.
+
 ### DUPR 전 구간 실계정 검증 (E2E)
 - **결정/검증**: 두 번째 UAT 계정 player2(troy=`4L4E72`) SSO 연결 → 실계정 2개 확보. `JZKMXM` vs `4L4E72` **실제 match/create 3판 등록 성공**(matchCode 발급). 둘 다 RATING 웹훅 구독 → 재계산 후 **웹훅이 실제로 날아와 두 프로필 `dupr_synced_at` 동시 갱신**(관리자의 합성값 3.7이 실데이터 null로 덮임) = 등록→재계산→웹훅→프로필 갱신 전 구간 확인.
 - **한계**: 두 계정 다 NR(무레이팅)이라 서로만 쳐서는 숫자 레이팅 미확립(rated anchor 없음) → 그래프 라인은 실계정으론 아직 안 나옴. **코드 문제 아님**(합성 데이터론 그래프 정상). 실서비스(레이팅 있는 선수)에선 숫자 흐름.
