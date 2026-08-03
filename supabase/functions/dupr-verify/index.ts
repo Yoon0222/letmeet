@@ -50,6 +50,11 @@ function num(v: unknown): number | null {
   const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) && n >= 2 && n <= 8 ? Math.round(n * 10) / 10 : null;
 }
+// 히스토리(그래프)용 — 3자리 정밀도 유지(테이블 numeric(4,3)).
+function num3(v: unknown): number | null {
+  const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN;
+  return Number.isFinite(n) && n >= 2 && n <= 8 ? Math.round(n * 1000) / 1000 : null;
+}
 function parseUser(user: Record<string, unknown> | null) {
   if (!user) return null;
   // deno-lint-ignore no-explicit-any
@@ -116,13 +121,27 @@ async function fetchHistory(token: string, duprId: string): Promise<HistPoint[]>
       // deno-lint-ignore no-explicit-any
       .map((r: any) => ({
         matchId: r?.matchId != null ? Number(r.matchId) : null,
-        doubles: num(r?.doubles),
-        singles: num(r?.singles),
+        doubles: num3(r?.doubles),
+        singles: num3(r?.singles),
         at: toIso(r?.created),
       }))
       .filter((r): r is HistPoint => r.at != null && (r.doubles != null || r.singles != null));
   } catch {
     return [];
+  }
+}
+
+// 이 선수의 레이팅 변경을 구독(RATING 웹훅). 이후 경기 후 자동으로 dupr-webhook 이 호출됨.
+async function subscribeRating(token: string, duprId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/user/${VERSION}/subscribe/webhook-event`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duprIds: [duprId.trim()], topic: 'RATING' }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -160,6 +179,38 @@ Deno.serve(async (req) => {
       clientKeyB64: btoa(key),
       ssoBase: Deno.env.get('DUPR_SSO_BASE') ?? 'https://uat.dupr.gg/login-external-app',
     });
+  }
+
+  // 0.5) 웹훅 셋업(관리자용, 시크릿 게이트) — 스키마 조회 / URL 등록 / 구독목록.
+  //      body: { setup:true, secret, register?:bool, list?:bool }
+  if (body?.setup === true) {
+    const secret = Deno.env.get('DUPR_WEBHOOK_SECRET');
+    if (!secret || body?.secret !== secret) return json({ error: 'forbidden' }, 403);
+    const token = await getDuprToken();
+    if (!token) return json({ error: 'dupr_not_configured' }, 503);
+    const h = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const out: Record<string, unknown> = {};
+    // RATING 페이로드 스키마
+    const sc = await fetch(`${BASE}/${VERSION}/webhook/schema/RATING`, { headers: h });
+    out.schemaStatus = sc.status;
+    out.schema = await sc.text().catch(() => null);
+    // 우리 웹훅 URL 등록(topics=[RATING])
+    if (body?.register === true) {
+      const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/dupr-webhook?s=${secret}`;
+      const rg = await fetch(`${BASE}/${VERSION}/webhook`, {
+        method: 'POST', headers: h, body: JSON.stringify({ webhookUrl, topics: ['RATING'] }),
+      });
+      out.registerStatus = rg.status;
+      out.registerBody = await rg.text().catch(() => null);
+      out.webhookUrl = webhookUrl;
+    }
+    // 현재 구독중인 duprId 목록
+    if (body?.list === true) {
+      const ls = await fetch(`${BASE}/${VERSION}/subscribe/rating-changes`, { headers: h });
+      out.listStatus = ls.status;
+      out.listBody = await ls.text().catch(() => null);
+    }
+    return json(out);
   }
 
   // 1) 호출자 인증 — 조회/검증 요청은 로그인 필요
@@ -211,9 +262,10 @@ Deno.serve(async (req) => {
     })
     .eq('id', caller.id);
 
-  // 6) 그래프용 히스토리도 함께 캐시(있으면). 실패해도 연결은 성공 처리.
+  // 6) 그래프용 히스토리 캐시 + 이후 변경 자동 수신 구독. 실패해도 연결은 성공 처리.
   const hist = await fetchHistory(token, duprId);
   await saveHistory(admin, caller.id, hist);
+  await subscribeRating(token, duprId);
 
   // unrated: 계정은 연결됐지만 아직 레이팅이 없는 상태(NR)
   return json({ ok: true, level: status, name: found.name, doubles: found.doubles, singles: found.singles, unrated: found.doubles == null && found.singles == null });

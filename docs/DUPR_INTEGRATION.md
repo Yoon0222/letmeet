@@ -44,6 +44,39 @@ dev 함수 배포 후, 앱 프로필 편집 → DUPR ID 입력 → "레이팅 �
 - 키 미설정: `503 dupr_not_configured` → "아직 준비 중" 토스트(정상)
 - 정상: 복식/단식 표시 + `dupr_status='linked'` 배지
 
+## 레이팅 변경 웹훅 (자동 갱신) — 2026-08-03 구현·검증
+
+DUPR 가 구독한 선수의 레이팅이 경기 후 바뀌면 우리 서버로 POST → 프로필/그래프 자동 갱신.
+
+```
+경기 종료 → DUPR 레이팅 재계산 → (RATING 웹훅) → Edge Function dupr-webhook
+   → profiles 갱신 + dupr_rating_history append + 푸시 알림
+```
+
+### 구성요소
+- **`dupr-webhook`** (공개 함수, `--no-verify-jwt`): DUPR 가 호출. URL 의 `?s=<DUPR_WEBHOOK_SECRET>` 로 진위 검증(ClientHookRequest 에 secret 필드 없음). 페이로드 `RatingWebhookEnvelope{ message:{ duprId, timestamp, rating:{doubles,singles(문자열),matchId} } }` 파싱 → `dupr_id` 로 유저 매칭 → 갱신.
+- **`dupr-verify`** 확장:
+  - 연결(verify) 성공 시 `POST /user/{v}/subscribe/webhook-event {duprIds,[topic:RATING]}` 로 **자동 구독**.
+  - `setup` 액션(시크릿 게이트): 웹훅 URL 등록 / 스키마 조회 / 구독목록.
+
+### 켜는 순서 (dev 완료 · prod 시 동일)
+```bash
+# 1) 웹훅 시크릿 생성·등록 (임의값)
+supabase secrets set DUPR_WEBHOOK_SECRET=<랜덤32자> --project-ref <ref>
+# 2) 함수 배포 (웹훅은 반드시 --no-verify-jwt)
+supabase functions deploy dupr-verify  --project-ref <ref>
+supabase functions deploy dupr-webhook --no-verify-jwt --project-ref <ref>
+# 3) DUPR 에 우리 웹훅 URL 등록 (setup 액션, register:true)
+curl -X POST ".../functions/v1/dupr-verify" -H "Authorization: Bearer <anon>" \
+  -d '{"setup":true,"secret":"<DUPR_WEBHOOK_SECRET>","register":true,"list":true}'
+#   → webhookUrl = https://<ref>.supabase.co/functions/v1/dupr-webhook?s=<secret>
+```
+- 기존 연결자(구독 코드 추가 전 연결)는 **재연결** 하거나, duprId 목록으로 일괄 `subscribe/webhook-event` 호출 필요.
+
+### 검증(dev, 2026-08-03)
+- 등록 `200 registered ok` · 잘못된 시크릿 `401` · 정상 이벤트 `200 + 프로필/히스토리 갱신`(합성 6포인트로 그래프 실데이터 확인).
+- ⚠️ dev 의 `관리자`(JZKMXM) 프로필엔 테스트용 합성 레이팅/히스토리가 들어있음(실데이터 아님).
+
 ## Level B — 소유 인증(OAuth) (후속)
 DB(`dupr_status='verified'`)와 UI 배지("DUPR 인증됨")는 준비됨.
 실제 흐름(DUPR 로그인 → 본인 계정 연결)은 **DUPR 파트너 OAuth 스펙**이 있어야
