@@ -113,11 +113,11 @@ export default function MeetupDetail() {
     // DUPR 인증 번개는 연결(verified)된 사람만 참가 가능
     if (meetup.dupr_certified && !duprConnected) {
       Alert.alert(
-        'DUPR 연결 필요',
-        'DUPR 인증 번개는 DUPR 계정을 연결한 회원만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.',
+        'DUPR 인증이 필요해요',
+        'DUPR 인증 번개는 DUPR 계정을 연결한 회원만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.\n\n지금 바로 연결할까요? (DUPR 계정이 없으면 가입도 가능해요)',
         [
-          { text: '닫기', style: 'cancel' },
-          { text: 'DUPR 연결하기', onPress: () => router.push('/profile/edit') },
+          { text: '나중에', style: 'cancel' },
+          { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
         ],
       );
       return;

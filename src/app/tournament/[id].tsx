@@ -228,11 +228,11 @@ export default function TournamentDetail() {
     // DUPR 인증 대회는 연결(verified)된 선수만 참가
     if (t?.dupr_certified && profile?.dupr_status !== 'verified') {
       Alert.alert(
-        'DUPR 연결 필요',
-        'DUPR 인증 대회는 DUPR 계정을 연결한 선수만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.',
+        'DUPR 인증이 필요해요',
+        'DUPR 인증 대회는 DUPR 계정을 연결한 선수만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.\n\n지금 바로 연결할까요? (DUPR 계정이 없으면 가입도 가능해요)',
         [
-          { text: '닫기', style: 'cancel' },
-          { text: 'DUPR 연결하기', onPress: () => router.push('/profile/edit') },
+          { text: '나중에', style: 'cancel' },
+          { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
         ],
       );
       return;
