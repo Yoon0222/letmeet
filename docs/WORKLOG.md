@@ -75,6 +75,13 @@
 
 ## 2026-08-04
 
+### DUPR 인증 경기 — 번개/대회 등록 (1~2단계)
+- **결정**: 번개·대회를 **인증/비인증** 두 종류로. 인증은 DUPR 연결자만 참여 + 경기결과를 DUPR 에 등록(match/create)→레이팅 반영→웹훅으로 그래프 자동갱신. 대회는 이미 경기·점수 엔진이 있어 쉬움, 번개는 점수기록 화면 신설. 경기형식=복식위주+단식, 점수기록=호스트.
+- **1단계(기반)**: DB `0059`(meetups/tournaments.dupr_certified + `meetup_matches` 번개경기기록 + tournament_matches DUPR추적컬럼 + meetups_with_counts 뷰 재생성). `dupr-match` 엣지함수(우리ID→DUPR ID 변환 후 match/create, meetup=호스트/tournament=organizer, 미연결자 422). types·schema 동반.
+- **2단계(번개)**: `meetup/[id]` 참가 게이트(인증=verified만)+배지+호스트 진입, `meetup/record/[id]` 신규(복식/단식·팀배정·게임점수→저장+DUPR등록), `submitMatchToDupr`.
+- **검증**: tsc/lint 0, 함수 dev 배포. DUPR 실제 등록은 **연결계정 2명** 필요(현재 player1 하나뿐). 번개 생성 토글은 코덱스(`meetup/create.tsx`) 담당 → HANDOFF 기재.
+- **남음**: 3단계 대회(참가 게이트+결과확정 시 자동 제출, 관리자웹). dev 에 0059 뷰 재생성 SQL 추가 실행 필요.
+
 ### DUPR 레이팅 변경 웹훅 — 자동 갱신
 - **결정**: 경기 후 레이팅이 바뀌면 그래프가 자동 업데이트되게 DUPR RATING 웹훅 연동. DUPR 이 우리 URL 을 아는 방식 = `POST /{v}/webhook`(ClientHookRequest{webhookUrl,topics})로 등록, 선수별 감시는 `/user/{v}/subscribe/webhook-event{duprIds,topic:RATING}`. secret 필드가 없어 **URL `?s=` 시크릿**으로 인바운드 검증.
 - **만든 것**: `dupr-webhook`(공개, --no-verify-jwt) — RatingWebhookEnvelope 파싱→dupr_id 매칭→profiles/dupr_rating_history 갱신+푸시. `dupr-verify` — 연결 시 자동 구독 + `setup` 액션(등록/스키마/목록). 히스토리 3자리 정밀도. 시크릿 `DUPR_WEBHOOK_SECRET` dev 설정.

@@ -23,6 +23,17 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-08-03, DUPR 인증 경기 — 번개 생성 토글 요청)
+
+- **What / Why**: DUPR 인증 번개/대회 기능을 붙이는 중. 인증 번개는 연결(verified)자만 참가하고, 경기결과를 DUPR 에 등록(→레이팅 반영→그래프 자동갱신). DB·게이트·경기기록 화면·제출함수는 내가 다 했다.
+- **요청(코덱스 담당)**: **번개 생성 화면 `src/app/meetup/create.tsx`(코덱스 소유·미커밋이라 내가 안 건드림)에 "DUPR 인증 경기" 토글 추가.** 스펙:
+  - 스위치/토글 하나 (기본 OFF). 켜면 insert payload 에 `dupr_certified: true` 포함(현재는 컬럼만 있고 UI 없음 → 항상 false 로 생성됨).
+  - 안내문 예: "연결된 회원만 참가 · 결과가 DUPR 공식 레이팅에 반영돼요."
+  - 컬럼은 이미 있음(`meetups.dupr_certified`, 0059). 타입 `Meetup.dupr_certified: boolean` 도 반영됨.
+- **내가 만든 것**: `meetup/[id]`(게이트+배지+호스트 진입), `meetup/record/[id]`(신규 점수기록), `dupr-match` 엣지함수, `dupr.ts.submitMatchToDupr`, 0059(컬럼+`meetup_matches`+뷰 재생성).
+- **Validation**: tsc 0 · lint 0. 실제 DUPR 등록은 연결계정 2명 필요(테스트 계정 부족).
+- **대회 토글**은 관리자웹(`web-admin/app/tournaments/new`)이라 내가 직접 붙일 예정(3단계).
+
 ### Claude -> Codex (2026-07-24, 인앱 알림 센터)
 
 - **What changed**: 인앱 알림 센터 신설 (커밋 `c7b7b71`, 마이그레이션 `0053`). 지금까지 푸시가 "쏘고 끝"이라 안읽음 숫자를 못 셌음 → 중앙 `notifications` 테이블에 저장 + Expo 푸시 동시 발송.
@@ -1465,3 +1476,18 @@ Production Supabase migration status check:
   - `npx.cmd tsc --noEmit` passed.
   - `npx.cmd expo lint` passed.
 - No app build or production deployment was run.
+
+2026-07-31 web-admin tournament court assignment visibility:
+
+- User reported the admin tournament "코트배정" tab was hard to visually scan for who is assigned to which court, especially in a demo singles 8-bracket tournament.
+- Confirmed work branch: `pinut-v2.0-dev`.
+- Updated `web-admin/app/tournaments/[id]/courts/page.tsx`:
+  - Replaced the court status chip-only area with a larger "코트별 진행 현황" board.
+  - Each court card now clearly shows court name, indoor/outdoor badge, usage status, current match phase, participant A vs B, and confirmation status.
+  - Organizer can confirm/unconfirm or unassign the current court match directly from the court card.
+  - Existing assignment table and functions remain intact.
+- Verification:
+  - `web-admin` page-level eslint for `app/tournaments/[id]/courts/page.tsx` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npm.cmd run build` passed after allowing network for Google Fonts.
+- No production deployment was run.
