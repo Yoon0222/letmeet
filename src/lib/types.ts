@@ -78,7 +78,26 @@ export type Meetup = {
   require_approval: boolean; // 참가 신청 승인 필요 여부 (0033)
   image_url: string | null; // 코트/장소 사진 (0034)
   court_id: string | null; // 등록 코트 연결(선택) (0046)
+  dupr_certified: boolean; // DUPR 인증 번개: 연결자만 참여, 결과를 DUPR 등록 (0059)
   status: MeetupStatus;
+  created_at: string;
+};
+
+// 번개 경기기록(0059) — 호스트가 기록, DUPR 등록 추적.
+export type MeetupMatch = {
+  id: string;
+  meetup_id: string;
+  format: 'singles' | 'doubles';
+  a1: string;
+  a2: string | null;
+  b1: string;
+  b2: string | null;
+  games: { a: number; b: number }[];
+  recorded_by: string | null;
+  dupr_identifier: string | null;
+  dupr_status: 'pending' | 'submitted' | 'failed' | 'skipped';
+  dupr_submitted_at: string | null;
+  dupr_error: string | null;
   created_at: string;
 };
 
@@ -231,6 +250,7 @@ export type Tournament = {
   group_count: number | null;
   advance_per_group: number | null;
   court_assign_mode: 'auto' | 'manual'; // 코트 배정 방식 (0057)
+  dupr_certified: boolean; // DUPR 인증 대회: 연결자만 참가, 결과를 DUPR 등록 (0059)
   team_min_size: number; // 단체전: 팀당 최소 인원 (0037)
   tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
   tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)
@@ -581,6 +601,12 @@ export interface Database {
         Row: DuprRatingHistoryRow;
         Insert: WriteDefaults<DuprRatingHistoryRow> & { user_id: string; recorded_at: string };
         Update: WriteDefaults<DuprRatingHistoryRow>;
+        Relationships: [];
+      };
+      meetup_matches: {
+        Row: MeetupMatch;
+        Insert: WriteDefaults<MeetupMatch> & { meetup_id: string; format: string; a1: string; b1: string };
+        Update: WriteDefaults<MeetupMatch>;
         Relationships: [];
       };
       meetups: {

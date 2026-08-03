@@ -68,9 +68,29 @@ create table if not exists public.meetups (
   require_approval boolean not null default true,   -- 참가 신청 승인 필요 여부 (0033, 0045 항상 승인제)
   image_url     text,                              -- 코트/장소 사진 (0034)
   court_id      uuid,                              -- 등록 코트 연결(선택) (0046). FK는 courts 정의 뒤(파일 끝)에서 추가
+  dupr_certified boolean not null default false,   -- DUPR 인증 번개(0059): 연결자만 참여, 결과 DUPR 등록
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
 );
+
+-- 번개 경기기록(0059) — 호스트가 기록, DUPR 등록 추적. 대회는 tournament_matches 사용.
+create table if not exists public.meetup_matches (
+  id            uuid primary key default gen_random_uuid(),
+  meetup_id     uuid not null references public.meetups(id) on delete cascade,
+  format        text not null check (format in ('singles','doubles')),
+  a1            uuid not null references public.profiles(id) on delete cascade,
+  a2            uuid references public.profiles(id) on delete set null,
+  b1            uuid not null references public.profiles(id) on delete cascade,
+  b2            uuid references public.profiles(id) on delete set null,
+  games         jsonb not null default '[]',
+  recorded_by   uuid references public.profiles(id) on delete set null,
+  dupr_identifier   text unique,
+  dupr_status       text not null default 'pending' check (dupr_status in ('pending','submitted','failed','skipped')),
+  dupr_submitted_at timestamptz,
+  dupr_error        text,
+  created_at    timestamptz not null default now()
+);
+create index if not exists meetup_matches_meetup_idx on public.meetup_matches (meetup_id);
 
 create index if not exists meetups_start_time_idx on public.meetups (start_time);
 create index if not exists meetups_region_idx on public.meetups (region);
@@ -162,6 +182,15 @@ create policy "profiles_update_own" on public.profiles
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
+
+-- meetup_matches: 조회 공개, 쓰기는 해당 번개 호스트만 (0059).
+alter table public.meetup_matches enable row level security;
+drop policy if exists meetup_matches_select on public.meetup_matches;
+create policy meetup_matches_select on public.meetup_matches for select using (true);
+drop policy if exists meetup_matches_write_host on public.meetup_matches;
+create policy meetup_matches_write_host on public.meetup_matches for all
+  using (exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid()))
+  with check (exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid()));
 
 -- dupr_rating_history: 본인 것은 항상, 남의 것은 공개(dupr_public)일 때만. 쓰기는 service_role 전용.
 alter table public.dupr_rating_history enable row level security;
@@ -389,6 +418,7 @@ create table if not exists public.tournaments (
   format                text not null default 'group_knockout' -- 진행 방식 (0036): group_knockout | kdk | team
                         check (format in ('group_knockout', 'kdk', 'team')),
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
+  dupr_certified        boolean not null default false,       -- DUPR 인증 대회(0059): 연결자만 참가, 결과 DUPR 등록
   group_count           int,                                  -- 조 개수 (대진 생성 시)
   advance_per_group     int,                                  -- 조별 진출 인원
   team_min_size         int not null default 2,               -- 단체전: 팀당 최소 인원 (0037)
