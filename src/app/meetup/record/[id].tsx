@@ -27,7 +27,6 @@ type Part = { user_id: string; nickname: string; avatar_url: string | null; conn
 type Side = 'A' | 'B' | null;
 
 export default function RecordMeetupMatch() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
 

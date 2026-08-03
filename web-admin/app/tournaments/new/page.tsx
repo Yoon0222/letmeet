@@ -33,6 +33,7 @@ function NewTournamentInner() {
   const [title, setTitle] = useState('');
   const [format, setFormat] = useState<TournamentFormat>('group_knockout');
   const [discipline, setDiscipline] = useState<'singles' | 'doubles'>('singles');
+  const [duprCertified, setDuprCertified] = useState(false);
   // 단체전 설정
   const [teamMinSize, setTeamMinSize] = useState(2);
   const [tieSingles, setTieSingles] = useState(2);
@@ -167,6 +168,7 @@ function NewTournamentInner() {
         description: description.trim(),
         images,
         court_assign_mode: courtMode,
+        dupr_certified: duprCertified,
       })
       .select('id')
       .single();
@@ -233,6 +235,20 @@ function NewTournamentInner() {
             </select>
           </Field>
         )}
+        <Field label="DUPR 인증 대회">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-[#2D6BD6]"
+              checked={duprCertified}
+              onChange={(e) => setDuprCertified(e.target.checked)}
+            />
+            <span className="text-sm text-gray-600">
+              DUPR 연결된 선수만 참가 · 경기 결과가 DUPR 공식 레이팅에 반영됩니다.
+            </span>
+          </label>
+        </Field>
+
         <div className="grid grid-cols-2 gap-4">
           <Field label="장소">
             <input

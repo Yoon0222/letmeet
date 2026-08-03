@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
@@ -39,7 +39,8 @@ const ENTRY_LABEL: Record<EntryStatus, string> = {
 export default function TournamentDetail() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
+  const router = useRouter();
   const { show, hide } = useLoading();
   const uid = session?.user.id;
 
@@ -224,6 +225,18 @@ export default function TournamentDetail() {
 
   // 참가 신청 전 확인 알럿
   function confirmApply() {
+    // DUPR 인증 대회는 연결(verified)된 선수만 참가
+    if (t?.dupr_certified && profile?.dupr_status !== 'verified') {
+      Alert.alert(
+        'DUPR 연결 필요',
+        'DUPR 인증 대회는 DUPR 계정을 연결한 선수만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.',
+        [
+          { text: '닫기', style: 'cancel' },
+          { text: 'DUPR 연결하기', onPress: () => router.push('/profile/edit') },
+        ],
+      );
+      return;
+    }
     if (isDoubles && !partnerSel) {
       Alert.alert('파트너 필요', '복식은 함께 출전할 파트너를 선택해야 해요.');
       return;
@@ -316,6 +329,7 @@ export default function TournamentDetail() {
         <View style={styles.badgeRow}>
           <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#2D6BD6" bg="rgba(56,132,255,0.14)" />
           <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#7A4E00" bg="rgba(245,166,35,0.16)" />
+          {t.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
           {t.status === 'registration' ? (
             <Badge label="접수중" />
           ) : (

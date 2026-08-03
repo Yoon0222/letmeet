@@ -72,3 +72,19 @@ select
   (select count(*) from public.meetup_participants mp where mp.meetup_id = m.id and mp.status = 'approved') as participant_count
 from public.meetups m
 join public.profiles p on p.id = m.host_id;
+
+-- tournaments_with_counts 뷰도 t.* 라 dupr_certified 를 자동으로 안 가진다 → drop+create.
+drop view if exists public.tournaments_with_counts;
+create view public.tournaments_with_counts
+with (security_invoker = true)
+as
+select
+  t.*,
+  p.nickname   as organizer_nickname,
+  p.avatar_url as organizer_avatar_url,
+  (select count(*) from public.tournament_entries e
+     where e.tournament_id = t.id and e.status = 'approved') as approved_count,
+  (select count(*) from public.tournament_entries e
+     where e.tournament_id = t.id and e.status = 'pending') as pending_count
+from public.tournaments t
+join public.profiles p on p.id = t.organizer_id;
