@@ -49,6 +49,22 @@ export async function deleteMeetupMatch(matchId: string): Promise<{ ok: boolean;
   return { ok: true };
 }
 
+// 자격(엔티틀먼트) 재조회 — 서버가 사용자 토큰으로 subscription/active 조회(만료 시 refresh).
+// DUPR 요건: 자격 캐시 24h 초과 시 재조회. 반환값으로 basic 여부.
+export async function syncEntitlements(): Promise<{ ok: boolean; basic?: boolean }> {
+  const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { entitlements: true } });
+  if (error || !data?.ok) return { ok: false };
+  return { ok: true, basic: !!data.basic };
+}
+
+// 마지막 동기화가 24h 초과면 재조회(그때만). 그 외엔 아무것도 안 함.
+export async function maybeSyncEntitlements(syncedAt: string | null): Promise<boolean> {
+  const stale = !syncedAt || Date.now() - new Date(syncedAt).getTime() > 24 * 60 * 60 * 1000;
+  if (!stale) return false;
+  const res = await syncEntitlements();
+  return res.ok;
+}
+
 // 서버에 히스토리 새로고침 요청(DUPR /history → 캐시 upsert). 갱신된 개수 반환.
 export async function refreshDuprHistory(): Promise<number> {
   const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { history: true } });

@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 
+import { maybeSyncEntitlements } from '@/lib/dupr';
 import { registerForPushTokenAsync } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
@@ -52,6 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setProfile(data ?? null);
+    // DUPR 자격 캐시가 24h 초과면 백그라운드로 재조회(운영요건). 갱신되면 프로필 재로드.
+    if (data?.dupr_status === 'verified') {
+      maybeSyncEntitlements(data.dupr_entitlements_synced_at)
+        .then(async (synced) => {
+          if (!synced) return;
+          const { data: d2 } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+          if (d2) setProfile(d2);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // 세션 초기화 — 스플래시는 '세션 확인'까지만 기다린다 (프로필은 뒤에서 백그라운드 로드).

@@ -14,7 +14,7 @@
 //         → { result: { token, expiry } }
 //   조회  GET  {BASE}/user/{version}/{id}         → { result: { ratings:{doubles,singles}, fullName } }
 //   검색  POST {BASE}/user/{version}/search {query,offset,limit} → { result:{ hits:[...] } }
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +26,8 @@ function json(body: unknown, status = 200) {
 
 const BASE = (Deno.env.get('DUPR_API_BASE') ?? 'https://uat.mydupr.com/api').replace(/\/$/, '');
 const VERSION = Deno.env.get('DUPR_API_VERSION') ?? 'v1.0';
+// public API(파트너 API 와 별개) — 사용자 토큰으로 자격/토큰갱신 호출. 운영: https://api.dupr.gg
+const PUBLIC_BASE = (Deno.env.get('DUPR_PUBLIC_BASE') ?? 'https://api.uat.dupr.gg').replace(/\/$/, '');
 
 // 파트너 토큰 발급: x-authorization = base64(ClientKey:ClientSecret)
 async function getDuprToken(): Promise<string | null> {
@@ -242,6 +244,51 @@ Deno.serve(async (req) => {
   const { data: userData } = await admin.auth.getUser(jwt);
   const caller = userData?.user;
   if (!caller) return json({ error: 'unauthorized' }, 401);
+
+  // 1.7) 자격(엔티틀먼트) 재조회 — 앱이 24h 초과 시 호출. 사용자 access token 으로
+  //      subscription/active 조회, 만료면 refresh(토큰 회전)로 갱신 후 재시도.
+  if (body?.entitlements === true) {
+    const { data: cred } = await admin
+      .from('dupr_credentials')
+      .select('access_token, refresh_token')
+      .eq('user_id', caller.id)
+      .maybeSingle();
+    if (!cred?.access_token) return json({ error: 'no_credentials', message: 'DUPR 재연결이 필요해요.' }, 400);
+
+    let access = cred.access_token as string;
+    let refresh = (cred.refresh_token ?? null) as string | null;
+    const subFetch = () =>
+      fetch(`${PUBLIC_BASE}/subscription/active`, { method: 'POST', headers: { Authorization: `Bearer ${access}` } });
+
+    let sres = await subFetch();
+    if (sres.status === 401 && refresh) {
+      // access 만료 → refresh 로 새 토큰 쌍 발급(둘 다 회전 저장)
+      const rr = await fetch(`${PUBLIC_BASE}/auth/${VERSION}/refresh`, {
+        headers: { Authorization: `Bearer ${access}`, 'x-refresh-token': refresh },
+      });
+      if (!rr.ok) return json({ error: 'reconnect_required', message: 'DUPR 재연결이 필요해요.' }, 401);
+      const rd = await rr.json().catch(() => null);
+      const na = rd?.result?.accessToken;
+      const nr = rd?.result?.refreshToken;
+      if (!na) return json({ error: 'reconnect_required' }, 401);
+      access = na;
+      refresh = nr ?? refresh;
+      await admin
+        .from('dupr_credentials')
+        .update({ access_token: access, refresh_token: refresh, updated_at: new Date().toISOString() })
+        .eq('user_id', caller.id);
+      sres = await subFetch();
+    }
+    if (!sres.ok) return json({ error: 'entitlements_failed', status: sres.status }, 502);
+    const sdata = await sres.json().catch(() => null);
+    const subs = sdata?.subscriptions ?? sdata?.result?.subscriptions ?? sdata;
+    const ent = parseEntitlements(subs);
+    await admin
+      .from('profiles')
+      .update({ dupr_basic: ent.basic, dupr_premium: ent.premium, dupr_entitlements_synced_at: new Date().toISOString() })
+      .eq('id', caller.id);
+    return json({ ok: true, basic: ent.basic, premium: ent.premium });
+  }
 
   // 2) 조회할 DUPR ID
   let duprId: string | undefined = body?.dupr_id;
