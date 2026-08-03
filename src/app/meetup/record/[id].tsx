@@ -18,7 +18,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { submitMatchToDupr } from '@/lib/dupr';
+import { deleteMeetupMatch, submitMatchToDupr } from '@/lib/dupr';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { supabase } from '@/lib/supabase';
 import type { MeetupMatch } from '@/lib/types';
@@ -157,6 +157,21 @@ export default function RecordMeetupMatch() {
     load();
   }
 
+  function confirmDelete(mId: string) {
+    Alert.alert('경기 삭제', '이 경기 기록을 삭제할까요? DUPR에 등록됐다면 거기서도 제거돼요.', [
+      { text: '닫기', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          const res = await deleteMeetupMatch(mId);
+          if (!res.ok) Alert.alert('삭제 실패', res.error ?? '다시 시도해주세요.');
+          load();
+        },
+      },
+    ]);
+  }
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -261,6 +276,9 @@ export default function RecordMeetupMatch() {
                       {m.format === 'doubles' ? '복식' : '단식'} · {m.games.map((g) => `${g.a}-${g.b}`).join(', ')}
                     </Text>
                     <Text style={[styles.pastStatus, statusStyle(m.dupr_status)]}>{statusLabel(m.dupr_status)}</Text>
+                    <Pressable onPress={() => confirmDelete(m.id)} hitSlop={8} style={{ marginLeft: 8 }}>
+                      <Ionicons name="trash-outline" size={18} color="#E5484D" />
+                    </Pressable>
                   </View>
                 ))}
               </View>

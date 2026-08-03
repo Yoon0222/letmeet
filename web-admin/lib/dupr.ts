@@ -11,7 +11,7 @@ export async function submitTournamentMatch(matchId: string): Promise<void> {
       .eq('id', matchId)
       .maybeSingle();
     if (!m || m.status !== 'done' || m.score1 == null || m.score2 == null || !m.entry1_id || !m.entry2_id) return;
-    if (m.dupr_status === 'submitted') return; // 멱등
+    // 이미 등록된 경기라도 재호출 = 점수 수정 반영(dupr-match 가 create/update 자동 판단).
 
     const { data: t } = await supabase
       .from('tournaments')

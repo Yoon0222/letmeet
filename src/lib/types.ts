@@ -95,6 +95,7 @@ export type MeetupMatch = {
   games: { a: number; b: number }[];
   recorded_by: string | null;
   dupr_identifier: string | null;
+  dupr_match_code: string | null;
   dupr_status: 'pending' | 'submitted' | 'failed' | 'skipped';
   dupr_submitted_at: string | null;
   dupr_error: string | null;

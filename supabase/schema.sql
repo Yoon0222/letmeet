@@ -85,6 +85,7 @@ create table if not exists public.meetup_matches (
   games         jsonb not null default '[]',
   recorded_by   uuid references public.profiles(id) on delete set null,
   dupr_identifier   text unique,
+  dupr_match_code   text,                          -- DUPR create 응답 matchCode(수정/삭제용)
   dupr_status       text not null default 'pending' check (dupr_status in ('pending','submitted','failed','skipped')),
   dupr_submitted_at timestamptz,
   dupr_error        text,

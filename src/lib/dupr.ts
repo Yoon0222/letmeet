@@ -39,6 +39,16 @@ export async function submitMatchToDupr(params: {
   return { ok: true };
 }
 
+// 번개 경기기록 삭제 — DUPR 에서도 제거(등록됐던 경우) 후 로컬 행 삭제.
+export async function deleteMeetupMatch(matchId: string): Promise<{ ok: boolean; error?: string }> {
+  // 1) DUPR 삭제(등록됐던 경기면). 실패해도 로컬 삭제는 진행.
+  await supabase.functions.invoke('dupr-match', { body: { source: 'meetup', match_id: matchId, action: 'delete' } });
+  // 2) 로컬 행 삭제(호스트 RLS)
+  const { error } = await supabase.from('meetup_matches').delete().eq('id', matchId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 // 서버에 히스토리 새로고침 요청(DUPR /history → 캐시 upsert). 갱신된 개수 반환.
 export async function refreshDuprHistory(): Promise<number> {
   const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { history: true } });

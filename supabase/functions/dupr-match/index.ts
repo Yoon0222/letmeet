@@ -55,12 +55,13 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const source: string = body?.source;
   const matchId: string = body?.match_id;
+  const action: string = body?.action ?? 'submit'; // 'submit' | 'delete'
   const format: string = (body?.format ?? 'doubles').toLowerCase();
   const teamA: Team = body?.teamA ?? {};
   const teamB: Team = body?.teamB ?? {};
   const games: Game[] = Array.isArray(body?.games) ? body.games : [];
   if (!['meetup', 'tournament'].includes(source) || !matchId) return json({ error: 'bad_request' }, 400);
-  if (!teamA.p1 || !teamB.p1 || games.length === 0) return json({ error: 'incomplete_match' }, 400);
+  const table = source === 'meetup' ? 'meetup_matches' : 'tournament_matches';
 
   // 2) 권한: meetup 은 호스트만. tournament 는 organizer/super_admin.
   if (source === 'meetup') {
@@ -74,7 +75,39 @@ Deno.serve(async (req) => {
     if (!prof || !['organizer', 'court_manager', 'super_admin'].includes(prof.role)) return json({ error: 'forbidden' }, 403);
   }
 
-  // 3) 우리 프로필 ID → DUPR ID 변환(연결된 사람만)
+  // 3) 현재 등록 상태(수정/삭제 판단용)
+  const { data: cur } = await admin
+    .from(table)
+    .select('dupr_status, dupr_match_code, dupr_identifier')
+    .eq('id', matchId)
+    .maybeSingle();
+  const identifier = cur?.dupr_identifier ?? `${source}:${matchId}`;
+  const token = await getDuprToken();
+  if (!token) {
+    if (action !== 'delete') await admin.from(table).update({ dupr_status: 'failed', dupr_error: 'no_token' }).eq('id', matchId);
+    return json({ error: 'dupr_not_configured' }, 503);
+  }
+  const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const isFail = (t: string) => /"status"\s*:\s*"FAILURE"/.test(t);
+
+  // ── 삭제: DUPR 에서 경기 제거(등록됐던 경우만) ─────────────────────────
+  if (action === 'delete') {
+    if (cur?.dupr_match_code) {
+      try {
+        await fetch(`${BASE}/match/${VERSION}/delete`, {
+          method: 'DELETE', headers: H,
+          body: JSON.stringify({ matchCode: cur.dupr_match_code, identifier }),
+        });
+      } catch (_) { /* 삭제 실패해도 로컬은 정리 */ }
+    }
+    await admin.from(table).update({ dupr_status: 'skipped', dupr_match_code: null, dupr_submitted_at: null, dupr_error: null }).eq('id', matchId);
+    return json({ ok: true, deleted: true });
+  }
+
+  // ── 등록/수정 ────────────────────────────────────────────────────────
+  if (!teamA.p1 || !teamB.p1 || games.length === 0) return json({ error: 'incomplete_match' }, 400);
+
+  // 우리 프로필 ID → DUPR ID 변환(연결된 사람만)
   const ids = [teamA.p1, teamA.p2, teamB.p1, teamB.p2].filter(Boolean) as string[];
   const { data: profs } = await admin.from('profiles').select('id, dupr_id, dupr_status').in('id', ids);
   const map = new Map((profs ?? []).map((p) => [p.id, p]));
@@ -82,7 +115,6 @@ Deno.serve(async (req) => {
   const missing = ids.filter((uid) => !map.get(uid)?.dupr_id || map.get(uid)?.dupr_status !== 'verified');
   if (missing.length > 0) return json({ error: 'players_not_connected', missing }, 422);
 
-  // 4) DUPR ExternalMatchRequest 구성
   const gN = (i: number, side: 'a' | 'b') => {
     const v = games[i]?.[side];
     return typeof v === 'number' ? Math.max(0, Math.round(v)) : 0;
@@ -96,10 +128,9 @@ Deno.serve(async (req) => {
     game4: games[3] ? gN(3, side) : undefined,
     game5: games[4] ? gN(4, side) : undefined,
   });
-  const identifier = `${source}:${matchId}`;
-  const matchDate = (body?.match_date ?? new Date().toISOString().slice(0, 10)) as string;
-  const request = {
-    matchDate,
+  // deno-lint-ignore no-explicit-any
+  const request: any = {
+    matchDate: (body?.match_date ?? new Date().toISOString().slice(0, 10)) as string,
     format: format === 'singles' ? 'SINGLES' : 'DOUBLES',
     event: String(body?.__event ?? body?.event ?? '피넛 경기').slice(0, 120),
     identifier,
@@ -109,33 +140,34 @@ Deno.serve(async (req) => {
     teamB: teamPayload(teamB, 'b'),
   };
 
-  const table = source === 'meetup' ? 'meetup_matches' : 'tournament_matches';
-
-  // 5) DUPR 등록
-  const token = await getDuprToken();
-  if (!token) {
-    await admin.from(table).update({ dupr_status: 'failed', dupr_error: 'no_token' }).eq('id', matchId);
-    return json({ error: 'dupr_not_configured' }, 503);
-  }
+  // 이미 등록된 경기(matchCode 보유)면 update, 아니면 create
+  const isUpdate = cur?.dupr_status === 'submitted' && !!cur?.dupr_match_code;
   let ok = false;
   let respText = '';
+  let matchCode: string | null = cur?.dupr_match_code ?? null;
   try {
-    const res = await fetch(`${BASE}/match/${VERSION}/create`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-    respText = await res.text().catch(() => '');
-    ok = res.ok && !/"status"\s*:\s*"FAILURE"/.test(respText);
+    if (isUpdate) {
+      request.matchId = Number(cur!.dupr_match_code);
+      const res = await fetch(`${BASE}/match/${VERSION}/update`, { method: 'POST', headers: H, body: JSON.stringify(request) });
+      respText = await res.text().catch(() => '');
+      ok = res.ok && !isFail(respText);
+    } else {
+      const res = await fetch(`${BASE}/match/${VERSION}/create`, { method: 'POST', headers: H, body: JSON.stringify(request) });
+      respText = await res.text().catch(() => '');
+      ok = res.ok && !isFail(respText);
+      if (ok) {
+        try { matchCode = JSON.parse(respText)?.result?.matchCode ?? matchCode; } catch (_) { /* ignore */ }
+      }
+    }
   } catch (e) {
     respText = String(e);
   }
 
-  // 6) 소스 행 상태 갱신
   await admin
     .from(table)
     .update({
       dupr_identifier: identifier,
+      dupr_match_code: matchCode,
       dupr_status: ok ? 'submitted' : 'failed',
       dupr_submitted_at: ok ? new Date().toISOString() : null,
       dupr_error: ok ? null : respText.slice(0, 500),
@@ -143,5 +175,5 @@ Deno.serve(async (req) => {
     .eq('id', matchId);
 
   if (!ok) return json({ error: 'submit_failed', detail: respText.slice(0, 300) }, 502);
-  return json({ ok: true, identifier });
+  return json({ ok: true, identifier, updated: isUpdate });
 });
