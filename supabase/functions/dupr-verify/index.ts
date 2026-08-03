@@ -204,6 +204,14 @@ Deno.serve(async (req) => {
       out.registerBody = await rg.text().catch(() => null);
       out.webhookUrl = webhookUrl;
     }
+    // 여러 선수 RATING 웹훅 구독(운영 초기 일괄구독용 — subscribeIds 배열)
+    if (Array.isArray(body?.subscribeIds)) {
+      const sb = await fetch(`${BASE}/user/${VERSION}/subscribe/webhook-event`, {
+        method: 'POST', headers: h, body: JSON.stringify({ duprIds: body.subscribeIds, topic: 'RATING' }),
+      });
+      out.subscribeStatus = sb.status;
+      out.subscribeBody = await sb.text().catch(() => null);
+    }
     // 현재 구독중인 duprId 목록
     if (body?.list === true) {
       const ls = await fetch(`${BASE}/${VERSION}/subscribe/rating-changes`, { headers: h });
