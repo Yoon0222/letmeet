@@ -21,7 +21,7 @@ function getUrlParams() {
 }
 
 // deno/next 브라우저에서 message 이벤트의 페이로드는 event.data(객체 또는 JSON 문자열)에 있다.
-type SsoPayload = { duprId?: string; id?: string; userToken?: string; refreshToken?: string; stats?: unknown };
+type SsoPayload = { duprId?: string; id?: string; userToken?: string; refreshToken?: string; stats?: unknown; subscriptions?: unknown };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function coerce(raw: any): any {
   if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return {}; } }
@@ -32,7 +32,7 @@ function extract(e: MessageEvent): SsoPayload | null {
   // 중첩 케이스(d.data)도 본다.
   const s = d && (d.duprId || d.id || d.userToken) ? d : coerce(d?.data);
   if (s && (s.duprId || s.id || s.userToken)) {
-    return { duprId: s.duprId, id: s.id != null ? String(s.id) : undefined, userToken: s.userToken, refreshToken: s.refreshToken, stats: s.stats };
+    return { duprId: s.duprId, id: s.id != null ? String(s.id) : undefined, userToken: s.userToken, refreshToken: s.refreshToken, stats: s.stats, subscriptions: s.subscriptions };
   }
   return null;
 }

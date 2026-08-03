@@ -36,6 +36,9 @@ export type Profile = {
   dupr_synced_at: string | null;
   dupr_verified: boolean; // = (dupr_status === 'verified'), 하위호환 유지
   dupr_public: boolean; // 레이팅 그래프 공개 여부(0058). 본인은 항상 봄, 남은 이 값이 true 일 때만.
+  dupr_basic: boolean; // BASIC_L1 자격 보유(active) — 인증 경기 참가/등록 최소조건 (0061)
+  dupr_premium: boolean; // PREMIUM_L1(DUPR+) 보유 (0061)
+  dupr_entitlements_synced_at: string | null; // 자격 마지막 동기화 (0061)
   role: UserRole;
   created_at: string;
   updated_at: string;
@@ -49,6 +52,8 @@ export type DuprVerifyResult = {
   doubles: number | null;
   singles: number | null;
   unrated?: boolean; // 계정은 연결됐지만 아직 레이팅 없음(NR)
+  basic?: boolean | null; // BASIC_L1 자격
+  premium?: boolean | null; // PREMIUM_L1 자격
 };
 
 // DUPR 레이팅 히스토리 캐시(0058) — 그래프용 스냅샷.

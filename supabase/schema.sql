@@ -28,6 +28,9 @@ create table if not exists public.profiles (
   dupr_synced_at timestamptz,                      -- 마지막 동기화 시각
   dupr_verified  boolean not null default false,   -- = (dupr_status='verified'), 하위호환
   dupr_public    boolean not null default false,   -- 레이팅 그래프 공개 여부(본인은 항상 봄)
+  dupr_basic     boolean not null default false,   -- BASIC_L1 자격(active) — 인증경기 최소조건(0061)
+  dupr_premium   boolean not null default false,   -- PREMIUM_L1(DUPR+) 자격(0061)
+  dupr_entitlements_synced_at timestamptz,         -- 자격 마지막 동기화(0061)
   -- 권한(역할): player < organizer < court_manager < super_admin. 부여는 super_admin 만.
   role        text not null default 'player'
               check (role in ('player', 'organizer', 'court_manager', 'super_admin')),
@@ -48,6 +51,16 @@ create table if not exists public.dupr_rating_history (
 );
 create index if not exists dupr_rating_history_user_time
   on public.dupr_rating_history (user_id, recorded_at);
+
+-- SSO user access/refresh 토큰(0061) — 비공개. RLS 정책 없음 = service_role 만 접근.
+create table if not exists public.dupr_credentials (
+  user_id          uuid primary key references public.profiles(id) on delete cascade,
+  access_token     text,
+  refresh_token    text,
+  token_expires_at timestamptz,
+  updated_at       timestamptz not null default now()
+);
+alter table public.dupr_credentials enable row level security;
 
 -- ============================================================
 -- 2) meetups : 번개 모임

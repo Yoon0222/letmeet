@@ -66,6 +66,22 @@ function parseUser(user: Record<string, unknown> | null) {
 // 유저를 찾으면 레이팅이 없어도(NR/null) found=true 로 돌려준다.
 // (레이팅 유무는 연결 성공 여부와 별개 — 미채점 계정도 정상 연결.)
 type Found = { found: true; name: string | null; doubles: number | null; singles: number | null };
+// SSO 응답의 subscriptions 에서 자격(BASIC_L1/PREMIUM_L1) 활성 여부를 뽑는다.
+//   subscriptions: [{ status:'active', entitlements:{ tournaments:['BASIC_L1', ...] } }]
+// deno-lint-ignore no-explicit-any
+function parseEntitlements(subs: any): { basic: boolean; premium: boolean } {
+  const list = Array.isArray(subs) ? subs : [];
+  const tags = new Set<string>();
+  for (const s of list) {
+    if (s?.status && String(s.status).toLowerCase() !== 'active') continue;
+    const ent = s?.entitlements ?? {};
+    for (const arr of Object.values(ent)) {
+      if (Array.isArray(arr)) for (const t of arr) tags.add(String(t));
+    }
+  }
+  return { basic: tags.has('BASIC_L1'), premium: tags.has('PREMIUM_L1') };
+}
+
 async function lookupPlayer(token: string, duprId: string): Promise<Found | null> {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const id = duprId.trim();
@@ -257,18 +273,36 @@ Deno.serve(async (req) => {
   const isVerified = body?.verified === true;
   const status = isVerified ? 'verified' : 'linked';
   const primary = found.doubles ?? found.singles ?? null;
-  await admin
-    .from('profiles')
-    .update({
-      dupr_id: duprId,
-      dupr_doubles: found.doubles,
-      dupr_singles: found.singles,
-      dupr_rating: primary,
-      dupr_status: status,
-      dupr_verified: isVerified,
-      dupr_synced_at: new Date().toISOString(),
-    })
-    .eq('id', caller.id);
+
+  // SSO 로 온 경우: 자격(엔티틀먼트) + 토큰 저장 (운영 요건)
+  const sso = body?.sso;
+  const ent = sso ? parseEntitlements(sso.subscriptions) : null;
+  // deno-lint-ignore no-explicit-any
+  const profilePatch: any = {
+    dupr_id: duprId,
+    dupr_doubles: found.doubles,
+    dupr_singles: found.singles,
+    dupr_rating: primary,
+    dupr_status: status,
+    dupr_verified: isVerified,
+    dupr_synced_at: new Date().toISOString(),
+  };
+  if (ent) {
+    profilePatch.dupr_basic = ent.basic;
+    profilePatch.dupr_premium = ent.premium;
+    profilePatch.dupr_entitlements_synced_at = new Date().toISOString();
+  }
+  await admin.from('profiles').update(profilePatch).eq('id', caller.id);
+
+  // 사용자 access/refresh 토큰 저장(비공개 테이블 — service_role 만 접근)
+  if (sso?.userToken || sso?.refreshToken) {
+    await admin.from('dupr_credentials').upsert({
+      user_id: caller.id,
+      access_token: sso.userToken ?? null,
+      refresh_token: sso.refreshToken ?? null,
+      updated_at: new Date().toISOString(),
+    });
+  }
 
   // 6) 그래프용 히스토리 캐시 + 이후 변경 자동 수신 구독. 실패해도 연결은 성공 처리.
   const hist = await fetchHistory(token, duprId);
@@ -276,5 +310,9 @@ Deno.serve(async (req) => {
   await subscribeRating(token, duprId);
 
   // unrated: 계정은 연결됐지만 아직 레이팅이 없는 상태(NR)
-  return json({ ok: true, level: status, name: found.name, doubles: found.doubles, singles: found.singles, unrated: found.doubles == null && found.singles == null });
+  return json({
+    ok: true, level: status, name: found.name, doubles: found.doubles, singles: found.singles,
+    unrated: found.doubles == null && found.singles == null,
+    basic: ent?.basic ?? null, premium: ent?.premium ?? null,
+  });
 });

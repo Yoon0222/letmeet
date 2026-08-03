@@ -225,8 +225,12 @@ export default function TournamentDetail() {
 
   // 참가 신청 전 확인 알럿
   function confirmApply() {
-    // DUPR 인증 대회는 연결(verified)된 선수만 참가
-    if (t?.dupr_certified && profile?.dupr_status !== 'verified') {
+    // DUPR 인증 대회는 연결(verified) + BASIC_L1(활성 회원)만 참가
+    if (t?.dupr_certified && !(profile?.dupr_status === 'verified' && profile?.dupr_basic)) {
+      if (profile?.dupr_status === 'verified' && !profile?.dupr_basic) {
+        Alert.alert('DUPR 자격 필요', 'DUPR 계정이 활성(BASIC) 상태가 아니에요. DUPR 앱에서 계정 상태를 확인한 뒤 다시 시도해 주세요.');
+        return;
+      }
       Alert.alert(
         'DUPR 인증이 필요해요',
         'DUPR 인증 대회는 DUPR 계정을 연결한 선수만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.\n\n지금 바로 연결할까요? (DUPR 계정이 없으면 가입도 가능해요)',

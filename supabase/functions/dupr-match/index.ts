@@ -107,12 +107,12 @@ Deno.serve(async (req) => {
   // ── 등록/수정 ────────────────────────────────────────────────────────
   if (!teamA.p1 || !teamB.p1 || games.length === 0) return json({ error: 'incomplete_match' }, 400);
 
-  // 우리 프로필 ID → DUPR ID 변환(연결된 사람만)
+  // 우리 프로필 ID → DUPR ID 변환. DUPR 요건: 모든 선수가 연결(verified) + BASIC_L1 보유.
   const ids = [teamA.p1, teamA.p2, teamB.p1, teamB.p2].filter(Boolean) as string[];
-  const { data: profs } = await admin.from('profiles').select('id, dupr_id, dupr_status').in('id', ids);
+  const { data: profs } = await admin.from('profiles').select('id, dupr_id, dupr_status, dupr_basic').in('id', ids);
   const map = new Map((profs ?? []).map((p) => [p.id, p]));
   const duprOf = (uid?: string) => (uid ? map.get(uid)?.dupr_id ?? null : null);
-  const missing = ids.filter((uid) => !map.get(uid)?.dupr_id || map.get(uid)?.dupr_status !== 'verified');
+  const missing = ids.filter((uid) => !map.get(uid)?.dupr_id || map.get(uid)?.dupr_status !== 'verified' || !map.get(uid)?.dupr_basic);
   if (missing.length > 0) return json({ error: 'players_not_connected', missing }, 422);
 
   const gN = (i: number, side: 'a' | 'b') => {
@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
     identifier,
     matchType: 'SIDEOUT',
     matchCompletionType: 'COMPLETED',
+    matchSource: 'PARTNER', // 파트너 제출(클럽 아님) → clubId 생략
     teamA: teamPayload(teamA, 'a'),
     teamB: teamPayload(teamB, 'b'),
   };

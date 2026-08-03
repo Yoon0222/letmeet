@@ -276,6 +276,12 @@ export default function EditProfile() {
           ) : null}
         </View>
 
+        <Pressable onPress={() => router.push('/support' as never)} style={styles.supportRow}>
+          <Ionicons name="help-buoy-outline" size={18} color="#16C784" />
+          <Text style={styles.supportText}>고객지원 · 문의 (경기·레이팅 분쟁 포함)</Text>
+          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+        </Pressable>
+
         <Button title="저장" onPress={onSave} loading={saving} style={{ marginTop: Spacing.two }} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -291,6 +297,20 @@ const styles = StyleSheet.create({
   duprStatusText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
   duprToggleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one },
   duprToggleLabel: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  supportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  supportText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#374151' },
   avatarWrap: { alignItems: 'center', gap: 8, marginBottom: Spacing.two },
   avatarBadge: {
     position: 'absolute',

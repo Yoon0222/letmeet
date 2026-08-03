@@ -22,6 +22,7 @@ export default function MeetupDetail() {
   const { session, profile } = useAuth();
   const uid = session?.user.id;
   const duprConnected = profile?.dupr_status === 'verified';
+  const duprEligible = duprConnected && !!profile?.dupr_basic; // 연결 + BASIC_L1(active)
 
   const [meetup, setMeetup] = useState<MeetupWithCounts | null>(null);
   const [participants, setParticipants] = useState<ParticipantWithProfile[]>([]);
@@ -110,8 +111,12 @@ export default function MeetupDetail() {
       router.push('/(auth)/sign-in');
       return;
     }
-    // DUPR 인증 번개는 연결(verified)된 사람만 참가 가능
-    if (meetup.dupr_certified && !duprConnected) {
+    // DUPR 인증 번개는 연결(verified) + BASIC_L1(활성 회원)만 참가 가능
+    if (meetup.dupr_certified && !duprEligible) {
+      if (duprConnected && !profile?.dupr_basic) {
+        Alert.alert('DUPR 자격 필요', 'DUPR 계정이 활성(BASIC) 상태가 아니에요. DUPR 앱에서 계정 상태를 확인한 뒤 다시 시도해 주세요.');
+        return;
+      }
       Alert.alert(
         'DUPR 인증이 필요해요',
         'DUPR 인증 번개는 DUPR 계정을 연결한 회원만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.\n\n지금 바로 연결할까요? (DUPR 계정이 없으면 가입도 가능해요)',

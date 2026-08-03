@@ -36,7 +36,9 @@ export default function DuprConnectScreen() {
 
   async function onMessage(e: WebViewMessageEvent) {
     if (handled.current) return;
-    let data: { type?: string; duprId?: string; id?: string } | null = null;
+    let data:
+      | { type?: string; duprId?: string; id?: string; userToken?: string; refreshToken?: string; subscriptions?: unknown }
+      | null = null;
     try {
       data = JSON.parse(e.nativeEvent.data);
     } catch {
@@ -48,8 +50,12 @@ export default function DuprConnectScreen() {
     handled.current = true;
     setSaving(true);
 
-    // 동의 완료 → 파트너 API 로 이제 조회 가능. verified 로 저장.
-    const { ok, result, error } = await verifyDupr(candidate, true);
+    // 동의 완료 → 파트너 API 로 이제 조회 가능. 자격/토큰(SSO)도 함께 저장.
+    const { ok, result, error } = await verifyDupr(candidate, true, {
+      userToken: data.userToken,
+      refreshToken: data.refreshToken,
+      subscriptions: data.subscriptions,
+    });
     setSaving(false);
     if (!ok) {
       Alert.alert('DUPR 연결 실패', error ?? '다시 시도해 주세요.');
