@@ -17,6 +17,28 @@ export async function getDuprHistory(userId: string): Promise<DuprPoint[]> {
   }));
 }
 
+// 경기결과를 DUPR 에 등록(match/create). 우리 프로필ID 를 넘기면 서버가 DUPR ID 로 변환.
+export async function submitMatchToDupr(params: {
+  source: 'meetup' | 'tournament';
+  match_id: string;
+  format: 'singles' | 'doubles';
+  teamA: { p1: string; p2?: string };
+  teamB: { p1: string; p2?: string };
+  games: { a: number; b: number }[];
+  event?: string;
+  match_date?: string;
+}): Promise<{ ok: boolean; error?: string; missing?: string[] }> {
+  const { data, error } = await supabase.functions.invoke('dupr-match', { body: params });
+  if (error) {
+    // deno-lint-ignore no-explicit-any
+    const body = (error as any).context?.body ?? (error as any).context;
+    if (body?.error === 'players_not_connected') return { ok: false, error: 'players_not_connected', missing: body.missing };
+    return { ok: false, error: body?.error ?? error.message };
+  }
+  if (data?.error) return { ok: false, error: data.error, missing: data.missing };
+  return { ok: true };
+}
+
 // 서버에 히스토리 새로고침 요청(DUPR /history → 캐시 upsert). 갱신된 개수 반환.
 export async function refreshDuprHistory(): Promise<number> {
   const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { history: true } });

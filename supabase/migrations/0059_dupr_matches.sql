@@ -58,3 +58,17 @@ alter table public.tournament_matches
     check (dupr_status in ('pending', 'submitted', 'failed', 'skipped')),
   add column if not exists dupr_submitted_at timestamptz,
   add column if not exists dupr_error text;
+
+-- 4) meetups_with_counts 뷰는 m.* 라 새 컬럼(dupr_certified)을 자동으로 안 가진다.
+--    컬럼 목록이 바뀌므로 create or replace 는 42P16 실패 → drop + create.
+drop view if exists public.meetups_with_counts;
+create view public.meetups_with_counts
+with (security_invoker = true)
+as
+select
+  m.*,
+  p.nickname    as host_nickname,
+  p.avatar_url  as host_avatar_url,
+  (select count(*) from public.meetup_participants mp where mp.meetup_id = m.id and mp.status = 'approved') as participant_count
+from public.meetups m
+join public.profiles p on p.id = m.host_id;

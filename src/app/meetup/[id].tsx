@@ -19,8 +19,9 @@ export default function MeetupDetail() {
   const router = useRouter();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const uid = session?.user.id;
+  const duprConnected = profile?.dupr_status === 'verified';
 
   const [meetup, setMeetup] = useState<MeetupWithCounts | null>(null);
   const [participants, setParticipants] = useState<ParticipantWithProfile[]>([]);
@@ -107,6 +108,18 @@ export default function MeetupDetail() {
     if (!meetup) return;
     if (!uid) {
       router.push('/(auth)/sign-in');
+      return;
+    }
+    // DUPR 인증 번개는 연결(verified)된 사람만 참가 가능
+    if (meetup.dupr_certified && !duprConnected) {
+      Alert.alert(
+        'DUPR 연결 필요',
+        'DUPR 인증 번개는 DUPR 계정을 연결한 회원만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.',
+        [
+          { text: '닫기', style: 'cancel' },
+          { text: 'DUPR 연결하기', onPress: () => router.push('/profile/edit') },
+        ],
+      );
       return;
     }
     const feeLine = meetup.fee > 0 ? `게스트비: ${meetup.fee.toLocaleString()}원\n` : '게스트비: 무료\n';
@@ -253,9 +266,27 @@ export default function MeetupDetail() {
           ) : (
             <Badge label="모집중" />
           )}
+          {meetup.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
         </View>
 
         <Text style={styles.title}>{meetup.title}</Text>
+
+        {/* DUPR 인증 번개 안내 + (호스트) 경기 기록 진입 */}
+        {meetup.dupr_certified ? (
+          <Pressable
+            onPress={() => isHost && router.push(`/meetup/record/${meetup.id}` as never)}
+            disabled={!isHost}
+            style={styles.duprBanner}>
+            <Ionicons name="stats-chart" size={18} color="#2D6BD6" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.duprBannerTitle}>DUPR 인증 경기</Text>
+              <Text style={styles.duprBannerSub}>
+                {isHost ? '경기 결과를 기록하면 DUPR 공식 레이팅에 반영돼요.' : '연결된 회원만 참가 · 결과가 DUPR에 반영돼요.'}
+              </Text>
+            </View>
+            {isHost ? <Ionicons name="chevron-forward" size={18} color="#2D6BD6" /> : null}
+          </Pressable>
+        ) : null}
 
         <View style={styles.infoCard}>
           <InfoRow icon="time-outline" text={formatMeetupTime(meetup.start_time)} />
@@ -373,8 +404,21 @@ const styles = StyleSheet.create({
   coverEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   coverEmpty: { height: 96, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
   coverEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
-  statusRow: { flexDirection: 'row' },
+  statusRow: { flexDirection: 'row', gap: 8 },
   title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  duprBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: Spacing.three,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(45,107,214,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(45,107,214,0.18)',
+  },
+  duprBannerTitle: { fontSize: 15, fontWeight: '800', color: '#2D6BD6' },
+  duprBannerSub: { fontSize: 12.5, color: '#4B5563', marginTop: 2, lineHeight: 17 },
   infoCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
