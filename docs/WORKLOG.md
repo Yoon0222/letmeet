@@ -75,6 +75,12 @@
 
 ## 2026-08-04
 
+### DUPR 레이팅 변경 웹훅 — 자동 갱신
+- **결정**: 경기 후 레이팅이 바뀌면 그래프가 자동 업데이트되게 DUPR RATING 웹훅 연동. DUPR 이 우리 URL 을 아는 방식 = `POST /{v}/webhook`(ClientHookRequest{webhookUrl,topics})로 등록, 선수별 감시는 `/user/{v}/subscribe/webhook-event{duprIds,topic:RATING}`. secret 필드가 없어 **URL `?s=` 시크릿**으로 인바운드 검증.
+- **만든 것**: `dupr-webhook`(공개, --no-verify-jwt) — RatingWebhookEnvelope 파싱→dupr_id 매칭→profiles/dupr_rating_history 갱신+푸시. `dupr-verify` — 연결 시 자동 구독 + `setup` 액션(등록/스키마/목록). 히스토리 3자리 정밀도. 시크릿 `DUPR_WEBHOOK_SECRET` dev 설정.
+- **검증(dev)**: 페이로드 스키마 실물 확인(`GET /webhook/schema/RATING`), 웹훅 URL 등록 200, 잘못된 시크릿 401, 정상 이벤트 200+프로필 갱신(복식3.7/단식3.5). 합성 6포인트로 그래프 실데이터 경로 확인. 커밋 DUPR 함수/문서만.
+- **메모**: dev `관리자`(JZKMXM) 프로필에 **테스트 합성 데이터** 있음. prod 전환 시 `DUPR_WEBHOOK_SECRET`+양 함수 배포+`setup register` 필요. 기존 연결자는 재연결/일괄구독 필요.
+
 ### DUPR 레이팅 추이 그래프 + NR 계정 연결 + 히스토리 연동
 - **결정**: 프로필에 DUPR 레이팅 그래프 추가. 공개/비공개는 **사용자 설정**(`dupr_public`) — 본인은 항상 보고, 공개 프로필(player)엔 켰을 때만. 차트는 `react-native-svg` 미설치라 **순수 RN View 라인차트**로 구현(네이티브 의존성 0 → dev-client 재빌드 불필요, 웹에서도 렌더).
 - **버그픽스(중요)**: player1이 NR(무레이팅)이라 연결 실패했던 원인 — 서버가 "레이팅 숫자 없으면 not_found"로 처리. **유저가 조회되면 레이팅 없어도 연결 성공**으로 수정. (진단으로 확인: 토큰 200·GET `/user/JZKMXM` 200·ratings=null)
