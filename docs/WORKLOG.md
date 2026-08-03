@@ -75,6 +75,12 @@
 
 ## 2026-08-04
 
+### DUPR 인증 경기 — 대회 (3단계)
+- **만든 것**: 대회 생성 인증토글(web-admin `tournaments/new`), 참가 게이트(`tournament/[id]` verified만)+배지, 결과확정 시 **자동 DUPR 등록**(`web-admin/lib/dupr.ts submitTournamentMatch` → 예선/본선 saveScore 훅). 복식은 `tournament_entries.partner_id`로 파트너 해석. tournaments_with_counts 뷰 재생성(0059).
+- **결정**: DB 트리거(서비스키 DB 내장) 대신 **관리자 세션에서 dupr-match 호출**(안전·비차단·멱등). 단식·복식 개별경기(조별+토너먼트) 자동등록. 단체전(tie_matches)은 구조 달라 후속.
+- **검증**: tsc(모바일+웹) 통과. 실제 DUPR 등록 왕복은 **연결계정 2명** 필요(현재 1개).
+- **남음**: dev 에 tournaments_with_counts 뷰 재생성 SQL 실행, 실계정 2개로 등록 검증, 단체전 제출, prod 전환.
+
 ### DUPR 인증 경기 — 번개/대회 등록 (1~2단계)
 - **결정**: 번개·대회를 **인증/비인증** 두 종류로. 인증은 DUPR 연결자만 참여 + 경기결과를 DUPR 에 등록(match/create)→레이팅 반영→웹훅으로 그래프 자동갱신. 대회는 이미 경기·점수 엔진이 있어 쉬움, 번개는 점수기록 화면 신설. 경기형식=복식위주+단식, 점수기록=호스트.
 - **1단계(기반)**: DB `0059`(meetups/tournaments.dupr_certified + `meetup_matches` 번개경기기록 + tournament_matches DUPR추적컬럼 + meetups_with_counts 뷰 재생성). `dupr-match` 엣지함수(우리ID→DUPR ID 변환 후 match/create, meetup=호스트/tournament=organizer, 미연결자 422). types·schema 동반.
