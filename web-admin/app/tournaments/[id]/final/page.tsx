@@ -15,6 +15,7 @@ import {
 import { autoAdvanceCourts } from '@/lib/court-assign';
 import { advanceKnockoutWinners } from '@/lib/knockout';
 import { supabase } from '@/lib/supabase';
+import { submitTournamentMatch } from '@/lib/dupr';
 import { useSession } from '@/lib/use-session';
 import { TOURNAMENT_FORMAT_LABELS, type TournamentMatch } from '@/lib/types';
 
@@ -64,6 +65,7 @@ export default function FinalTab() {
     }
     const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
     await supabase.from('tournament_matches').update({ score1: s1, score2: s2, winner_id, status: 'done' }).eq('id', m.id);
+    void submitTournamentMatch(m.id); // 인증 대회면 DUPR 등록(비차단)
     await advanceKnockoutWinners(id); // 승자를 다음 라운드로 진출
     if (courts.length > 0 && t?.court_assign_mode === 'auto') await autoAdvanceCourts(id);
     reload();

@@ -77,6 +77,7 @@ export type TournamentMatch = {
   status: 'scheduled' | 'done';
   court_id: string | null;
   court_confirmed: boolean;
+  dupr_status: 'pending' | 'submitted' | 'failed' | 'skipped'; // DUPR 등록 상태 (0059)
   created_at: string;
 };
 
