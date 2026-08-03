@@ -75,6 +75,14 @@
 
 ## 2026-08-04
 
+### DUPR 운영키 요건 3종 — 엔티틀먼트 · SSO토큰 · 지원창구
+- **배경**: DUPR RaaS 운영키는 tech@mydupr.com 이메일 심사(영업일 10일). GitBook 요건 확인 결과 우리가 이미 충족(SSO·레이팅·웹훅·경기CRUD)한 것 외에 **엔티틀먼트 게이팅·SSO토큰 저장·지원창구**가 미비 → 구현.
+- **엔티틀먼트**: SSO subscriptions 에서 BASIC_L1/PREMIUM_L1(active) 파싱 → `profiles.dupr_basic/premium`(0061, protect_dupr 보호). 인증 번개/대회 참가 게이트 + `dupr-match` 등록 게이트에 **모든 선수 BASIC_L1 필수** 반영. (BASIC_L1=일반 활성회원, SSO 응답에 이미 옴)
+- **SSO 토큰**: userToken/refreshToken 을 비공개 `dupr_credentials`(RLS 정책 없음=service_role만) 저장. 웹 dupr-connect→앱→dupr-verify 로 전달.
+- **지원창구**: `src/app/support.tsx`(경기·레이팅 분쟁/일반 문의 mailto, SUPPORT_EMAIL=support@pinut.org TODO 교체) + 프로필편집 진입점. `matchSource='PARTNER'` 명시.
+- **검증**: tsc(모바일+웹)·lint 통과, 함수 dev 배포. **dev 에 0061 실행 필요**(안 하면 연결 시 profile 업데이트 실패). 기존 연결자(player1/troy)는 **재연결**해야 dupr_basic 채워짐.
+- **남음(후속)**: access token 만료 시 refresh + 자격 24h 초과 시 재조회(subscriptions API). SUPPORT_EMAIL 실제값.
+
 ### DUPR 경기 수정/삭제 동기화 (match update·delete)
 - **만든 것**: 0060(meetup_matches/tournament_matches.dupr_match_code — create 응답 matchCode 저장). `dupr-match`: 이미 등록된 경기 재제출→match/update(matchId=code), 아니면 create(matchCode 저장). action:'delete'→match/delete+skipped. 대회 submitTournamentMatch 멱등가드 제거(점수수정 재저장 시 자동 update). 번개 경기기록 화면 삭제버튼(deleteMeetupMatch: DUPR삭제+로컬삭제).
 - **검증**: 실계정 경기로 DUPR **update 200 SUCCESS · delete 200 SUCCESS** 직접 확인. tsc(모바일+웹)·lint 통과. 임시 matchOp 테스트코드 제거.
