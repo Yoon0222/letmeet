@@ -75,6 +75,13 @@
 
 ## 2026-08-04
 
+### DUPR 레이팅 추이 그래프 + NR 계정 연결 + 히스토리 연동
+- **결정**: 프로필에 DUPR 레이팅 그래프 추가. 공개/비공개는 **사용자 설정**(`dupr_public`) — 본인은 항상 보고, 공개 프로필(player)엔 켰을 때만. 차트는 `react-native-svg` 미설치라 **순수 RN View 라인차트**로 구현(네이티브 의존성 0 → dev-client 재빌드 불필요, 웹에서도 렌더).
+- **버그픽스(중요)**: player1이 NR(무레이팅)이라 연결 실패했던 원인 — 서버가 "레이팅 숫자 없으면 not_found"로 처리. **유저가 조회되면 레이팅 없어도 연결 성공**으로 수정. (진단으로 확인: 토큰 200·GET `/user/JZKMXM` 200·ratings=null)
+- **만든 것**: `dupr-rating-chart.tsx`(라인차트), `dupr-rating-card.tsx`(조회+렌더, 데이터<2 숨김, __DEV__ 샘플). 내정보 프로필·공개 프로필 배치, 프로필편집 공개토글. DB `0058`(dupr_public + dupr_rating_history 캐시 + RLS), schema.sql·types 갱신. `dupr-verify`에 `/history` 조회→캐시 upsert(연결 시 자동 + `history` 액션).
+- **검증**: 차트 웹 프리뷰 렌더 확인(모바일 폭 포함) · tsc/lint 통과 · 함수 dev 배포 · 웹 prod 배포. 커밋 DUPR 파일만(결제 임시플래그·코덱스 파일 제외).
+- **남음**: **dev/prod 에 `0058` 실행**(사장님, SQL 에디터) · 레이팅 있는 계정으로 실데이터 그래프 확인 · prod 전환 시 운영 Supabase `DUPR_*` 시크릿 + dupr-verify prod 배포.
+
 ### DUPR SSO 연결 — 전 구간 검증 + iframe 안정화
 - **결정**: DUPR Level A(ID 직접조회)는 동의 없으면 403이라 불가 → **Level B(SSO 동의 후 검증)** 로 확정. 연결 흐름: 앱 WebView → `pinut.org/dupr-connect`(iframe에 DUPR 로그인) → 동의 → duprId postMessage → `dupr-verify`로 레이팅 저장(verified).
 - **만든 것/고친 것**: `dupr-verify` — `config`(base64 clientKey) 브랜치를 caller 인증 **이전**으로 이동(공개값이라 게이팅 불필요·세션 지연에도 견고). `web-admin/dupr-connect` — URL 파라미터를 `useEffect`에서 상태로 읽어 iframe src를 클라이언트에서 확정(SSR 빈 src에 묶여 DUPR가 안 뜨던 문제 해결). 커밋 `fb6ab65`, Vercel prod 배포.
