@@ -7,10 +7,14 @@ import { AppAlert as Alert } from '@/lib/feedback';
 
 // 고객지원·문의 창구. DUPR RaaS 운영요건: 매치 분쟁 등 사용자가 지원팀에 연락할
 // 명확한 방법을 제공해야 한다. 이메일로 안내한다.
-const SUPPORT_EMAIL = 'support@pinut.org'; // TODO: 실제 지원 이메일로 교체
+// 대표 주소는 support@pinut.org, 실제 수신 확보를 위해 운영자 메일로도 함께(cc) 보낸다.
+const SUPPORT_EMAIL = 'support@pinut.org';
+const SUPPORT_CC = 'troy.yoonsik.shin@gmail.com';
 
 async function contact(subjectPrefix: string) {
-  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`[피넛 문의] ${subjectPrefix}`)}`;
+  const url =
+    `mailto:${SUPPORT_EMAIL}?cc=${encodeURIComponent(SUPPORT_CC)}` +
+    `&subject=${encodeURIComponent(`[피넛 문의] ${subjectPrefix}`)}`;
   const ok = await Linking.canOpenURL(url).catch(() => false);
   if (ok) Linking.openURL(url);
   else Alert.alert('문의 이메일', `${SUPPORT_EMAIL} 로 메일 주시면 도와드릴게요.`);
