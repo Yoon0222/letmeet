@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
   const { order_id, paymentId } = await req.json().catch(() => ({}));
-  if (!order_id || !paymentId) return json({ error: 'order_id, paymentId required' }, 400);
+  if (!order_id) return json({ error: 'order_id required' }, 400);
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -47,6 +47,23 @@ Deno.serve(async (req) => {
     const secret = Deno.env.get('TOSS_SECRET_KEY');
     if (!secret) return json({ error: 'TOSS_SECRET_KEY is not configured' }, 501);
 
+    // paymentKey 가 없으면(앱2앱 복귀 등 웹뷰 리다이렉트를 못 받은 경우)
+    // orderId 로 토스에서 결제를 직접 조회해 paymentKey/상태를 얻는다.
+    let payKey: string | undefined = paymentId;
+    if (!payKey) {
+      const lookRes = await fetch(`https://api.tosspayments.com/v1/payments/orders/${encodeURIComponent(order_id)}`, {
+        headers: { Authorization: basicAuth(secret) },
+      });
+      const look = await lookRes.json().catch(() => ({}));
+      if (!lookRes.ok) return json({ paid: false, pending: true }); // 아직 결제 진행 전/조회 실패 → 실패처리 안 함
+      if (look?.status === 'DONE' && Number(look?.totalAmount) === Number(order.amount)) {
+        await admin.from('payments').update({ status: 'paid', provider_tx: look?.paymentKey ?? null, paid_at: new Date().toISOString() }).eq('id', order.id);
+        return json({ paid: true });
+      }
+      payKey = look?.paymentKey;
+      if (!payKey) return json({ paid: false, pending: true }); // 아직 인증 미완 → 대기
+    }
+
     const tossRes = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
       method: 'POST',
       headers: {
@@ -55,7 +72,7 @@ Deno.serve(async (req) => {
         'Idempotency-Key': `confirm_${order_id}`,
       },
       body: JSON.stringify({
-        paymentKey: paymentId,
+        paymentKey: payKey,
         orderId: order_id,
         amount: Number(order.amount),
       }),
@@ -68,7 +85,7 @@ Deno.serve(async (req) => {
       return json({ paid: false, error: toss?.message ?? 'Toss verification mismatch', code: toss?.code });
     }
 
-    await admin.from('payments').update({ status: 'paid', provider_tx: paymentId, paid_at: new Date().toISOString() }).eq('id', order.id);
+    await admin.from('payments').update({ status: 'paid', provider_tx: payKey, paid_at: new Date().toISOString() }).eq('id', order.id);
     return json({ paid: true });
   }
 

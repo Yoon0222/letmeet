@@ -5,12 +5,16 @@ import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
+import { clearPendingPayment, setPendingPayment } from '@/lib/pending-payment';
 import { supabase } from '@/lib/supabase';
 
 // 인앱 결제 WebView. 토스 체크아웃 페이지를 앱 안에서 띄우고,
 // 성공/실패 리다이렉트를 내부에서 가로채 서버 승인(pay-verify) 후 앱 화면으로 복귀한다.
 // (외부 브라우저·딥링크·"앱 열기" 프롬프트 없음)
 const BASE = process.env.EXPO_PUBLIC_PAYMENT_RETURN_BASE_URL ?? 'https://pinut.org/payment';
+// 외부 결제앱(카카오페이 등)에서 결제 후 우리 앱으로 복귀할 스킴. 이걸 토스에 넘겨야
+// 카카오페이가 카카오톡이 아니라 피넛으로 돌아온다.
+const APP_SCHEME = process.env.EXPO_PUBLIC_PAYMENT_APP_SCHEME ?? 'pickleball://';
 
 function qp(url: string, key: string): string | null {
   const m = url.match(new RegExp('[?&]' + key + '=([^&#]*)'));
@@ -41,7 +45,8 @@ export default function PaymentWebview() {
   const checkoutUrl =
     `${BASE}/checkout?orderId=${encodeURIComponent(orderId)}&amount=${encodeURIComponent(amount)}` +
     `&orderName=${encodeURIComponent(orderName)}&successUrl=${encodeURIComponent(successUrl)}&failUrl=${encodeURIComponent(failUrl)}` +
-    `&method=${encodeURIComponent(method)}&easyPay=${encodeURIComponent(easyPay)}`;
+    `&method=${encodeURIComponent(method)}&easyPay=${encodeURIComponent(easyPay)}` +
+    `&appScheme=${encodeURIComponent(APP_SCHEME)}`;
 
   async function releaseHold() {
     if (!pid) return;
@@ -64,6 +69,7 @@ export default function PaymentWebview() {
         const paymentKey = qp(url, 'paymentKey');
         const oid = qp(url, 'orderId') ?? orderId;
         const { data, error } = await supabase.functions.invoke('pay-verify', { body: { order_id: oid, paymentId: paymentKey } });
+        await clearPendingPayment();
         if (!error && data?.paid) {
           router.replace('/court/reservations' as never);
           setTimeout(() => Alert.alert('결제 완료', '예약이 확정됐어요! 🎉'), 300);
@@ -78,6 +84,7 @@ export default function PaymentWebview() {
     if (url.startsWith(failUrl)) {
       handled.current = true;
       (async () => {
+        await clearPendingPayment();
         await releaseHold();
         finishFail(qp(url, 'message') ?? '결제가 취소됐어요.');
       })();
@@ -121,11 +128,12 @@ export default function PaymentWebview() {
     handleReturn(state.url);
   }
 
-  // 결제 미완료로 화면을 벗어나면(뒤로가기 등) 홀드된 예약을 해제한다(유령 예약 방지).
+  // 결제 시작 시 orderId 를 저장 → 외부 결제앱에서 돌아오면 PaymentResumeWatcher 가
+  // 이 orderId 로 결제 성공을 서버 확인해 예약을 확정한다(딥링크 복귀가 흔들려도 안전).
+  // ⚠️ 언마운트 시 releaseHold 하지 않는다: 앱2앱 복귀 확인이 방금 확정한 예약을
+  //    삭제하는 사고를 막기 위해. 미결제로 남은 홀드는 서버 스테일 정리(cron)가 처리.
   useEffect(() => {
-    return () => {
-      if (!handled.current) releaseHold();
-    };
+    if (orderId) void setPendingPayment({ orderId, orderName });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
