@@ -7,6 +7,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import type { EventPopupRow } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 // 팝업별로 "오늘 하루 보지 않기"를 따로 기억 (새 팝업은 이전 숨김에 영향 안 받음)
 const storageKey = (id: string) => `pinut:event-popup:${id}:hidden-date`;
@@ -98,13 +99,13 @@ export function EventPopup() {
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Pressable onPress={next} hitSlop={10} style={styles.close}>
-            <Ionicons name="close" size={20} color="#6B7280" />
+            <Ionicons name="close" size={20} color={AppColors.textSecondary} />
           </Pressable>
 
           {current.image_url ? <Image source={{ uri: current.image_url }} style={styles.banner} resizeMode="cover" /> : null}
 
           <View style={styles.badge}>
-            <Ionicons name="sparkles-outline" size={18} color="#16C784" />
+            <Ionicons name="sparkles-outline" size={18} color={AppColors.primary} />
             <Text style={styles.badgeText}>EVENT</Text>
           </View>
 
@@ -133,7 +134,7 @@ export function EventPopup() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.48)',
+    backgroundColor: 'rgba(0, 0, 0, 0.68)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.four,
@@ -143,13 +144,11 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     borderRadius: 18,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     padding: Spacing.four,
-    shadowColor: '#111827',
-    shadowOpacity: 0.14,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 12,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    boxShadow: '0 18px 42px rgba(0, 0, 0, 0.34)',
   },
   close: {
     position: 'absolute',
@@ -159,7 +158,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 14,
     borderCurve: 'continuous',
-    backgroundColor: '#F6F7F9',
+    backgroundColor: AppColors.surfaceSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -168,7 +167,7 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 14,
     borderCurve: 'continuous',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: AppColors.surfaceSoft,
     marginBottom: Spacing.three,
   },
   badge: {
@@ -178,35 +177,35 @@ const styles = StyleSheet.create({
     gap: 6,
     borderRadius: 16,
     borderCurve: 'continuous',
-    backgroundColor: '#DCFCE7',
+    backgroundColor: 'rgba(22,199,132,0.12)',
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   badgeText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#16A34A',
+    color: AppColors.primary,
   },
   title: {
     marginTop: Spacing.three,
     paddingRight: 44,
     fontSize: 26,
     fontWeight: '800',
-    color: '#111827',
+    color: AppColors.textPrimary,
   },
   body: {
     marginTop: Spacing.two,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '500',
-    color: '#6B7280',
+    color: AppColors.textSecondary,
   },
   counter: {
     marginTop: Spacing.two,
     alignSelf: 'flex-end',
     fontSize: 13,
     fontWeight: '700',
-    color: '#9CA3AF',
+    color: AppColors.textMuted,
   },
   actionRow: {
     marginTop: Spacing.four,
@@ -219,15 +218,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surfaceSoft,
   },
   secondaryText: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#6B7280',
+    color: AppColors.textSecondary,
   },
   primaryButton: {
     width: 92,
@@ -236,7 +235,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#16C784',
+    backgroundColor: AppColors.primary,
   },
   primaryText: {
     fontSize: 16,

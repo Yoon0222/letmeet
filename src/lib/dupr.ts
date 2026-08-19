@@ -19,7 +19,7 @@ export async function getDuprHistory(userId: string): Promise<DuprPoint[]> {
 
 // 경기결과를 DUPR 에 등록(match/create). 우리 프로필ID 를 넘기면 서버가 DUPR ID 로 변환.
 export async function submitMatchToDupr(params: {
-  source: 'meetup' | 'tournament';
+  source: 'meetup' | 'tournament' | 'club' | 'club_session';
   match_id: string;
   format: 'singles' | 'doubles';
   teamA: { p1: string; p2?: string };

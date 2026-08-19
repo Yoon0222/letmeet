@@ -7,7 +7,7 @@ interface BadgeProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function Badge({ label, color = '#16A34A', bg = '#DCFCE7', style }: BadgeProps) {
+export function Badge({ label, color = '#16C784', bg = 'rgba(22,199,132,0.14)', style }: BadgeProps) {
   return (
     <View style={[styles.badge, { backgroundColor: bg }, style]}>
       <Text style={[styles.text, { color }]} numberOfLines={1}>

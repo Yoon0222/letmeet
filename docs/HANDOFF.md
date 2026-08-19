@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-07-24 (Claude: v2.0.0 릴리스 + OTA + 게스트제거 + 인앱 알림센터)
+Last updated: 2026-08-19 (Codex: 클럽 프리미엄 1개월 체험 + 경기 결과 관리 MVP)
 
 ## Purpose
 
@@ -22,6 +22,232 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Codex -> Claude (2026-08-19, club premium match-result MVP)
+
+- **What changed**:
+  - Added a first premium-club MVP focused only on club match result management.
+  - Intentionally excluded bracket management and court assignment per user request.
+  - Added premium/trial fields to clubs and a new `club_match_results` table with RLS.
+  - Club detail now shows plan status, a 1-month trial CTA for owners, recent match results, and a result-record button for usable premium clubs.
+  - Added `src/app/club/match-create.tsx` for simple singles result entry between approved club members.
+  - Follow-up UI fix: `src/app/(tabs)/clubs.tsx` now exposes club creation in the header, shows a visible empty-state `클럽 만들기` CTA, and lifts the FAB above the custom bottom tab bar.
+  - Follow-up UI fix: `src/app/club/create.tsx` now lets the owner choose `일반 클럽` or `프리미엄` at creation time. Premium creation starts the 1-month trial immediately and shows benefit copy.
+  - Premium benefit copy now emphasizes club meetup bracket generation from attendance votes and skill levels, match result recording, and monthly tournaments/leagues.
+  - Follow-up UI fix: `src/app/club/[id].tsx` and club create modal were aligned to the current dark app theme instead of the old white background.
+- **Why**:
+  - User wants general clubs and paid premium clubs. Premium clubs should eventually support club-only events, but this step should start smaller with match result management only.
+- **Files touched**:
+  - `supabase/schema.sql`
+  - `supabase/migrations/0063_club_premium_match_results.sql`
+  - `src/lib/types.ts`
+  - `src/components/club-card.tsx`
+  - `src/app/(tabs)/clubs.tsx`
+  - `src/app/club/[id].tsx`
+  - `src/app/club/match-create.tsx`
+  - `src/app/_layout.tsx`
+  - `docs/HANDOFF.md`
+- **Validation**:
+  - Root app: `npx.cmd tsc --noEmit` passed.
+  - Root app: `npx.cmd expo lint` passed.
+- **Follow-up**:
+  - Apply migration `0063_club_premium_match_results.sql` to the intended Supabase DB before testing the feature.
+  - Subscription billing is not wired yet; current upgrade button starts a local 1-month trial by updating the club row.
+  - First result-entry screen is singles only, while the table already has nullable second-player fields for doubles later.
+
+### Codex -> Claude (2026-08-19, premium club subscription direction)
+
+- **Decision**:
+  - Premium club billing should eventually use Toss Payments recurring billing/automatic payment, not the court reservation one-time payment flow.
+  - User wants to move directly toward the recurring billing version, but implementation will be continued by Claude.
+- **Pricing / display**:
+  - Show regular price: `월 9,900원`.
+  - Show launch discount price: `월 5,500원`.
+  - Main charged price should be `5,500 KRW / month`.
+  - Suggested copy: `첫 1개월 무료`, `이후 월 5,500원`, `정상가 월 9,900원`, `오픈 기념 44% 할인`.
+- **Premium benefits copy**:
+  - `클럽 모임 대진 짜기` — attendance votes + club member skill levels generate matchups automatically.
+  - `경기 결과 기록`.
+  - `월례대회 기능 제공` — tournaments, leagues, and other club-only events.
+- **Suggested implementation path**:
+  - Add subscription tables such as `club_subscriptions`, `club_billing_methods`, and `club_subscription_payments`.
+  - Use Toss billing key flow for card registration.
+  - Add Edge Functions for issuing/storing billing keys, monthly charge execution, webhook/status reconciliation, and cancellation.
+  - Add scheduled job for monthly billing and failed-payment handling (`past_due` -> lock/cancel after grace period).
+  - Keep existing `clubs.tier`, `premium_status`, and `premium_trial_ends_at` fields aligned with subscription status.
+- **Important**:
+  - Price shown in app, payment request amount, refund policy, and Toss merchant review materials must all match the actual charged amount: `월 5,500원`.
+
+### Codex -> Claude (2026-08-11, app WebView external payment launch)
+
+- **What changed**:
+  - Updated `src/app/payment/webview.tsx`.
+  - Replaced the Android external payment launcher path so `intent://` URLs try `SendIntentAndroid.openAppWithUri()` first, then `openChromeIntent()`, then `Linking.openURL()`.
+  - Custom payment schemes such as `kakaotalk://` / `kakaopay://` now go through the same external URL opener.
+  - Enabled `setSupportMultipleWindows` and added `onOpenWindow` so Toss/KakaoPay URLs opened through a new window are intercepted and launched externally.
+- **Why**:
+  - User clarified the broken button is inside the app WebView: pressing KakaoPay "direct move" does not launch the payment app.
+  - Toss/Kakao app-to-app flows can emit either `intent://`, custom scheme URLs, or target-blank/new-window URLs.
+- **Files touched**:
+  - `src/app/payment/webview.tsx`
+  - `docs/HANDOFF.md`
+- **Validation**:
+  - Root app: `npx.cmd tsc --noEmit` passed.
+  - Web admin: `npx.cmd tsc --noEmit` passed.
+- **Follow-up**:
+  - With Metro running on `8082`, reload the installed Android development client and retry KakaoPay direct move.
+  - If it still fails, capture the exact URL emitted by the WebView. A missing native query/scheme would require another development-client rebuild.
+
+### Codex -> Claude (2026-08-11, payment return deep-link fallback)
+
+- **What changed**:
+  - Reworked `web-admin/app/payment/success/page.tsx` and `web-admin/app/payment/fail/page.tsx`.
+  - The return button now first opens the app with the direct custom scheme (`pickleball://payment/success` or `pickleball://payment/fail`).
+  - On Android, it then falls back to an `intent://` URL with `package=com.pinut.app` and `S.browser_fallback_url`.
+  - Cleaned corrupted Korean copy in both return pages.
+- **Why**:
+  - User reported that pressing the direct return button after payment did not open the app.
+  - Some Kakao/KakaoPay in-app browsers do not reliably handle Chrome-style `intent://` links. Trying the custom scheme first is more compatible, while keeping `intent://` as Android fallback.
+- **Files touched**:
+  - `web-admin/app/payment/success/page.tsx`
+  - `web-admin/app/payment/fail/page.tsx`
+  - `docs/HANDOFF.md`
+- **Validation**:
+  - Web admin: `npx.cmd tsc --noEmit` passed.
+  - Root app: `npx.cmd tsc --noEmit` passed.
+- **Not done**:
+  - No production deployment. This web change must be deployed or wired to a preview URL before it affects `pinut.org/payment`.
+
+### Codex -> Claude (2026-08-11, KakaoPay direct checkout button)
+
+- **What changed**:
+  - Reworked `web-admin/app/payment/checkout/page.tsx`.
+  - Direct easy-pay methods such as `KAKAOPAY`, `NAVERPAY`, `TOSSPAY`, and `PAYCO` no longer auto-call Toss `requestPayment()` immediately on page load.
+  - The checkout page now shows a method-specific button such as `카카오페이 결제창 열기`; the user tap triggers Toss `requestPayment()`.
+  - Cleaned corrupted Korean text in the checkout wrapper.
+- **Why**:
+  - User reported that Toss UI is visible, but choosing KakaoPay does not open the payment window.
+  - Mobile WebView/app-to-app launches are often blocked or unreliable without a user gesture. Toss direct easy-pay uses `card.flowMode = DIRECT` and `card.easyPay = KAKAOPAY`, so the safer flow is to launch it from a button tap inside the WebView.
+- **Files touched**:
+  - `web-admin/app/payment/checkout/page.tsx`
+  - `docs/HANDOFF.md`
+- **Validation**:
+  - Web admin: `npx.cmd tsc --noEmit` passed.
+  - Root app: `npx.cmd tsc --noEmit` passed.
+- **Not done**:
+  - No Vercel production deployment. User explicitly said future production deployments must not be done without permission.
+- **Follow-up**:
+  - To test on the installed Android dev client, deploy this `web-admin` change to the payment host or temporarily point `EXPO_PUBLIC_PAYMENT_RETURN_BASE_URL` to a local/preview payment URL and restart Metro.
+
+### Codex -> Claude (2026-08-11, dev-pay development client + Metro)
+
+- **What changed**:
+  - Updated `eas.json` so the `dev-pay` Android profile now has `developmentClient: true`.
+  - Started Metro in development-client mode on port `8082`.
+- **Why**:
+  - The previous `dev-pay` APK was an internal install build, not a live-reload development client.
+  - User needs to install the new development APK and attach it to Metro for real-time UI/JS testing.
+- **Files touched**:
+  - `eas.json`
+  - `docs/HANDOFF.md`
+- **Runtime info**:
+  - Metro URL: `http://192.168.1.66:8082`
+  - Dev client URL: `exp+pickleball://expo-development-client/?url=http%3A%2F%2F192.168.1.66%3A8082`
+- **Validation / notes**:
+  - Metro started and is waiting on `http://localhost:8082`.
+  - React Native DevTools fallback warning appeared, but Metro continued running.
+  - Android device must be on the same network as the PC.
+
+### Codex -> Claude (2026-08-11, Android dev-pay build completed)
+
+- **What changed**:
+  - Started and completed an Android EAS internal build for the Toss payment return changes.
+- **Build**:
+  - Platform: Android
+  - Profile: `dev-pay`
+  - Channel: `dev-pay`
+  - Distribution: internal
+  - Build ID: `ca70bca3-512a-40a3-9f8d-3d65a6d6e74c`
+  - Version: `2.0.0`
+  - Version code: `10`
+  - APK: https://expo.dev/artifacts/eas/hbzKScBqkrHxNZV8tE1qeuaytDBE0wPZh-Uj0L7KIak.apk
+  - Logs: https://expo.dev/accounts/yoonsik2/projects/pickleball/builds/ca70bca3-512a-40a3-9f8d-3d65a6d6e74c
+- **Why**:
+  - Native app scheme changes for KakaoPay/TossPay app-to-app return require a rebuilt dev client/APK.
+- **Validation before build**:
+  - Root app: `npx.cmd tsc --noEmit` passed.
+  - Web admin: `npx.cmd tsc --noEmit` passed.
+  - Root app: `npx.cmd expo lint` passed.
+  - Expo config: `npx.cmd expo config --type public` passed.
+- **Not done**:
+  - No iOS build.
+  - No EAS submit.
+  - No Vercel production deployment.
+  - No Supabase production deployment.
+- **Follow-ups / risks**:
+  - Install this APK on a real Android device and test card payment, KakaoPay return, cancel/fail, and app resume behavior.
+  - JS/UI changes can be checked with `npx expo start`, but native app scheme behavior requires this installed APK.
+
+### Codex -> Claude (2026-08-11, Toss Payments app-to-app return hardening)
+
+- **What changed**:
+  - Hardened Toss checkout return flow for KakaoPay/TossPay/NaverPay style app-to-app payments.
+  - Added native payment app URL schemes through `app.config.js` for iOS `LSApplicationQueriesSchemes` and Android manifest `queries`.
+  - Normalized Toss checkout `appScheme` to `pickleball://` and passed it to the web checkout page.
+  - Reworked `src/app/payment/webview.tsx` so success and fail redirects both verify with `pay-verify` before clearing pending payment or releasing held reservation slots.
+  - Reworked native deep-link fallback screens: `src/app/payment/success.tsx`, `src/app/payment/fail.tsx`.
+  - Cleaned payment method UI copy and kept selected method/easyPay forwarding in `src/app/payment/method.tsx`.
+  - Reworked web-admin payment return pages to redirect back to the app with Android intent fallback.
+  - Reworked web-admin Toss checkout wrapper to use Toss JS v2 standard SDK, `card.appScheme`, and direct easy-pay options.
+  - Cleaned payment pending storage, reservation payment helper, and app foreground payment resume watcher.
+- **Why**:
+  - User reported KakaoPay success then direct move returning to KakaoTalk instead of P!NUT.
+  - Cause is usually missing or incomplete native app scheme/app-to-app return configuration.
+  - Also avoids a risky case where Toss `failUrl` can arrive even though the payment is already captured or still pending.
+- **Files touched in this session**:
+  - `app.config.js`
+  - `src/lib/payments.ts`
+  - `src/lib/pending-payment.ts`
+  - `src/components/payment-resume-watcher.tsx`
+  - `src/app/payment/method.tsx`
+  - `src/app/payment/webview.tsx`
+  - `src/app/payment/success.tsx`
+  - `src/app/payment/fail.tsx`
+  - `web-admin/app/payment/checkout/page.tsx`
+  - `web-admin/app/payment/success/page.tsx`
+  - `web-admin/app/payment/fail/page.tsx`
+- **Validation**:
+  - Root app: `npx.cmd tsc --noEmit` passed.
+  - Web admin: `npx.cmd tsc --noEmit` passed.
+  - Root app: `npx.cmd expo lint` passed.
+  - Expo config: `npx.cmd expo config --type public` passed.
+- **Not done**:
+  - No EAS build, EAS submit, Vercel production deployment, or Supabase production function/secret deployment.
+- **Follow-ups / risks**:
+  - Native app scheme additions require a fresh Android/iOS build before real-device app-to-app return behavior can be verified.
+  - Web-admin payment pages must be deployed only after user explicitly approves production deployment.
+  - KakaoPay availability still depends on Toss dashboard merchant/payment-method activation.
+  - Run real-device E2E: card payment, KakaoPay, fail/cancel path, app resume path, and held slot expiry/release.
+
+### Claude -> Codex (2026-08-11, 코트 예약 결제(토스) — 클라이언트 정석 재작성 + 홀드모델)
+
+- **What changed**: 코트 예약 결제(토스 웹뷰) 전체를 파고들어 클라이언트를 **토스 공식 웹뷰 패턴으로 재작성**하고, 결제 모델을 **"짧은 점유(홀드)+만료"** 로 전환. 세션 내내 실기기 로그(Metro)로 디버깅하며 여러 실제 버그를 잡음.
+  - **결제 모델(홀드)**: `court_reservations.expires_at` 추가 — `NULL`=확정(영구) / 미래=활성 홀드 / 과거=만료. 결제 시작 시 슬롯을 **3분 점유**(HOLD_MINUTES=3), 결제 성공 시 `expires_at=null` 로 확정. 동시 선택은 유니크 인덱스가 한 명만 통과시킴.
+  - **pay-verify(엣지, dev 배포됨)**: paymentKey 있어도 **항상 orderId lookup 우선** → 이미 DONE이면 confirm 없이 확정. `NOT_FOUND_PAYMENT_SESSION`·`IDEMPOTENT_REQUEST_PROCESSING`는 재시도(pending, 삭제 안 함). 확정 시 예약 upsert(경합으로 지워져도 복구), 슬롯 충돌 시 **자동 환불**(refundToss). 진단필드 `resv/lookStatus/at` 응답 포함.
+  - **toss-webhook(엣지, dev 배포됨)**: 결제완료 시 `expires_at=null` 확정 추가. 취소/만료 삭제는 **미완료 홀드만**(확정 예약 보호).
+  - **webview.tsx 대재작성**: `react-native-send-intent` 도입 → `intent://` 는 `openAppWithData(package, scheme://data)` 로 **앱 직접 실행**(로그 `[pay] openApp com.kakao.talk true` 로 app2app 실행 성공 확인). `successUrl/failUrl` 가로채 pay-verify 재시도, **appScheme=`pickleball://`(콜론 필수 — 없으면 토스 retAppScheme 에러)**, WebView props 추가(`javaScriptCanOpenWindowsAutomatically`·`sharedCookiesEnabled`·`thirdPartyCookiesEnabled`·`mixedContentMode=always`). 3분 카운트다운 UI.
+  - **court/[id]**: 우리 결제수단 화면 스킵하고 **토스 기본 결제창 직행**(method=CARD, easyPay=''). 홀드모델 반영. **내예약/홈**은 `expires_at IS NULL`(확정)만 표시.
+- **Why**: 기존 결제가 실기기에서 안 됨 — 파고드니 (1)appScheme 콜론 누락으로 토스 retAppScheme 거부, (2)동시 승인 IDEMPOTENT를 실패로 오판해 예약 삭제, (3)intent를 단순 스킴 치환으로 열어 app2app 복귀가 홈으로 튐 — 이 세 개가 실제 원인이었음. 홀드모델은 "결제 안 하면 예약 안 됨 + 먼저 결제한 사람이 예약" 요구를 안전하게 구현.
+- **⚠️ dev-client 재빌드 함**(send-intent 네이티브): **빌드 완료 → https://expo.dev/accounts/yoonsik2/projects/pickleball/builds/3a68d428-6abd-47d4-ac10-b3ff60fd0c49** (이 빌드 설치해야 새 결제 동작).
+- **Files touched (내 경계)**: `src/lib/payments.ts`, `src/lib/types.ts`(expires_at + reserve_court_hold/release_expired RPC 타입), `supabase/migrations/0062_court_hold_expiry.sql`(신규), `supabase/schema.sql`, `supabase/functions/pay-verify/index.ts`, `supabase/functions/toss-webhook/index.ts`, `src/app/payment/webview.tsx`(재작성), `src/app/payment/success.tsx`, `src/app/payment/fail.tsx`, `src/app/payment/method.tsx`(이제 미사용, 파일은 남김), `src/app/court/[id].tsx`, `src/app/court/reservations.tsx`, `src/app/(tabs)/index.tsx`, `package.json`(react-native-send-intent).
+- **Validation**: tsc 0. pay-verify·toss-webhook dev 배포됨. 실기기: app2app 실행·appScheme·IDEMPOTENT 재시도·홀드·예약 로직 확인됨. **카드/토스페이는 테스트에서 승인**. 카카오페이는 계속 `READY`(승인 안 올라감) — 원인은 "테스트라 원래 안 됨"이 **아니라** 이 test_ck(`test_ck_[redacted]`) 상점에 **카카오페이가 활성화 안 돼 있을 가능성**(토스 FAQ: 카카오페이는 계약 후 발급 테스트키 필요). **토스 대시보드에서 카카오페이 활성화 확인 필요.**
+- **⚠️ Follow-ups / 남은 것**:
+  - (a) **카드로 결제 E2E 최종 확인**(복귀→confirm→예약 확정→내예약/홈 표시)까지 아직 사용자 최종검증 전.
+  - (b) **카카오페이**: 토스 개발자센터에서 이 상점 카카오페이 결제수단 **활성화 여부 확인**(안 켜져 있으면 신청).
+  - (c) **프로덕션 빌드 전 디버그 로그 정리**: `[pay]`(webview), `[watcher]`(payment-resume-watcher), `[pay-verify:deeplink]`(success.tsx), webview의 상세로그, checkout `console.error`(web-admin) 등.
+  - (d) **마이그레이션 0062를 운영(prod) DB에도 적용** 필요(현재 dev만).
+  - (e) `src/constants/features.ts`의 **`PAYMENTS_ENABLED=true`는 결제 테스트용 임시** — 프로덕션 빌드 전 원복 정책 확인. `.env`의 `EXPO_PUBLIC_PAYMENT_PROVIDER=toss`도 테스트용.
+- **경계 주의**: 이번에 **코덱스 미커밋 파일 일부를 로직 목적으로 건드림**(`_layout.tsx`의 네비 테마 다크고정, `(tabs)/index.tsx` 홈 쿼리·로딩 Modal, `court/*`, `(tabs)/_layout.tsx` sceneStyle 등). **나는 커밋 안 했음** — 코덱스가 자기 파일 커밋할 때 이 변경들 확인 요망. 결제 관련 내 소유 파일은 위 목록.
 
 ### Claude -> Codex (2026-08-03, DUPR 인증 경기 — 번개 생성 토글 요청)
 
@@ -1491,3 +1717,1523 @@ Production Supabase migration status check:
   - `web-admin` `npx.cmd tsc --noEmit` passed.
   - `web-admin` `npm.cmd run build` passed after allowing network for Google Fonts.
 - No production deployment was run.
+
+2026-08-03 app profile premium dark UI prototype:
+
+- User shared a dark premium sports profile reference with P!NUT logo, DUPR rating card, quick record/stat/ranking/badge actions, and recent match card.
+- Confirmed work branch: `pinut-v2.0-dev`.
+- Updated `src/app/(tabs)/profile.tsx` only:
+  - Replaced the previous light profile summary layout with a dark athlete-card style profile screen.
+  - Kept existing profile edit, connected login management, language setting, my meetups list, sign out, and account deletion functions.
+  - Shows DUPR verified/pending badge, rating/skill fallback, profile avatar, region/play style, quick actions, recent activity card, and dark empty states.
+  - Did not change routing, data model, Supabase schema, or production deployment.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build or production deployment was run.
+
+2026-08-03 app-wide premium dark UI pass:
+
+- User approved the dark P!NUT athlete-card profile direction and asked to apply it to the remaining app screens.
+- Confirmed work branch: `pinut-v2.0-dev`.
+- Updated main Expo app UI only; no routing/data model/DB/deploy changes.
+- Applied the premium dark sports style to:
+  - Bottom tab navigation: `src/app/(tabs)/_layout.tsx`
+  - Home: `src/app/(tabs)/index.tsx`
+  - Match list: `src/app/(tabs)/matches.tsx`
+  - Club list: `src/app/(tabs)/clubs.tsx`
+  - Tournament list: `src/app/(tabs)/tournaments.tsx`
+  - Community list: `src/app/(tabs)/community.tsx`
+  - Profile: `src/app/(tabs)/profile.tsx`
+- Updated shared visual components for the same design language:
+  - `AppCard`, `AppChip`, `AppHeader`, `AppScaffold`, `Button`, `TextField`, `Badge`, `AppFAB` styling context
+  - `MeetupCard`, `CourtCard`, `TournamentCard`, `ClubCard`, `CommunityPostCard`
+  - `BootScreen`, `NotificationBell`, `CourtPicker`, `DuprRatingCard`, `DuprRatingChart`
+- Updated theme tokens to dark premium surfaces/text/borders while keeping P!NUT primary green.
+- Fixed the boot/loading copy to normal Korean text.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 bottom tab IA update: community promoted, clubs moved under More:
+
+- User decided to promote Community and move Clubs out of the primary bottom navigation.
+- Updated visible bottom tabs to:
+  - `홈`
+  - `모임`
+  - `코트`
+  - `커뮤니티`
+  - `전체`
+- Updated `src/app/(tabs)/_layout.tsx`:
+  - Added visible `court` and `more` tabs.
+  - Hid `clubs`, `tournaments`, and `profile` from the tab bar with `href: null` while preserving the routes.
+- Added `src/app/(tabs)/court.tsx`:
+  - Reuses the existing court reservation/list screen as a bottom tab entry.
+- Added `src/app/(tabs)/more.tsx`:
+  - New premium dark "전체" hub.
+  - Links to 대회, 클럽, 내 예약, 내 정보, 프로필 수정, 연결된 로그인, 알림.
+- Existing club, tournament, profile, and court route functionality was not deleted.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 app bottom navigation attached island refinement:
+
+- User shared a Toss-style bottom menu reference and suggested making the nav look integrated with the phone bottom/system navigation area.
+- Updated `src/app/(tabs)/_layout.tsx` only:
+  - Changed the tab bar from a floating capsule to an attached bottom island.
+  - Bar now spans full width, sits at `bottom: 0`, includes safe-area bottom inset, and uses large rounded top corners.
+  - Shadow direction changed upward so the bar feels connected to the device bottom area.
+  - Existing tab routes and labels remain unchanged.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 app bottom navigation vertical alignment fix:
+
+- User reported the redesigned bottom menu items looked slightly shifted upward.
+- Updated `src/app/(tabs)/_layout.tsx` only:
+  - Removed extra vertical padding from the floating tab bar.
+  - Added explicit tab icon area centering with `tabBarIconStyle`.
+  - Matched tab item height to the bar height and centered the custom icon+label group.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 app bottom navigation redesign:
+
+- User asked if the bottom menu could feel different from the default tab bar.
+- Updated `src/app/(tabs)/_layout.tsx`:
+  - Reworked the tab bar into a floating dark capsule with rounded corners, subtle border, and shadow.
+  - Hid default labels and added custom icon+label rendering for each tab.
+  - Active tab now uses a bright green rounded icon shell for a faster sports-app feel.
+  - Kept the existing tab route names and navigation structure unchanged.
+- Updated tab screen bottom spacing so content is not hidden behind the floating nav:
+  - `src/app/(tabs)/index.tsx`
+  - `src/app/(tabs)/matches.tsx`
+  - `src/app/(tabs)/clubs.tsx`
+  - `src/app/(tabs)/community.tsx`
+  - `src/app/(tabs)/tournaments.tsx`
+  - `src/app/(tabs)/profile.tsx`
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 court/reservation surface consistency pass:
+
+- User reported My Reservations and Court Reservation screens still did not feel visually unified, and asked to check popup modals too.
+- Updated court-related screens to use the shared AppColors surface system instead of scattered light Material-like hardcoded colors:
+  - `src/app/court/index.tsx`
+  - `src/app/court/reservations.tsx`
+  - `src/app/court/[id].tsx`
+- Increased bottom padding on court list and my reservations so the attached bottom navigation does not cover list content.
+- Updated popup/modal surfaces:
+  - `src/components/court-reviews.tsx`
+  - `src/components/event-popup.tsx`
+  - `src/components/ui/loading-overlay.tsx`
+  - `src/app/meetup/create.tsx` court request bottom sheet
+- Updated native court-map selected-court preview card shadow to use a single subtle `boxShadow` style instead of legacy `shadowColor`/`elevation`.
+- Rechecked the target files for leftover light background tokens; remaining white values are intentional text colors on primary/dark buttons or toast text.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 court tab top safe-area fix:
+
+- User shared a screenshot where the Court Reservation tab search bar was colliding with the Android status bar at the top of the screen.
+- Root cause:
+  - Bottom tabs use `headerShown: false`, so tab screens must handle their own top safe area.
+  - `src/app/court/index.tsx` was using `SafeAreaView` with only `edges={['bottom']}`.
+- Updated `src/app/court/index.tsx`:
+  - Changed the root `SafeAreaView` to `edges={['top', 'bottom']}` so the search/toggle header starts below the device status bar.
+- Checked other primary tab screens:
+  - Home, Matches, Community, More, Clubs, Tournaments, and Profile already use top safe area.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Supabase deployment, Vercel deployment, or production DB work was run.
+
+2026-08-03 P!NUT wordmark usage alignment:
+
+- User decided:
+  - App icon should stay as a compact symbol direction (`P!` / app icon style).
+  - Splash/loading/landing/store graphic should show the full `P!NUT` wordmark.
+- Confirmed existing state:
+  - App boot/loading screen already renders `P!NUT`.
+  - Login screen already shows the app icon plus `P!NUT` text.
+  - Play Store feature graphic already contains `P!NUT`.
+- Added a new native splash image:
+  - `assets/images/splash-wordmark.png`
+  - Uses the peanut mascot plus `P!NUT` and `Play instant`.
+- Updated `app.json`:
+  - Expo splash image now points to `./assets/images/splash-wordmark.png`.
+  - Splash image width increased from `140` to `220`.
+- Updated landing hero:
+  - `web-admin/app/landing/page.tsx` hero H1 now uses `P!NUT`.
+  - `Play now, instantly.` is now supporting hero copy below the brand.
+- Verification:
+  - `app.json` JSON parse passed.
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+  - `npm.cmd run build` in `web-admin` passed after allowing network access for Google Fonts.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-12 TossPayments app return still landing on Home - nested app-scheme fix:
+
+- User reported that after the Android rebuild, TossPay/Paybooc still returned to the app Home instead of completing the reservation flow.
+- Root cause found in `src/components/payment-resume-watcher.tsx`:
+  - Some external payment apps return to the merchant app as `pickleball://?...` and include the actual Toss result URL inside a nested query param such as `url`.
+  - The previous watcher only detected that `pickleball://` opened the app, then verified by the locally stored pending `orderId`.
+  - It did not extract nested Toss return params like `paymentKey`, `orderId`, `code`, or `message`, so the app could wake at the root route/Home without enough result context.
+- Updated `src/components/payment-resume-watcher.tsx`:
+  - Added parsing for direct `/payment/success` and `/payment/fail` URLs.
+  - Added parsing for nested return URLs in `url`, `redirectUrl`, `paymentRedirectUrl`, and `paymentUrl`.
+  - Sends both `order_id` and `paymentId` (`paymentKey`) to the `pay-verify` Edge Function when available.
+  - Keeps pending-payment retry behavior and routes to `/court/reservations` only after verification.
+  - Replaced previously corrupted alert strings in this file with readable Korean.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+
+2026-08-12 payment key cleanup check:
+
+- User asked whether the previously shared Toss test keys were deleted.
+- Confirmed active env/code no longer contains Toss key patterns such as `test_ck_`, `test_sk_`, `live_ck_`, or `live_sk_`.
+- Removed leftover payment env names from `.env.example` and `.env.production`.
+- Redacted an old partial public test client key fragment in `docs/HANDOFF.md`.
+- Remaining matches are old documentation/worklog variable names such as `TOSS_SECRET_KEY`; no secret values are present.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+
+2026-08-12 Toss test key setup check:
+
+- User added new Toss test keys and asked for a setup check.
+- Local `.env` now contains `EXPO_PUBLIC_TOSS_CLIENT_KEY`.
+- Dev Supabase project `pjfhxkvdjipvdmfsacie` contains secret name `TOSS_SECRET_KEY`.
+- `.env.production` does not contain Toss client key yet, so this setup is currently dev/local only.
+- No payment implementation, Edge Function deploy, app build, store submit, or production deploy was run.
+- Important next checks:
+  - If the phone is connected to Metro/dev client, reload the app and retest without a native rebuild.
+  - If testing a standalone APK with embedded JS, rebuild or deliver an OTA update before retesting.
+  - The Edge Function retry/status improvements in `supabase/functions/pay-verify/index.ts` must be deployed to the target Supabase project; local code changes alone do not affect the running server.
+- No EAS build, app-store submit, Vercel deployment, or production DB work was run in this step.
+
+2026-08-12 TossPayments direct-window doc comparison:
+
+- User attached TossPayments direct card/easy-pay window documentation.
+- Relevant requirements confirmed:
+  - Direct card/easy-pay window needs `method: "CARD"`.
+  - Direct window needs `card.flowMode: "DIRECT"`.
+  - Easy-pay direct window is selected with `card.easyPay` such as `TOSSPAY` or `KAKAOPAY`.
+  - App return for app-to-app flows should use `card.appScheme`.
+  - Successful auth redirects to `successUrl` with `orderId`, `paymentKey`, and `amount`.
+  - Server must confirm payment with Toss confirm API within the valid payment session window.
+- Current `web-admin/app/payment/checkout/page.tsx` already sets:
+  - `method: CARD`
+  - `card.flowMode: DIRECT` when easyPay exists
+  - `card.easyPay`
+  - `card.appScheme`
+- Current likely remaining issue if the app still returns Home:
+  - The installed/running app may not include the latest nested app-scheme parsing fix, or
+  - The deployed `pay-verify` Edge Function may not include the latest retry/lookup/confirm behavior, or
+  - Edge Function logs will show whether `paymentKey` is arriving and whether Toss confirm/lookup succeeds.
+- No code change, EAS build, app-store submit, Vercel deployment, or production DB work was run in this step.
+
+2026-08-12 TossPay/Paybooc still returning to Home after SamsungPay works:
+
+- User reported SamsungPay completed normally, but TossPay still returned to app Home.
+- Interpretation:
+  - The normal web success path works because SamsungPay reaches the `successUrl` and the app/webview can verify.
+  - TossPay/Paybooc likely open the merchant app scheme at the app root, for example `pickleball://?url=...`, and Expo Router may consume those params into the current/global route instead of only firing the React Native `Linking` event.
+- Updated `src/components/payment-resume-watcher.tsx` again:
+  - Added `useGlobalSearchParams()` monitoring.
+  - Parses payment return data from global route params as a fallback when Expo Router consumes app-scheme query params.
+  - If a `pickleball://` payment return is detected, immediately routes to `/court/reservations` before verification so the user is not dropped on Home.
+  - Still verifies through `pay-verify` with `order_id` and `paymentId` when available.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next retest note:
+  - This is a JS/app-side change. If testing with Metro/dev client, reload the app.
+  - If testing a standalone APK with embedded JS, rebuild or OTA update is required.
+- No EAS build, app-store submit, Vercel deployment, or production DB work was run.
+
+2026-08-12 TossPay return/verification analysis:
+
+- User reported: KakaoPay completes correctly, but TossPay returns to the app home after fingerprint auth and the court reservation is not confirmed.
+- Root cause found:
+  - Toss mobile flow can return through the app scheme/root instead of the web success route.
+  - `PaymentResumeWatcher` retried `pay-verify` only briefly and then cleared the pending payment.
+  - Once pending storage was cleared, later Toss status propagation could no longer be verified by `order_id`.
+  - `pay-verify` also treated several Toss transient/duplicate-processing codes as final failures.
+- Changes made:
+  - Rebuilt `src/components/payment-resume-watcher.tsx`.
+  - It now treats any `pickleball://...` return as a payment resume signal.
+  - It retries verification longer: 20 attempts x 1.5s.
+  - It clears pending payment only on confirmed paid, old expired pending, or definitive failure.
+  - It keeps pending payment on delayed/network/temporary Toss states and suppresses repeated delayed notices per order during the app session.
+  - It logs `[payment-resume] verify` in dev builds with `paid`, `pending`, `code`, `error`, and `lookStatus`.
+  - Updated `supabase/functions/pay-verify/index.ts` retryable Toss codes:
+    - `NOT_FOUND_PAYMENT`
+    - `NOT_FOUND_PAYMENT_SESSION`
+    - `ALREADY_PROCESSED_PAYMENT`
+    - `IDEMPOTENT_REQUEST_PROCESSING`
+    - `FORBIDDEN_CONSECUTIVE_REQUEST`
+    - `FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING`
+    - `FAILED_INTERNAL_SYSTEM_PROCESSING`
+    - `UNKNOWN_PAYMENT_ERROR`
+    - `COMMON_ERROR`
+- Verification:
+  - App `npx.cmd tsc --noEmit` passed.
+  - Web-admin `npx.cmd tsc --noEmit` passed.
+  - App `npx.cmd expo lint` passed.
+- Important next test:
+  - Run Metro and test TossPay again.
+  - Watch Metro logs for `[payment-resume] verify`.
+  - If Toss still returns home without reservation, capture the logged `code/lookStatus/error`.
+- No app build, EAS submit, Vercel deployment, Edge Function deployment, or production DB work was run.
+
+2026-08-12 BC Paybooc/TossPay WebView intent analysis:
+
+- User reported: KakaoPay works, but BC Paybooc and TossPay do not.
+- Analysis:
+  - This points more to WebView app-to-app launch handling than to only Toss status verification.
+  - Toss docs show mobile WebView can emit intent URLs in forms such as `intent://...#Intent...` and `intent:appScheme://...#Intent...`.
+  - Existing `src/app/payment/webview.tsx` only treated `intent://` as an Android intent. `intent:...` could fall through to `Linking.openURL('intent:...')` and fail silently.
+- Changes made:
+  - Added `isAndroidIntentUrl()` to handle both `intent://...` and `intent:...`.
+  - Updated Android external opener and WebView request interception to use the broader intent matcher.
+  - Added dev-only `[payment-webview] intent` logs containing packageName, dataUri, fallbackUrl, and raw URL.
+  - Added missing official Toss WebView scheme `citicardappkr` to `app.config.js`.
+- Verification:
+  - App `npx.cmd tsc --noEmit` passed.
+  - App `npx.cmd expo lint` passed.
+- Important:
+  - `src/app/payment/webview.tsx` JS changes can be tested with Metro reload.
+  - `app.config.js` native scheme/query changes require a fresh development/production build install.
+- No app build, EAS submit, Vercel deployment, Edge Function deployment, or production DB work was run.
+
+2026-08-12 Android dev-pay rebuild for payment app schemes:
+
+- User requested a rebuild after Toss/BC Paybooc WebView intent handling and payment app scheme changes.
+- Pre-build validation:
+  - App `npx.cmd tsc --noEmit` passed.
+  - App `npx.cmd expo lint` passed.
+- Build:
+  - Command: `npx.cmd eas-cli build -p android --profile dev-pay --non-interactive`
+  - Platform: Android
+  - Profile: `dev-pay`
+  - Distribution: internal
+  - Channel: `dev-pay`
+  - Build ID: `b8c60025-7720-4a5f-bf0b-c5f8594ed0d0`
+  - Version: `2.0.0`
+  - Version code: `10`
+  - Status: finished
+  - Logs: https://expo.dev/accounts/yoonsik2/projects/pickleball/builds/b8c60025-7720-4a5f-bf0b-c5f8594ed0d0
+  - APK: https://expo.dev/artifacts/eas/yxI4Z-kxHosN_xYZRRYl2YY_qwiJj6-NyAAhN8Up2_I.apk
+- Purpose:
+  - Includes native scheme/query updates from `app.config.js`.
+  - Use this APK to retest BC Paybooc/ISP and TossPay app-to-app launch/return.
+- No EAS submit, Vercel deployment, Edge Function deployment, or production DB work was run.
+
+2026-08-11 Toss Payments reservation confirmation fix:
+
+- Context:
+  - Android development client + Metro live test is in progress.
+  - User reported TossPay payment itself completes, but the court reservation does not appear to be confirmed afterward.
+- App-side fix in `src/app/payment/webview.tsx`:
+  - Payment return URL detection now parses URL origin/path instead of relying on `startsWith(successUrl/failUrl)`, so Toss return URLs with additional query params are caught reliably.
+  - Removed WebView unmount cleanup that released held reservations before server verification could finish during app-to-app payment return.
+  - Added retry-based `pay-verify` handling for pending Toss propagation states.
+  - On paid result, the app clears pending payment, dismisses payment screens, and navigates to `/court/reservations`.
+  - On pending result, the app moves to reservations with a “payment checking” alert instead of immediately failing/canceling.
+- Existing server flow checked:
+  - `supabase/functions/pay-verify/index.ts` confirms Toss payment by `order_id`, calls `ensureCourtReservation`, then marks `payments.status = paid`.
+  - `PaymentResumeWatcher` also verifies pending payment on foreground as a fallback.
+- Verification:
+  - Root `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+- Notes:
+  - No native rebuild is required for this JS-only app-side fix while testing in the installed dev client.
+  - Reload Metro/dev client before retesting.
+  - No production deployment, EAS submit, or production DB change was run in this step.
+
+2026-08-11 KakaoPay app-open fallback fix:
+
+- Context:
+  - During Toss Payments KakaoPay test, the Toss page showed “카카오페이를 열어주세요 / 눌러서 열기”.
+  - Pressing the button opened Google Play’s KakaoTalk listing even though KakaoTalk was already installed.
+- App-side fix in `src/app/payment/webview.tsx`:
+  - Added Android `intent://...#Intent` parsing.
+  - For intent URLs with `package=com.kakao.talk`, the app now first tries `SendIntentAndroid.openAppWithData(packageName, dataUri)` to launch KakaoTalk directly.
+  - Chrome-intent fallback remains as a secondary path.
+  - If the fallback URL points to Google Play, the app no longer immediately opens the store after all direct app-open attempts fail; it shows a payment-app launch failure alert instead.
+- Verification:
+  - Root `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+- Notes:
+  - This is JS-side behavior and can be tested with the installed dev client after Metro reload.
+  - No production deployment, EAS submit, production DB change, or app rebuild was run.
+
+2026-08-11 Toss payment duplicate failure toast fix:
+
+- Context:
+  - User showed the reservation list after payment where a red toast said `결제 실패 — Failed to send a request to the Edge Function`, while a green toast also said the reservation/payment completed.
+  - This means the reservation was created, but one payment verification request failed transiently during WebView/app return timing.
+- App-side fix:
+  - `src/app/payment/webview.tsx`
+    - `verifyPayment()` now treats `supabase.functions.invoke('pay-verify')` transport/network errors as retryable/pending, not immediate payment failure.
+    - After retries, it returns pending instead of showing a scary failure toast.
+  - `src/app/payment/success.tsx`
+    - Edge Function transport errors now retry and then show “confirmation delayed” copy instead of “payment confirmation failed”.
+- Verification:
+  - Root `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+- Notes:
+  - JS-only fix: dev client reload is enough for testing.
+  - No production deployment, EAS submit, production DB change, or app rebuild was run.
+
+2026-08-11 TossPay foreground return verification fix:
+
+- Context:
+  - User confirmed KakaoPay can now complete, but payment status messages still felt noisy.
+  - TossPay completed fingerprint authentication but returned directly to the app home screen without obvious success verification.
+- App-side fix in `src/components/payment-resume-watcher.tsx`:
+  - The foreground/resume watcher now actively verifies a pending payment when the app becomes active, even if the Toss success deep link/web return page is not reached.
+  - It shows a single “결제 확인 중” notice per order, retries `pay-verify` up to 8 times with delay, and navigates to `/court/reservations` on paid result.
+  - If Toss/Supabase propagation is delayed after all retries, it still routes to reservations with a softer “confirmation delayed” notice instead of leaving the user on home.
+  - If the payment is definitively not pending, pending payment storage is cleared to avoid repeated checks/toasts.
+- Verification:
+  - Root `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+- Notes:
+  - JS-only fix: dev client reload is enough for testing.
+  - No production deployment, EAS submit, production DB change, or app rebuild was run.
+
+2026-08-11 pending payment repeated delayed-toast fix:
+
+- Context:
+  - User reported the `결제 확인 중 - 결제 반영이 지연되고 있어요...` toast kept appearing on the reservation screen.
+  - Cause: after foreground payment verification exhausted retries, pending payment storage was left in place, so the watcher retried and showed the delayed notice again on later active checks.
+- App-side fix in `src/components/payment-resume-watcher.tsx`:
+  - Removed the early “결제 결과를 확인하고 있어요” toast to reduce noisy payment feedback.
+  - When retries are exhausted and the app routes to reservations with the delayed notice, it now clears pending payment storage so the same toast does not repeat.
+- Verification:
+  - Root `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+- Notes:
+  - JS-only fix: dev client reload is enough for testing.
+  - No production deployment, EAS submit, production DB change, or app rebuild was run.
+
+2026-08-12 Toss return URL / appScheme fallback hardening:
+
+- Context:
+  - User suspected Toss return URL is wrong because TossPay fingerprint authentication returns directly to the app home screen without an obvious payment success verification flow.
+- Findings:
+  - Toss docs describe `card.appScheme` as a plain app scheme like `testapp://`; some mobile payment flows may return to this scheme directly rather than the web `successUrl` route.
+  - Existing deep links used `pickleball://payment/success`, which can be interpreted with `payment` as the host. To make the app route path explicit, app return URLs now use `pickleball:///payment/success` and `pickleball:///payment/fail`.
+- App-side fixes:
+  - `src/app/payment/method.tsx`
+    - Saves pending payment immediately when the user presses the payment button, before WebView/external payment app launch.
+  - `src/components/payment-resume-watcher.tsx`
+    - Adds `Linking` URL listener and initial URL check.
+    - If the app receives `pickleball://`, `pickleball:///payment/success`, or `pickleball:///payment/fail`, it verifies any pending payment even if Expo Router lands on home.
+  - `src/app/payment/success.tsx`
+    - Falls back to saved pending payment orderId if Toss/app deep link does not include `orderId`.
+  - `src/app/payment/webview.tsx`
+    - Uses triple-slash explicit route redirects in `successUrl`/`failUrl`.
+- Web-admin alignment:
+  - `web-admin/app/payment/success/page.tsx` and `fail/page.tsx` default redirect values also changed to triple-slash routes.
+- Verification:
+  - Root `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+- Notes:
+  - No production deployment, EAS submit, production DB change, or app rebuild was run.
+  - App-side changes are JS-only and can be tested after dev-client reload.
+
+2026-08-05 home court reservation navigation/header fix:
+
+- User reported that tapping `코트 예약` `더 보기` from Home opened a screen with duplicate headers and no bottom tab menu.
+- Fixed the Home entry route:
+  - `src/app/(tabs)/index.tsx`
+  - `코트 예약` `더 보기` now navigates to `/(tabs)/court` instead of the root-stack `/court` route, preserving the bottom tab menu.
+- Hardened the court list screen against duplicate native headers:
+  - `src/app/court/index.tsx`
+  - Sets `Stack.Screen` `headerShown: false` because the screen already renders its own `코트예약` title/action row.
+- Fixed the empty reservations CTA:
+  - `src/app/court/reservations.tsx`
+  - `코트 예약하러 가기` now returns to `/(tabs)/court` so users land back in the tabbed court screen.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-05 Toss KakaoPay Android intent return hardening:
+
+- User reported KakaoPay still returns to KakaoTalk after payment.
+- Further hardened the Toss web relay pages:
+  - `web-admin/app/payment/success/page.tsx`
+  - `web-admin/app/payment/fail/page.tsx`
+- Android browsers/KakaoTalk now open P!NUT through an explicit intent URL:
+  - `intent://payment/success...#Intent;scheme=pickleball;package=com.pinut.app;end`
+  - `intent://payment/fail...#Intent;scheme=pickleball;package=com.pinut.app;end`
+- iOS and non-Android browsers keep using the normal deep link:
+  - `pickleball://payment/success`
+  - `pickleball://payment/fail`
+- The manual `피넛 앱으로 돌아가기` button uses the same platform-specific return URL.
+- Verification:
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Important:
+  - This web relay change must be deployed to `pinut.org` before the real KakaoPay flow can reflect it.
+  - No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-05 Toss KakaoPay app return hardening:
+
+- User reported KakaoPay payment succeeds, but tapping the KakaoTalk `direct move` button keeps returning to KakaoTalk instead of P!NUT.
+- Updated native payment WebView return setup:
+  - `src/app/payment/webview.tsx`
+  - Normalizes `EXPO_PUBLIC_PAYMENT_APP_SCHEME` to a bare scheme name (`pickleball`) before passing it to Toss `card.appScheme`.
+  - Adds explicit `redirect=pickleball://payment/success|fail` to the web `successUrl` / `failUrl` relay URLs.
+- Updated Toss web relay pages:
+  - `web-admin/app/payment/success/page.tsx`
+  - `web-admin/app/payment/fail/page.tsx`
+  - Pages now auto-redirect back to the app after a short delay and also show a manual `피넛 앱으로 돌아가기` button for KakaoTalk/in-app-browser fallback cases.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+  - `web-admin` `npx.cmd tsc --noEmit` passed.
+  - `web-admin` `npm.cmd run lint` still fails on pre-existing unrelated React hook lint errors in `dupr-connect`, tournament team, and team-roster files; payment relay files introduced no type errors.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-05 boot screen peanut transparent asset fix:
+
+- User reported the loading peanut avatar still looked dirty because the mascot image itself had a square white background.
+- Created a non-destructive transparent-background variant:
+  - `assets/images/splash-peanut-cutout.png`
+  - Original `assets/images/splash-peanut.png` remains unchanged.
+- Updated `src/components/ui/boot-screen.tsx`:
+  - Boot screen now uses `splash-peanut-cutout.png`.
+  - The circular mascot shell/mask remains in place for a cleaner premium loading mark.
+- Verification:
+  - Confirmed the new PNG has transparent corner alpha.
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-04 boot screen peanut mascot mask fix:
+
+- User reported the loading screen peanut avatar looked messy because the image showed a square background.
+- Updated `src/components/ui/boot-screen.tsx`:
+  - Changed the mascot shell to a full circle.
+  - Added `overflow: 'hidden'` so the square image background is clipped.
+  - Increased the mascot image to fill the circular shell cleanly.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-04 Android transparent system navigation bar / edge-to-edge:
+
+- User wanted the Android system navigation bar at the very bottom to look transparent like KakaoTalk, not white or detached from the app theme.
+- Switched from the temporary `expo-navigation-bar` dark-style approach to `react-native-edge-to-edge`.
+- Updated `src/app/_layout.tsx`:
+  - Replaced global `expo-status-bar` / `expo-navigation-bar` handling with `<SystemBars style="light" />`.
+- Updated `app.json`:
+  - Added the `react-native-edge-to-edge` config plugin.
+  - Set `android.parentTheme` to `Default`.
+  - Set `android.enforceNavigationBarContrast` to `false` for a transparent navigation bar direction.
+- Cleaned up court-specific React Native `StatusBar` overrides because edge-to-edge manages system bars globally.
+- Dependency changes:
+  - Added `react-native-edge-to-edge`.
+  - Removed the temporary `expo-navigation-bar` dependency.
+- Important:
+  - This native configuration requires a new development/production build to fully show on Android devices.
+  - Plain `npx expo start` alone may not reflect the config-plugin portion until a rebuilt dev client/APK/AAB is installed.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+  - `app.json` parse passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-04 court reservation tab visible title fix:
+
+- User reported the Court Reservation tab did not visibly show `코트예약` in the top header area.
+- Updated `src/app/court/index.tsx`:
+  - Normalized the route title from `코트 예약` to `코트예약`.
+  - Added a visible in-screen `코트예약` title above the search/list-map controls because the bottom-tab layout hides the native header.
+  - Kept `내 예약` available as a right-side header action in the same visible top area.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-04 court map and reservation chrome fix:
+
+- Fixed the native court map selected-court card being hidden behind the attached bottom tab bar.
+  - `src/components/court-map.native.tsx`
+  - The card now uses a safe-area-aware bottom offset above the dark tab island.
+- Fixed white native top chrome on court reservation flows.
+  - `src/app/court/[id].tsx`
+  - `src/app/court/reservations.tsx`
+  - Stack headers now use the app dark background, light title/back icon, and no header shadow.
+  - Android status bar now uses the app dark background/light content on these screens.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-03 app icon simplified to P!:
+
+- User confirmed the app icon should use only the compact `P!` symbol.
+- Regenerated icon assets with a centered `P!` mark:
+  - `assets/images/icon.png` — 1024 x 1024, iOS/Expo app icon
+  - `assets/images/play-store-icon.png` — 512 x 512, Play Console icon
+  - `assets/images/favicon.png` — 256 x 256
+  - `assets/images/app-icon-128.png` — 128 x 128
+  - `assets/images/android-icon-background.png` — 512 x 512 adaptive icon background
+  - `assets/images/android-icon-foreground.png` — 1024 x 1024 adaptive icon foreground
+  - `assets/images/android-icon-monochrome.png` — 432 x 432 monochrome icon
+  - `web-admin/app/icon.png`
+  - `web-admin/app/favicon.ico`
+- Design direction:
+  - App icon = `P!` only.
+  - Splash/loading/landing/store feature graphic = full `P!NUT` wordmark.
+- Verification:
+  - Confirmed generated asset dimensions.
+  - `app.json` JSON parse passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-12 payment reset / removal:
+
+- User decided to remove the current payment integration and rebuild it later from scratch.
+- Removed app-side payment runtime code:
+  - Deleted `src/lib/payments.ts`.
+  - Deleted `src/lib/pending-payment.ts`.
+  - Deleted payment routes under `src/app/payment/*`.
+  - Deleted `src/components/payment-resume-watcher.tsx`.
+  - Removed payment routes and the payment resume watcher from `src/app/_layout.tsx`.
+- Court reservation flow now creates reservations directly through `src/lib/court-reservations.ts`.
+  - Paid courts no longer open Toss / WebView / external payment apps.
+  - Reservation rows are inserted with `payment_id: null`.
+  - Button text now says reservation, not payment.
+- Removed web-admin payment pages:
+  - `web-admin/app/payment/checkout/page.tsx`
+  - `web-admin/app/payment/success/page.tsx`
+  - `web-admin/app/payment/fail/page.tsx`
+  - Removed the now-empty `web-admin/app/payment` directory.
+- Removed payment build/env wiring:
+  - Removed `EXPO_PUBLIC_PAYMENT_*` entries from `eas.json`.
+  - Removed `EXPO_PUBLIC_PAYMENT_*` entries from local `.env`.
+  - Removed the temporary `dev-pay` EAS profile.
+  - Removed native payment app scheme plugin logic from `app.config.js`.
+  - Removed `react-native-send-intent`.
+- Removed a stray iframe `allow="payment"` permission from DUPR connect.
+- Removed unused local payment table/function types from `src/lib/types.ts`.
+- Intentionally not changed:
+  - No production deployment.
+  - No EAS build or submit.
+  - No Supabase deploy.
+  - No DB/payment table drop or production data deletion. Existing DB schema/types still contain payment fields/tables for safety.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+
+2026-08-03 app icon black background refinement:
+
+- User preferred a black background for the `P!` app icon.
+- Regenerated the same icon asset set with a near-black premium background and centered `P!` mark:
+  - `assets/images/icon.png`
+  - `assets/images/play-store-icon.png`
+  - `assets/images/favicon.png`
+  - `assets/images/app-icon-128.png`
+  - `assets/images/android-icon-background.png`
+  - `assets/images/android-icon-foreground.png`
+  - `assets/images/android-icon-monochrome.png`
+  - `web-admin/app/icon.png`
+  - `web-admin/app/favicon.ico`
+- Direction remains:
+  - App icon = `P!` only, black background.
+  - Splash/loading/landing/store feature graphic = full `P!NUT` wordmark.
+- Verification:
+  - Confirmed generated asset dimensions.
+  - `app.json` JSON parse passed.
+- No app build, EAS submit, Vercel deployment, or production DB work was run.
+
+2026-08-12 Toss Payments rebuild started:
+
+- Rebuilt payment flow from scratch after the previous WebView/deep-link flow was removed.
+- Added the official Toss React Native SDK dependency:
+  - `@tosspayments/widget-sdk-react-native@1.5.2`
+  - Existing `react-native-webview@13.16.1` satisfies the SDK peer range.
+- App-side flow:
+  - Added `src/lib/payments.ts`.
+  - Added `src/app/payment/court.tsx`.
+  - Updated `src/app/court/[id].tsx` so free courts still reserve directly, while paid courts:
+    1. create a pending `payments` row,
+    2. create temporary reservation holds through `reserve_court_hold`,
+    3. open the Toss RN payment widget,
+    4. call the server confirmation function,
+    5. confirm reservations only after Toss confirm succeeds.
+- Server-side flow:
+  - Added `supabase/functions/toss-confirm/index.ts`.
+  - The function validates the caller, checks the stored payment row, calls Toss Core API `POST /v1/payments/confirm`, marks the payment as `paid`, and clears `court_reservations.expires_at` to finalize the reservation.
+  - On Toss confirm failure, the function marks payment `failed` and deletes held reservations.
+- Config:
+  - Added Android `manifestQueries` payment-app schemes in `app.config.js` via `expo-build-properties`.
+  - Added iOS `LSApplicationQueriesSchemes` payment-app schemes in `app.config.js`.
+  - Toss `requestPayment` uses `appScheme: "pickleball://"` so external payment apps can return to P!NUT.
+  - Added `EXPO_PUBLIC_TOSS_CLIENT_KEY` placeholder to `.env.example`.
+  - Local `.env` already contains the public Toss client key; do not commit real keys.
+  - Dev Supabase project `pjfhxkvdjipvdmfsacie` already has `TOSS_SECRET_KEY` secret set.
+- Deployment:
+  - Deployed `toss-confirm` only to dev Supabase project `pjfhxkvdjipvdmfsacie`.
+  - Did not deploy to production Supabase.
+  - Did not run Vercel production deploy.
+  - Did not run EAS build or App Store / Play Store submit.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+  - `npx.cmd expo config --type public` passed and showed Android manifest queries.
+- Next test note:
+  - Because a native payment SDK was added, a new development build is required before real-device testing.
+  - Test with KakaoPay, TossPay, Paybook, and card. Confirm that reservation appears only after the Toss confirmation call succeeds.
+
+2026-08-12 Toss payment screen safe-area fix:
+
+- User reported the new Toss payment screen looked smeared/overlapped at the top and bottom on Android.
+- Fixed `src/app/payment/court.tsx` layout:
+  - Safe area now includes top and bottom edges.
+  - Removed absolute positioning from the bottom payment action bar.
+  - Added bottom safe-area padding to keep the payment button above the Android navigation bar.
+  - Reduced scroll content bottom padding now that the action bar is part of layout flow.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+
+2026-08-12 Toss payment callback/API confirm fix:
+
+- User reported that the Toss confirm API did not appear to be sent after payment testing.
+- Confirmed local `.env` points to dev Supabase project `pjfhxkvdjipvdmfsacie` and the app has a Toss test client key.
+- Root cause found in the new RN SDK flow:
+  - `src/app/payment/court.tsx` only called `confirmTossPayment()` when `requestPayment()` returned `result.success`.
+  - For external payment apps such as TossPay/Paybook, the app can return through the app scheme before the Promise path finishes, causing the payment screen to close or return home without sending the confirm API.
+- App fixes:
+  - Added `src/app/payment/callback.tsx`.
+  - Changed Toss `requestPayment` `appScheme` from root `pickleball://` to `Linking.createURL('payment/callback')`.
+  - The callback route parses Toss return params (`url`, `paymentKey`, `orderId`, `amount`) and calls `confirmTossPayment()`.
+  - Added payment debug logs:
+    - `[payment] request start`
+    - `[payment] request result`
+    - `[payment] confirm start`
+    - `[payment] callback confirm start`
+  - Registered `payment/court` and `payment/callback` in `src/app/_layout.tsx`.
+- Edge Function fixes:
+  - Updated `supabase/functions/toss-confirm/index.ts` so `paymentId` is optional.
+  - The function can now find the pending `payments` row by `orderId` + authenticated user.
+  - If `paymentKey` is missing, it attempts Toss order lookup with `GET /v1/payments/orders/{orderId}` before confirming/finalizing.
+- Deployment:
+  - Deployed `toss-confirm` only to dev Supabase project `pjfhxkvdjipvdmfsacie`.
+  - Did not deploy to production Supabase.
+  - Did not run Vercel production deploy.
+  - Did not run EAS build or App Store / Play Store submit.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Metro reload should be enough if the installed development build already contains the Toss RN SDK and `pickleball` scheme.
+  - If the installed app predates the native SDK addition, rebuild/reinstall the development build.
+  - Retest TossPay and Paybook. On return, expected path is payment callback -> dev `toss-confirm` -> `court/reservations`.
+
+2026-08-12 Toss callback missing params follow-up:
+
+- User showed the new payment callback screen with the message that the app could not find the payment result.
+- Meaning:
+  - The app returned to `payment/callback`, but Toss/external payment app did not include `paymentKey/orderId/amount` or nested `url` params in the incoming link.
+  - Because `readTossResult()` required `paymentKey`, it displayed the fallback message and did not call `toss-confirm`.
+- App fix:
+  - `src/app/payment/court.tsx` now embeds our known `paymentId`, `orderId`, and `amount` into the callback URL passed as Toss `appScheme`.
+  - `src/app/payment/callback.tsx` now accepts `paymentId/orderId/amount` without `paymentKey` and calls `confirmTossPayment()`.
+  - Server `toss-confirm` already supports this path by finding the payment by orderId and trying Toss order lookup when paymentKey is missing.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Deployment:
+  - No production deploy.
+  - No new Edge Function deploy needed after this app-only callback parameter change.
+
+2026-08-12 Toss confirm non-2xx diagnostics:
+
+- User showed payment callback screen message: `Edge Function returned a non-2xx status code`.
+- Meaning:
+  - The app now calls the dev `toss-confirm` Edge Function.
+  - The Edge Function returned an HTTP error, but Supabase client only surfaced the generic FunctionsHttpError message.
+- App diagnostics added:
+  - `src/lib/payments.ts` now reads `FunctionsHttpError.context` when it is a `Response`, parses the JSON body, logs `[payment] confirm http error`, and throws the actual server `error/message`.
+  - `src/app/payment/callback.tsx` now logs `[payment] callback params` so the next test shows whether Toss/external payment returned `paymentKey`, `orderId`, `amount`, nested `url`, or only our fallback params.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Metro reload and retry.
+  - If screen still errors, read the visible message and Metro logs.
+  - Likely next distinction:
+    - `toss payment result missing`: callback had no `paymentKey`, and Toss order lookup could not find an approved payment.
+    - `toss confirm failed`: Toss confirm API rejected the `paymentKey/orderId/amount`.
+    - `payment not found` / `payment mismatch`: app callback params differ from local pending payment row.
+
+2026-08-12 Toss external app return correction:
+
+- User reported:
+  - Reservation appeared successful, but the Toss test payment history did not show the latest app payment.
+  - Toss API logs did not show a new confirm call for the current test.
+- Findings:
+  - Current app-generated order IDs are `court_...`.
+  - The Toss dashboard screenshots showed `ord_...` order IDs, which are from the older payment flow.
+  - Toss RN SDK docs define `appScheme` as the merchant app scheme such as `testapp://`, not a full in-app callback route.
+  - The previous callback-route experiment passed `pickleball://payment/callback?...` as `appScheme`, which can make external apps return into Expo Router instead of letting the Toss SDK modal finish its own success flow.
+- App fix:
+  - Replaced the payment screen `appScheme` with plain `pickleball://`.
+  - Kept final reservation confirmation strict: the app calls `confirmTossPayment()` only after `requestPayment()` returns `result.success.paymentKey/orderId/amount`.
+  - Restored readable Korean strings in `src/app/payment/court.tsx`.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload Metro and retry TossPay/Paybook.
+  - Expected Toss dashboard evidence: a new test payment row with order ID starting `court_...`.
+  - Expected app evidence: Metro logs should show `[payment] request result` followed by `[payment] confirm start`.
+  - If the app returns home without those logs, the installed dev build may need to be rebuilt/reinstalled because native app scheme handling is involved.
+
+2026-08-12 Toss API log check after missing test payment:
+
+- User showed Toss dashboard API logs and noted that API calls looked missing.
+- Current diagnosis:
+  - The dashboard rows still show older `ord_...` order IDs.
+  - The rebuilt app flow should create `court_...` order IDs from `src/lib/payments.ts`.
+  - If Toss test payment history/API logs do not show a fresh `court_...` row, the external payment app did not complete the Toss SDK success path for the current app flow.
+- App cleanup:
+  - Rewrote `src/app/payment/court.tsx` with readable Korean copy and plain `appScheme: 'pickleball://'`.
+  - Rewrote `src/app/payment/callback.tsx` with readable Korean copy and callback diagnostics.
+  - Confirm remains strict: no `result.success` from the Toss RN SDK means no `toss-confirm` call and no paid reservation finalization.
+- Verification:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload Metro and run a new payment.
+  - Success evidence should be:
+    - App log: `[payment] request result` with `success`.
+    - App log: `[payment] confirm start`.
+    - Toss dashboard: new test payment/API log with `court_...` order ID.
+  - If the app goes home without those logs, rebuild/reinstall the development build because native URL scheme handling may be stale.
+
+2026-08-13 Codex - Toss API individual payment window rebuild:
+
+- User decided to abandon the Toss React Native payment widget SDK and use the Toss standard payment window directly.
+- Removed the unused `@tosspayments/widget-sdk-react-native` dependency from `package.json` / `package-lock.json`.
+- Rebuilt `src/app/payment/court.tsx` as a WebView-hosted Toss JS v2 Standard Payment Window flow.
+  - Uses `https://js.tosspayments.com/v2/standard`.
+  - Calls `payment.requestPayment({ method: 'CARD', ... })` from a user tap inside the WebView.
+  - Uses `successUrl=https://pinut.org/payment/success` and `failUrl=https://pinut.org/payment/fail` only as redirect markers intercepted inside the app.
+  - Intercepts success/fail URLs, extracts `paymentKey/orderId/amount`, then calls the existing `toss-confirm` Edge Function through `confirmTossPayment()`.
+  - Handles Android `intent://` and custom payment-app URLs through `Linking.openURL()` with Play Store fallback for package targets.
+- Cleaned `src/app/payment/callback.tsx` Korean copy so fallback callback/error screens are readable.
+- Updated `src/lib/payments.ts` to treat only Toss API individual client keys as valid: `test_ck_` or `live_ck_`.
+  - This intentionally rejects the old docs/widget-style `test_gck...` key path so the app fails loudly if the wrong key family is configured.
+- Important key pairing:
+  - App env: `EXPO_PUBLIC_TOSS_CLIENT_KEY=test_ck_...` or `live_ck_...` from Toss API individual integration keys.
+  - Supabase Edge Function secret: `TOSS_SECRET_KEY=test_sk_...` or `live_sk_...` from the same API individual key set.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Not done:
+  - No production deployment.
+  - No EAS build/submit.
+  - No Supabase production deploy.
+- Follow-up:
+  - Restart Metro after env changes.
+  - If external payment app return behavior is stale on device, rebuild/reinstall a dev client because native app scheme handling may be cached in the installed app.
+  - If Toss dashboard still shows no test payment row, verify the app is using API individual `test_ck_...` and Edge Function uses matching `test_sk_...`, not docs keys.
+
+2026-08-13 Codex - Toss key setup verification:
+
+- User completed Toss key setup.
+- Verified local `.env` has `EXPO_PUBLIC_TOSS_CLIENT_KEY` with the expected API individual test client key prefix: `test_ck_`.
+- Verified core payment files exist:
+  - `src/app/payment/court.tsx`
+  - `src/lib/payments.ts`
+  - `supabase/functions/toss-confirm/index.ts`
+- Updated `.env.example` so future setup points to `test_ck_` / `live_ck_` instead of the old `test_gck` widget/docs key family.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Not done:
+  - No production deployment.
+  - No EAS build/submit.
+  - No Supabase production deploy.
+- Next test:
+  - Restart Metro after env changes.
+  - Test card first, then TossPay/KakaoPay.
+  - Confirm Toss dashboard shows a new test payment with `court_...` order ID and the app lands in `내 예약` only after `toss-confirm` succeeds.
+
+2026-08-13 Codex - Android development build started for Toss retest:
+
+- User requested a fresh build after rebuilding Toss payment without the RN widget SDK.
+- Started an Android EAS development build from branch `pinut-v2.0-dev`.
+- Build command:
+  - `EAS_NO_VCS=1 npx eas-cli build -p android --profile development --non-interactive --no-wait`
+- Build details:
+  - Build ID: `30131572-d6ff-46d9-b560-71384f92dbda`
+  - Platform: Android
+  - Profile: `development`
+  - Distribution: internal
+  - Channel: `development`
+  - App version: `2.0.0`
+  - Build version: `10`
+  - Logs: https://expo.dev/accounts/yoonsik2/projects/pickleball/builds/30131572-d6ff-46d9-b560-71384f92dbda
+- Status checks:
+  - Build uploaded successfully to EAS.
+  - Rechecked several times; latest status was still `IN_PROGRESS`.
+  - No APK artifact URL was available yet at handoff time.
+- Important:
+  - EAS output showed only `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID` from the EAS development environment and Supabase URL/anon key from `eas.json`.
+  - Local `.env` has `EXPO_PUBLIC_TOSS_CLIENT_KEY=test_ck_...`; for this development client, run Metro locally so the JS bundle uses the local env.
+  - If a standalone internal build is needed without Metro, add `EXPO_PUBLIC_TOSS_CLIENT_KEY` to the EAS development environment before rebuilding.
+- Not done:
+  - No production build.
+  - No store submit.
+  - No production deployment.
+
+2026-08-13 Codex - Toss payment entry UI refinement:
+
+- User reported the rebuilt Toss payment entry UI looked too rough.
+- Reworked `src/app/payment/court.tsx` WebView HTML UI:
+  - Removed fake payment-method selection buttons from the pre-payment screen.
+  - Changed the screen to a premium dark P!NUT-styled order summary and "open Toss payment window" flow.
+  - Shows amount, order summary, shortened order ID, pending approval status, two-step explanation, and one primary CTA.
+  - Cleaned broken Korean strings in the payment route again.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Build status update:
+  - Previous Android development build `30131572-d6ff-46d9-b560-71384f92dbda` finished.
+  - APK: https://expo.dev/artifacts/eas/5Q3sog20-MtaizcvTlDaDdaeqR53vCAEdwye4icRBAg.apk
+  - This UI change happened after the EAS build completed, but it is a JS/WebView HTML change and will apply through Metro reload in the development client.
+- Not done:
+  - No new EAS build after this UI-only change.
+  - No production deployment.
+
+2026-08-13 Codex - TossPay failure diagnosis and direct-flow fix:
+
+- User reported TossPay still fails/returns incorrectly while KakaoPay behaves better.
+- Diagnosis from `src/app/payment/court.tsx`:
+  - The screen was using Toss Standard Payment Window with `card.flowMode: 'DEFAULT'`.
+  - In Toss docs, a specific easy-pay provider should be invoked with `card.flowMode: 'DIRECT'` and `card.easyPay`, so TossPay was not being called as a direct TossPay flow.
+  - `card.appScheme` was passed as `pickleball://`; changed to the plain scheme value `pickleball`, which is the expected app scheme format for payment app return.
+  - The file had mojibake/broken Korean strings in the embedded WebView HTML and route alerts.
+- Changes:
+  - Replaced `src/app/payment/court.tsx` with a clean payment route.
+  - Kept the default Toss payment-window CTA.
+  - Added a separate "토스페이로 바로 결제" CTA that calls `requestPayment` with:
+    - `method: 'CARD'`
+    - `card.flowMode: 'DIRECT'`
+    - `card.easyPay: 'TOSSPAY'`
+    - `card.appScheme: 'pickleball'`
+  - Added `onOpenWindow` handling in the WebView to catch payment app/new-window URLs and pass them to the same external app opener or success/fail handler.
+  - Broadened success/fail URL detection so returned URLs with Toss success params can still be confirmed.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - In the current development client, reload Metro and test the new "토스페이로 바로 결제" button first.
+  - Expected success path: Toss app/payment screen -> return to P!NUT payment route -> `toss-confirm` Edge Function -> reservation confirmed -> `/court/reservations`.
+  - If it still returns to app home, capture the exact screen/URL transition and check whether `onOpenWindow` or `incoming url` logs appear in Metro.
+
+2026-08-13 Codex - Toss retAppScheme validation fix:
+
+- User tested TossPay direct flow and Toss payment screen showed:
+  - `retAppScheme=pickleball ... 유효하지 않습니다`
+- Root cause:
+  - Toss JS SDK docs specify `appScheme` in app URL form such as `testapp://`.
+  - The previous fix changed it to plain `pickleball`, which is the Expo config scheme but not the Toss `appScheme` request value.
+- Change:
+  - Updated `src/app/payment/court.tsx`:
+    - `APP_SCHEME = 'pickleball://'`
+    - `APP_URL_PREFIX = APP_SCHEME`
+  - App config remains `"scheme": "pickleball"` in `app.json`.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload the development client/Metro bundle.
+  - Try "토스페이로 바로 결제" again.
+  - If TossPay still fails, the next useful signal is the exact Toss screen message or Metro log lines containing `[payment] api-window`.
+
+2026-08-13 Codex - TossPay post-auth return-to-home fix:
+
+- User reported:
+  - TossPay opens normally.
+  - Fingerprint authentication completes.
+  - App returns, but lands on the app/home instead of confirming payment.
+- Diagnosis:
+  - Toss mobile payment apps can return to the merchant app with an app-scheme URL like `pickleball://?url={paymentRedirectUrl}`.
+  - The payment WebView only caught WebView navigation URLs, so an app-level deep link could be handled by Expo Router as a root URL and send the user to home.
+- Changes:
+  - Added app-level payment redirect interception in `src/app/_layout.tsx`.
+    - Detects `pickleball://` URLs with nested `url` query.
+    - If nested URL is `/payment/success`, `/payment/fail`, or contains Toss result params, routes to `/payment/callback?url=...`.
+  - Added a `Linking.addEventListener('url', ...)` listener inside `src/app/payment/court.tsx` as an extra guard while the payment screen is mounted.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload Metro/development client.
+  - Run TossPay fingerprint auth again.
+  - Expected: return to payment callback -> `toss-confirm` -> reservation confirmed.
+  - If it still lands on home, check Metro logs for `[payment] initial redirect read failed`, `[payment] api-window incoming url`, or whether any `pickleball://?url=` event is emitted.
+
+2026-08-18 Codex - Refund policy page for Toss Payments review:
+
+- User decided to create a simple refund/cancellation policy before continuing payment integration.
+- Added public page:
+  - `web-admin/app/refund-policy/page.tsx`
+  - Intended URL after deployment: `https://pinut.org/refund-policy`
+- Policy content covers:
+  - Scope: court reservations, tournament/event applications, and other paid services.
+  - Court refund rule:
+    - Full refund until 24 hours before reservation start.
+    - Refund may be limited within 24 hours depending on court policy.
+    - No refund after reservation time/no-show.
+    - Full refund when use is impossible due to court/operator fault, force majeure, or facility issue.
+  - Tournament/event refund rule:
+    - Full refund before application close.
+    - Refund may be limited after close due to bracket/operation preparation.
+    - Full refund if event is canceled by the operator.
+  - Refund method/timing: refund to original payment method, usually 3-7 business days depending on payment provider/card issuer.
+  - Business info and contact email.
+- Added landing footer links:
+  - `환불 및 취소 정책` -> `/refund-policy`
+  - `계정 삭제 안내` -> `/account-delete`
+- Validation notes:
+  - `npm.cmd run build` in `web-admin` failed because this environment could not fetch Google Fonts (`Geist`, `Geist Mono`) through `next/font`.
+  - `npm.cmd run lint` failed on pre-existing unrelated React hook lint errors in `web-admin/app/dupr-connect/page.tsx`, `web-admin/app/tournaments/[id]/team/page.tsx`, and `web-admin/components/team-roster.tsx`.
+  - `npx.cmd tsc --noEmit` failed due stale `.next/dev/types/validator.ts` references to deleted old payment pages (`app/payment/checkout`, `fail`, `success`).
+- Not done:
+  - Production deployment completed later in this session; see the entry below.
+
+2026-08-18 Codex - Vercel production deploy for refund policy:
+
+- User explicitly asked to deploy after the refund policy page was added.
+- Vercel CLI initially failed with `Not authorized` because the deployment needed the project scope.
+- Confirmed project scope:
+  - `troyyoonsikshin-2301s-projects`
+  - project: `web-admin`
+  - production domain: `https://pinut.org`
+- Deployed with the correct scope to production.
+- Deployment:
+  - ID: `dpl_F6cfLxGAhfdKphmQFZ7MVmf7jgsS`
+  - Vercel URL: `https://web-admin-2qtppzirl-troyyoonsikshin-2301s-projects.vercel.app`
+  - Aliased domain: `https://pinut.org`
+  - Status: `READY`
+- Verified:
+  - `https://pinut.org/refund-policy` responds successfully.
+  - Page title is `환불 및 취소 정책 | 피넛`.
+  - Business info and refund policy content are present in the deployed HTML.
+- Reminder:
+  - Do not run production deploys unless the user explicitly asks.
+
+2026-08-18 Codex - Toss Payments redirect/confirm rebuild:
+
+- Goal:
+  - Finish the Toss Payments integration after the previous payment logic was removed/rebuilt.
+  - Keep the app using Toss Payments payment-window redirect flow, not the widget SDK.
+- Docs checked:
+  - Expo SDK 56 docs before Expo/RN work.
+  - Toss Payments official payment-window integration docs.
+  - Toss Payments JS SDK docs: mobile must use redirect flow; Promise flow is not supported on mobile.
+- App changes:
+  - `src/app/payment/callback.tsx`
+    - Accepts direct Toss return params and wrapped `url=` params.
+    - Accepts `orderId + amount` even if `paymentKey` is missing, because the server can look up the Toss order.
+    - Handles fail returns by canceling the pending payment hold when `paymentId` is present.
+    - On successful confirmation, moves user to `/court/reservations`.
+  - `src/lib/payments.ts`
+    - Current payment flow is Toss-only for paid court reservations.
+    - Creates pending payment row, reserves court slots with `reserve_court_hold`, then sends the user to the payment screen.
+- Edge Function changes:
+  - `supabase/functions/toss-confirm/index.ts`
+    - Confirmation is now more idempotent.
+    - If local payment is already `paid`, it returns the linked reservation ids instead of failing.
+    - Looks up Toss order by `orderId` before trying confirm.
+    - If Toss already says `DONE`, it skips duplicate confirm and updates local payment/reservation state.
+    - Checks amount mismatch before marking paid.
+- Web return route changes:
+  - Added `web-admin/app/payment/return-client.tsx`.
+  - Added/updated:
+    - `web-admin/app/payment/success/page.tsx`
+    - `web-admin/app/payment/fail/page.tsx`
+  - These pages redirect external browser/payment app returns back to:
+    - `pickleball://payment/callback?...`
+  - This fixes the problem where `https://pinut.org/payment/success` or `/fail` could land on a web page/404 and never return cleanly to the app.
+- Web build fix:
+  - Removed `next/font/google` Geist dependency from `web-admin/app/layout.tsx`.
+  - Switched `web-admin/app/globals.css` to system font stack.
+  - Reason: local build environment could not fetch Google Fonts, causing unrelated build failures.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+  - `npm.cmd run build` in `web-admin` passed.
+- Not deployed:
+  - No Vercel production deployment was run in this step.
+  - No Supabase Edge Function deployment was run in this step.
+- Required before real phone test:
+  - Deploy `toss-confirm` Edge Function to the target Supabase project.
+  - Deploy `web-admin` to production so `https://pinut.org/payment/success` and `/payment/fail` exist.
+  - User previously instructed: do not run production deployments unless explicitly asked.
+- Suggested test path after deployment:
+  - Start from court reservation payment.
+  - Test card, KakaoPay, TossPay, NaverPay separately.
+  - Expected result:
+    - Payment app/browser returns to `pinut.org/payment/success`.
+    - Web page opens `pickleball://payment/callback`.
+    - App calls `toss-confirm`.
+    - Payment becomes `paid`.
+    - Court reservation hold becomes confirmed with `expires_at = null`.
+
+2026-08-18 Codex - Payment deploy completed:
+
+- User explicitly requested both deployments.
+- Supabase Edge Function deployment:
+  - Function: `toss-confirm`
+  - Project ref: `pjfhxkvdjipvdmfsacie` (test project; current app `.env` points here)
+  - Result: deployed successfully.
+  - Dashboard: `https://supabase.com/dashboard/project/pjfhxkvdjipvdmfsacie/functions`
+- Vercel production deployment:
+  - Project: `web-admin`
+  - Scope: `troyyoonsikshin-2301s-projects`
+  - Deployment ID: `dpl_5YjXa2MbF4VmFHtQAxqnhzCEMo93`
+  - Deployment URL: `https://web-admin-hss793gp3-troyyoonsikshin-2301s-projects.vercel.app`
+  - Aliases:
+    - `https://pinut.org`
+    - `https://admin.pinut.org`
+    - `https://web-admin-gamma-seven.vercel.app`
+    - `https://web-admin-troyyoonsikshin-2301s-projects.vercel.app`
+  - Status: `READY`
+- Verified:
+  - `https://pinut.org/payment/success?paymentId=test` returned HTTP 200.
+  - `https://pinut.org/payment/fail?paymentId=test` returned HTTP 200.
+- Next test:
+  - Use the current development app that points to `pjfhxkvdjipvdmfsacie`.
+  - Try court reservation payment again.
+  - If payment succeeds in Toss but app confirmation fails, check Supabase Function logs for `toss-confirm` and app logs around `payment/callback`.
+- Reminder:
+  - Production app/production Supabase Edge Function was not deployed unless separately requested.
+
+2026-08-18 Codex - TossPay bare app-scheme return fix:
+
+- User provided Metro logs:
+  - TossPay flow:
+    - Toss sandbox mobile URL loaded.
+    - Toss app intent opened with `scheme=supertoss`.
+    - App received only `pickleball://`.
+  - KakaoPay flow:
+    - KakaoPay web bridge URL loaded.
+    - KakaoTalk intent opened with `scheme=kakaotalk`.
+- Diagnosis:
+  - TossPay can return with a bare app scheme (`pickleball://`) before the final success/fail URL is available.
+  - The app treated that bare scheme like a normal Expo Router deep link, which could route to root/home and lose the payment screen state.
+- Changes:
+  - Added `src/lib/payment-return-state.ts`.
+    - Stores the active court payment route params in memory while the payment screen is mounted.
+    - Detects bare payment app returns: `pickleball://` and `pickleball:/`.
+  - Updated `src/app/payment/court.tsx`.
+    - Saves active payment params when the payment route is valid.
+    - Consumes bare `pickleball://` returns and keeps the user on the payment flow instead of treating them as success/fail.
+  - Updated `src/app/_layout.tsx`.
+    - If a bare `pickleball://` link is received and an active payment exists, routes back to `/payment/court` with the saved payment params.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload the development app and retry TossPay.
+  - Expected: after Toss fingerprint/auth returns with `pickleball://`, the app should remain/recover to the payment screen instead of going home.
+  - Continue watching for a later `https://pinut.org/payment/success?...` or Toss success params; that is what triggers final confirmation.
+
+2026-08-18 Codex - TossPay bare return now triggers server confirmation:
+
+- User retested and TossPay still only emitted:
+  - Toss sandbox mobile URL
+  - `intent://pay?...scheme=supertoss...`
+  - `pickleball://`
+- Diagnosis:
+  - The previous fix consumed/recovered the bare app-scheme return, but did not actually ask the server to verify the Toss order after that return.
+  - Since `toss-confirm` can now look up Toss payment state by `orderId`, the app can confirm after bare return even without `paymentKey`.
+- Change:
+  - Updated `src/app/payment/court.tsx`.
+  - Extracted confirmation into `confirmPaymentResult`.
+  - `confirmSuccess(url)` still uses Toss success params when they exist.
+  - Bare `pickleball://` now waits 1.2 seconds, then calls `confirmPaymentResult()` with current `paymentId/orderId/amount`.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload dev app and retry TossPay.
+  - Expected after `pickleball://`: app logs should show `[payment] api-window confirm start` and then Supabase `toss-confirm` should be invoked.
+  - If it fails, inspect the shown error and Supabase `toss-confirm` logs; likely causes are Toss order still not `DONE`, wrong Toss key pair, or test MID mismatch.
+
+2026-08-18 Codex - TossPay DIRECT disabled for DEFAULT comparison:
+
+- User asked to try TossPay through DEFAULT flow.
+- Change:
+  - Updated `src/app/payment/court.tsx` embedded Toss payment HTML.
+  - Removed the `DIRECT + easyPay: 'TOSSPAY'` request path from the secondary button.
+  - Both buttons now open Toss Payments with:
+    - `method: 'CARD'`
+    - `card.flowMode: 'DEFAULT'`
+    - `card.appScheme: 'pickleball://'`
+  - Secondary button label changed to `통합 결제창 다시 열기`.
+- Purpose:
+  - Let the user select TossPay inside the hosted/default Toss payment window, matching the more stable KakaoPay-style flow.
+  - Compare whether successUrl/paymentKey returns correctly when not using direct TossPay.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload the dev app.
+  - Open payment.
+  - Select TossPay inside the Toss integrated payment window.
+  - Compare logs against the old DIRECT flow.
+
+2026-08-19 Codex - Align court payment with Toss payment-window docs:
+
+- User provided Toss Payments "payment window" guide using:
+  - `TossPayments(clientKey)`
+  - `tossPayments.widgets({ customerKey })`
+  - `widgets.setAmount({ value, currency: 'KRW' })`
+  - `widgets.renderPaymentWindow({ variantKey: { paymentMethod: 'DEFAULT', agreement: 'AGREEMENT' } })`
+  - `paymentWindow.on('paymentRequest', ...)`
+  - `widgets.requestPayment({ orderId, orderName, successUrl, failUrl })`
+- Finding:
+  - Current app was not following that guide exactly.
+  - It was using API-style `tossPayments.payment(...).requestPayment({ method: 'CARD', card.flowMode: 'DEFAULT' })`.
+  - That could make wallet-specific behavior easier to expose in the app flow.
+- Changes:
+  - Updated `src/app/payment/court.tsx` embedded payment HTML to render a Toss payment window via `widgets`.
+  - Payment method selection is now delegated to Toss payment window instead of custom app buttons for each wallet.
+  - Kept a fallback basic payment request behind the same button after render, but main path is now widget render -> paymentRequest -> requestPayment.
+  - Updated `src/lib/payments.ts` so `EXPO_PUBLIC_TOSS_CLIENT_KEY` accepts both payment-window keys (`test_gck_` / `live_gck_`) and API keys (`test_ck_` / `live_ck_`) during transition.
+- Important:
+  - For the provided Toss guide, the app should use the order/payment-window client key (`test_gck_...`) in `EXPO_PUBLIC_TOSS_CLIENT_KEY`.
+  - The Supabase Edge Function secret `TOSS_SECRET_KEY` must be the matching order/payment-window secret key (`test_gsk_...`) from the same MID/key group.
+  - Mixing `test_ck_` with `test_gsk_`, or `test_gck_` with `test_sk_`, can cause Toss confirm errors such as unauthorized/forbidden/not found.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Not deployed:
+  - No Supabase Edge Function deploy.
+  - No production deploy.
+- Next test:
+  - Set `EXPO_PUBLIC_TOSS_CLIENT_KEY` to the Toss payment-window `test_gck_...` key.
+  - Set test Supabase `TOSS_SECRET_KEY` to the matching `test_gsk_...` key.
+  - Restart Metro and retry the court reservation payment.
+
+2026-08-19 Codex - Switch all court payment options to Toss direct payment windows:
+
+- User explicitly changed direction:
+  - Use Toss Payments "card company and easy-pay direct window" guide.
+  - Convert all payment methods to the direct-window/API individual integration style.
+- Important correction:
+  - Direct-window integration uses API individual keys:
+    - App: `EXPO_PUBLIC_TOSS_CLIENT_KEY=test_ck_...` or `live_ck_...`
+    - Supabase Edge Function: `TOSS_SECRET_KEY=test_sk_...` or `live_sk_...`
+  - The previous widget/payment-window `test_gck_...` / `test_gsk_...` direction is no longer the target for the app payment screen.
+- Changes:
+  - Updated `src/app/payment/court.tsx`.
+  - Removed the embedded `widgets.renderPaymentWindow()` flow.
+  - Restored `TossPayments(clientKey).payment({ customerKey }).requestPayment(...)`.
+  - Added direct-window method buttons:
+    - TossPay: `easyPay: '토스페이'`
+    - KakaoPay: `easyPay: '카카오페이'`
+    - NaverPay: `easyPay: '네이버페이'`
+    - PAYCO: `easyPay: '페이코'`
+    - Samsung Pay: `easyPay: '삼성페이'`
+    - Card: fallback `flowMode: 'DEFAULT'` because direct mode needs a specific card/easy-pay target.
+  - Direct easy-pay options use:
+    - `method: 'CARD'`
+    - `card.flowMode: 'DIRECT'`
+    - `card.easyPay`
+    - `card.appScheme: 'pickleball'`
+  - `appScheme` is intentionally the scheme name without `://` to avoid Toss `retAppScheme` validation errors.
+  - Updated `src/lib/payments.ts` so `isTossConfigured` only accepts `test_ck_` / `live_ck_` again.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Not deployed:
+  - No app build started.
+  - No Supabase Edge Function deploy.
+  - No production deploy.
+- Next test:
+  - Restart Metro if needed.
+  - Test TossPay first.
+  - If TossPay returns to the app and confirm fails, inspect the now-improved app alert/log body from `toss-confirm`.
+  - If a direct provider button fails before opening, confirm the exact `easyPay` string accepted by Toss SDK for that provider.
+
+2026-08-19 Codex - Make every visible payment option DIRECT only:
+
+- User corrected that every payment option must use Toss direct-window mode.
+- Change:
+  - Updated `src/app/payment/court.tsx`.
+  - Removed the generic "card payment" DEFAULT fallback button from the visible payment methods.
+  - Added card-company direct buttons instead:
+    - Hyundai Card: `cardCompany: '현대'`
+    - Samsung Card: `cardCompany: '삼성'`
+    - Shinhan Card: `cardCompany: '신한'`
+    - KB Kookmin Card: `cardCompany: '국민'`
+    - BC Card: `cardCompany: 'BC'`
+    - Lotte Card: `cardCompany: '롯데'`
+    - NH Card: `cardCompany: '농협'`
+  - Existing easy-pay buttons stay DIRECT:
+    - TossPay, KakaoPay, NaverPay, PAYCO, Samsung Pay.
+  - `getCardOptions()` now always returns `flowMode: 'DIRECT'`.
+  - `easyPay` is used for easy-pay buttons; `cardCompany` is used for card-company buttons.
+  - Restored `appScheme` to `pickleball://` to match Toss docs examples for mobile app return schemes.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Note:
+  - If a specific card company/easyPay value is rejected by Toss SDK, verify the exact provider code/string in Toss SDK docs or with Toss support.
+
+2026-08-19 Codex - Stop treating bare TossPay app return as payment completion:
+
+- User reported TossPay still returns incorrectly after fingerprint/auth.
+- Diagnosis:
+  - TossPay direct flow can emit only the app scheme URL (`pickleball://`) when returning from the Toss app.
+  - That URL is not a success or failure result; it is only an app foreground signal.
+  - Previous code handled bare `pickleball://` by routing back to `/payment/court` or by calling `toss-confirm` after 1.2s.
+  - That could interrupt the WebView before Toss redirects to the real `successUrl` with `paymentKey/orderId/amount`.
+- Changes:
+  - Updated `src/app/_layout.tsx`.
+    - Bare `pickleball://` is now consumed/no-op globally.
+    - It no longer calls `router.replace('/payment/court')`.
+  - Updated `src/app/payment/court.tsx`.
+    - Bare `pickleball://` no longer triggers `confirmPaymentResult()`.
+    - It now only updates status text and waits for the real success/fail URL.
+  - Final confirmation still only happens when:
+    - `https://pinut.org/payment/success?...paymentKey=...&orderId=...&amount=...` is received, or
+    - equivalent success query params are present.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Reload the dev app via Metro.
+  - Retry TossPay.
+  - Expected logs:
+    - Toss mobile URL
+    - Toss app intent
+    - bare `pickleball://`
+    - then eventually a real success/fail URL.
+  - If only bare `pickleball://` appears and no success/fail URL follows, the remaining issue is likely Toss direct-window WebView return behavior or the `appScheme` format expected by Toss.
+
+2026-08-19 Codex - Prevent Android back button from minimizing app on payment failure:
+
+- User reported:
+  - In Toss payment window, choose TossPay.
+  - TossPay fails/returns.
+  - Pressing the device back button minimizes/exits the app instead of returning to the app flow.
+- Change:
+  - Updated `src/app/payment/court.tsx`.
+  - Added Android `BackHandler` handling on the payment route.
+  - Hardware back is now consumed and calls `leavePayment()`.
+  - `leavePayment()` clears active payment return state, cancels the pending payment hold if payment is not completed, and routes to `/court`.
+  - Success path now marks payment as completed and clears active payment return state.
+  - Failure alert now routes to `/court` instead of `router.back()` to avoid app minimization when route history is shallow.
+  - Payment route cleanup now clears active payment return state.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Test:
+  - Metro reload is enough; no new native build required.
+  - Retry TossPay failure/return, then press Android back.
+  - Expected: app stays open and moves to court reservation screen.
+
+2026-08-19 Codex - Toss direct payment provider codes and auth debugging:
+
+- User reported:
+  - After tapping the in-app payment button, Toss Payments/TossPay does not show fingerprint authentication.
+- Diagnosis:
+  - TossPay biometric authentication should appear inside the Toss app, not inside the Toss Payments WebView.
+  - The first thing to verify is whether the payment WebView emits a Toss app intent and whether React Native actually opens it.
+  - Toss docs list direct-window easy-pay provider codes such as `TOSSPAY`, `KAKAOPAY`, `NAVERPAY`, `PAYCO`, `SAMSUNGPAY`; code values are safer than Korean display strings.
+- Changes:
+  - Updated `src/app/payment/court.tsx`.
+  - Payment buttons still display Korean labels, but now send official Toss provider/card codes:
+    - `easyPay: 'TOSSPAY'`
+    - `easyPay: 'KAKAOPAY'`
+    - `easyPay: 'NAVERPAY'`
+    - `easyPay: 'PAYCO'`
+    - `easyPay: 'SAMSUNGPAY'`
+    - `cardCompany: 'HYUNDAI'`
+    - `cardCompany: 'SAMSUNG'`
+    - `cardCompany: 'SHINHAN'`
+    - `cardCompany: 'KOOKMIN'`
+    - `cardCompany: 'BC'`
+    - `cardCompany: 'LOTTE'`
+    - `cardCompany: 'NONGHYEOP'`
+  - Added `PAYMENT_REQUEST_START` WebView message logging with selected mode/code/label and card options.
+  - Added `[payment] external app open` logging before `Linking.openURL()` so we can confirm the app URL/package being opened.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test:
+  - Metro reload is enough.
+  - Select TossPay, tap payment.
+  - Check Metro logs for:
+    - `[payment] api-window message {"type":"PAYMENT_REQUEST_START"... "mode":"easyPay:TOSSPAY"}`
+    - `[payment] api-window incoming url intent://pay?...package=viva.republica.toss...`
+    - `[payment] external app open ... appUrl: 'supertoss://pay?...'`
+ - If those logs appear but no biometric appears, the next suspected layer is Toss app/test account/test-payment behavior, not local request construction.
+
+2026-08-19 Codex - TossPay bare-return verification fallback:
+
+- User said the TossPay issue is still hard to identify.
+- Diagnosis:
+  - Some TossPay/app-to-app flows can return only the bare app scheme (`pickleball://`) before or instead of the final `successUrl`.
+  - Treating that bare scheme as success is unsafe, but doing nothing can leave the app waiting forever.
+  - The server can safely check Toss status by `orderId`; if Toss has not exposed the payment result yet, it should report `pending` rather than fail and delete the held reservation.
+- Changes:
+  - Updated `src/app/payment/court.tsx`.
+    - When `pickleball://` is received, the app now waits 2.5 seconds and calls `confirmPaymentResult()` with the current `paymentId/orderId/amount`.
+    - If a real success URL arrives first, the fallback does not duplicate confirmation.
+  - Updated `supabase/functions/toss-confirm/index.ts`.
+    - If Toss order lookup does not yet return a payment result and no `paymentKey` is available, returns `{ ok: false, pending: true }`.
+    - It no longer treats this transient state as a hard error.
+    - This avoids prematurely marking the local payment as `failed` or deleting held reservations while TossPay is still resolving.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Required before phone retest:
+  - Deploy `toss-confirm` to the test Supabase project (`pjfhxkvdjipvdmfsacie`).
+  - Metro reload is enough for the app-side JS change.
+- Expected TossPay behavior after deploy:
+  - App receives `pickleball://`.
+  - 2.5 seconds later logs `[payment] api-window confirm start`.
+  - If Toss order is `DONE`, reservation is confirmed.
+  - If Toss still has no result, app shows a waiting message instead of a hard failure.
+
+2026-08-19 Codex - Deployed toss-confirm fallback to test Supabase:
+
+- User asked Codex to deploy the function.
+- Deployment target:
+  - Supabase test project: `pjfhxkvdjipvdmfsacie`
+  - Function: `toss-confirm`
+- Result:
+  - Deployed successfully.
+  - Dashboard: `https://supabase.com/dashboard/project/pjfhxkvdjipvdmfsacie/functions`
+- Scope:
+  - Test Supabase only.
+  - Production Supabase was not touched.
+- Next test:
+  - Reload the development app via Metro.
+  - Retry TossPay.
+ - Watch Metro logs for:
+    - `mode":"easyPay:TOSSPAY"`
+    - `intent://pay?...package=viva.republica.toss...`
+    - `pickleball://`
+    - `[payment] api-window confirm start` roughly 2.5 seconds later.
+
+2026-08-19 Codex - Align direct-window values with Toss sample code:
+
+- User provided Toss sample code for direct payment window:
+  - `TossPayments(clientKey)`
+  - `tossPayments.payment({ customerKey })`
+  - `payment.requestPayment({ method: 'CARD', card: { flowMode: 'DIRECT', easyPay: '토스페이' } })`
+- Comparison result:
+  - App structure already matched the sample at the request level.
+  - Main mismatch was that the app had been changed to English provider/card codes such as `TOSSPAY`, while the sample uses Korean direct-window values such as `토스페이`.
+- Change:
+  - Updated `src/app/payment/court.tsx`.
+  - Reverted direct-window request values to match the provided Toss sample:
+    - `easyPay: '토스페이'`
+    - `easyPay: '카카오페이'`
+    - `easyPay: '네이버페이'`
+    - `easyPay: '페이코'`
+    - `easyPay: '삼성페이'`
+    - `cardCompany: '현대'`
+    - `cardCompany: '삼성'`
+    - `cardCompany: '신한'`
+    - `cardCompany: '국민'`
+    - `cardCompany: 'BC'`
+    - `cardCompany: '롯데'`
+    - `cardCompany: '농협'`
+- What remains intentionally different from the Toss browser sample:
+  - `card.appScheme: 'pickleball://'` is kept because this is a mobile app WebView/app-to-app flow.
+  - `successUrl/failUrl` use `https://pinut.org/payment/success|fail` with `paymentId` so the app can confirm the reservation.
+  - `customerKey` uses the app's authenticated user id instead of a sample static value.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Next test expectation:
+  - Metro reload is enough.
+  - TossPay request log should now show `mode":"easyPay:토스페이"`.
+
+2026-08-19 Codex - Remove appScheme from Toss direct-window card options:
+
+- User suspected sending `card.appScheme: 'pickleball://'` may be the reason TossPay returns only `pickleball://` instead of continuing to `successUrl`.
+- Official Toss docs say `appScheme` is used for returning from mobile ISP/external payment apps, but the current raw WebView + JS SDK flow repeatedly received a bare app scheme with no `paymentKey/orderId/amount`.
+- Change:
+  - Updated `src/app/payment/court.tsx`.
+  - Removed unconditional `appScheme: paymentInfo.appScheme` from `card` options in the direct-window request.
+- Expected retest signal:
+  - `PAYMENT_REQUEST_START` log should no longer include `appScheme` inside `card`.
+  - TossPay should ideally continue to `https://pinut.org/payment/success?...` instead of returning only `pickleball://`.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Deployment:
+  - No production deployment was performed.
+  - Metro reload should be enough for development testing.
+
+2026-08-19 Codex - Toss payment success conclusion:
+
+- User confirmed all payment methods now complete successfully after removing `card.appScheme` from the Toss direct-window request.
+- Root cause conclusion:
+  - Sending `card.appScheme: 'pickleball://'` caused TossPay to return a bare `pickleball://` instead of continuing to the final `successUrl` redirect.
+  - A bare `pickleball://` has no `paymentKey/orderId/amount`, so it must not be treated as payment success.
+- Keep this rule:
+  - Do not re-add `card.appScheme` to the Toss direct-window card options unless a future implementation uses the official SDK redirect handler end-to-end.
+  - Treat only `successUrl`/`failUrl` with Toss query params as payment result sources.
+- Current status:
+  - Payment success confirmed by the user.
+  - Remaining issue is cleanup/UX after completion: prevent WebView from showing leftover `ERR_NAME_NOT_RESOLVED`/undefined page after the payment has already succeeded, and route cleanly to reservations.
+- Deployment:
+  - No production deployment was performed by Codex in this step.
+
+2026-08-19 Codex - Clean payment completion UX after Toss success:
+
+- User confirmed Toss payment succeeds after removing `card.appScheme`.
+- UX issue:
+  - After success, the payment WebView could remain visible briefly and show leftover blank/error/undefined states before the app moved to reservations.
+- Change:
+  - Updated `src/app/payment/court.tsx`.
+  - Added a local `paymentFinished` completion state.
+  - Once `confirmTossPayment` succeeds:
+    - mark payment as completed,
+    - clear active payment return state,
+    - replace the WebView with a small completed state,
+    - route automatically to `/court/reservations` after a short delay.
+  - Block further WebView navigation after completion/exiting.
+  - Ignore empty or `undefined` WebView target URLs.
+  - Bare `pickleball://` returns are still treated only as an app-return signal, not payment success.
+  - Removed the unused `appScheme` payload from the embedded payment page data to avoid future confusion.
+- Validation:
+  - `npx.cmd tsc --noEmit` passed.
+  - `npx.cmd expo lint` passed.
+- Deployment:
+  - No production deployment was performed.

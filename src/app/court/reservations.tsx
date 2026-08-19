@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import type { CourtReservationWithCourt } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -44,11 +45,13 @@ export default function MyReservationsScreen() {
 
   const load = useCallback(async () => {
     if (!uid) return;
+    // 확정 예약만 표시한다.
     const { data } = await supabase
       .from('court_reservations')
       .select('*, courts(id,name,region,indoor,hourly_price)')
       .eq('user_id', uid)
       .eq('status', 'reserved')
+      .is('expires_at', null)
       .order('slot_date', { ascending: true })
       .order('hour', { ascending: true });
     setRows((data as unknown as CourtReservationWithCourt[]) ?? []);
@@ -110,10 +113,10 @@ export default function MyReservationsScreen() {
           </Text>
           <Text style={styles.meta}>{g.region || '지역 미설정'}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        <Ionicons name="chevron-forward" size={18} color={AppColors.textMuted} />
       </Pressable>
       <View style={styles.dateRow}>
-        <Ionicons name="calendar-outline" size={16} color="#16C784" />
+        <Ionicons name="calendar-outline" size={16} color={AppColors.primary} />
         <Text style={styles.dateText}>{fmtDate(g.date)}</Text>
         <Text style={styles.hoursText}>{g.hours.map((h) => `${h}시`).join(', ')}</Text>
       </View>
@@ -134,16 +137,23 @@ export default function MyReservationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <Stack.Screen options={{ title: '내 예약' }} />
+      <Stack.Screen
+        options={{
+          title: '내 예약',
+          headerStyle: { backgroundColor: AppColors.background },
+          headerTintColor: AppColors.textPrimary,
+          headerShadowVisible: false,
+        }}
+      />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : groups.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
+          <Ionicons name="calendar-outline" size={48} color={AppColors.textMuted} />
           <Text style={styles.emptyTitle}>예약 내역이 없어요</Text>
-          <Pressable onPress={() => router.replace('/court')} style={styles.goBtn}>
+          <Pressable onPress={() => router.replace('/(tabs)/court' as never)} style={styles.goBtn}>
             <Text style={styles.goText}>코트 예약하러 가기</Text>
           </Pressable>
         </View>
@@ -172,32 +182,32 @@ export default function MyReservationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: AppColors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: Spacing.four, gap: Spacing.three },
-  section: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 2 },
+  list: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 124 },
+  section: { fontSize: 15, fontWeight: '800', color: AppColors.textPrimary, marginBottom: 2 },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
     borderRadius: 18,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
   cardPast: { opacity: 0.6 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.three },
-  courtName: { fontSize: 17, fontWeight: '700', color: '#111827' },
-  meta: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#F1F3F5', paddingHorizontal: Spacing.three, paddingVertical: 10 },
-  dateText: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  hoursText: { fontSize: 13, color: '#6B7280', flex: 1 },
+  courtName: { fontSize: 17, fontWeight: '700', color: AppColors.textPrimary },
+  meta: { fontSize: 13, color: AppColors.textSecondary, marginTop: 2 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: AppColors.border, paddingHorizontal: Spacing.three, paddingVertical: 10 },
+  dateText: { fontSize: 14, fontWeight: '700', color: AppColors.textPrimary },
+  hoursText: { fontSize: 13, color: AppColors.textSecondary, flex: 1 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingBottom: Spacing.three },
-  total: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  doneBadge: { fontSize: 13, fontWeight: '700', color: '#9CA3AF' },
-  cancelBtn: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  total: { fontSize: 13, fontWeight: '600', color: AppColors.textSecondary },
+  doneBadge: { fontSize: 13, fontWeight: '700', color: AppColors.textMuted },
+  cancelBtn: { borderWidth: 1, borderColor: AppColors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   cancelText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: Spacing.four },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  goBtn: { marginTop: 8, borderRadius: 999, backgroundColor: '#16C784', paddingHorizontal: 20, paddingVertical: 12 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: AppColors.textPrimary },
+  goBtn: { marginTop: 8, borderRadius: 999, backgroundColor: AppColors.primary, paddingHorizontal: 20, paddingVertical: 12 },
   goText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

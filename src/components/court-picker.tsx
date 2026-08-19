@@ -40,12 +40,12 @@ export function CourtPicker({ value, onChange }: { value: PlaceValue; onChange: 
     <View style={styles.field}>
       <Text style={styles.label}>장소 (코트 검색)</Text>
       <View style={styles.inputRow}>
-        <Ionicons name="search" size={16} color="#9CA3AF" />
+        <Ionicons name="search" size={16} color="#707B87" />
         <TextInput
           value={value.name}
           onChangeText={onType}
           placeholder="코트 이름 검색 · 또는 직접 입력"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#707B87"
           style={styles.input}
           onFocus={() => value.name.trim().length >= 1 && results.length > 0 && setOpen(true)}
         />
@@ -74,7 +74,7 @@ export function CourtPicker({ value, onChange }: { value: PlaceValue; onChange: 
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  label: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  label: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -84,22 +84,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: '#10161D',
   },
-  input: { flex: 1, fontSize: 15, color: '#111827' },
+  input: { flex: 1, fontSize: 15, color: '#F8FAFC' },
   linkedHint: { fontSize: 12, color: '#16C784', fontWeight: '600' },
   dropdown: {
     borderRadius: 14,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: '#10161D',
     overflow: 'hidden',
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9' },
-  rowName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  rowSub: { fontSize: 12, color: '#6B7280', marginTop: 1 },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: '#DCFCE7' },
-  badgeText: { fontSize: 11, fontWeight: '700', color: '#0F8F5F' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.09)' },
+  rowName: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
+  rowSub: { fontSize: 12, color: '#AAB4C0', marginTop: 1 },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(22,199,132,0.14)' },
+  badgeText: { fontSize: 11, fontWeight: '700', color: '#16C784' },
 });

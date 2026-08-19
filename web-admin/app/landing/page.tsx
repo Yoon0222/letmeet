@@ -43,6 +43,14 @@ const downloadLinks = {
   android: '#download',
 };
 
+const businessInfo = {
+  name: process.env.NEXT_PUBLIC_BUSINESS_NAME ?? '피넛',
+  registrationNumber: process.env.NEXT_PUBLIC_BUSINESS_REGISTRATION_NUMBER ?? '221-14-95232',
+  representative: process.env.NEXT_PUBLIC_BUSINESS_REPRESENTATIVE ?? '신윤식',
+  address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS ?? '인천광역시 경인대로3, 1동 4층 401호(물류동)',
+  phone: process.env.NEXT_PUBLIC_BUSINESS_PHONE ?? '010 5270 2034',
+};
+
 async function getLandingStats() {
   if (!isConfigured) {
     return {
@@ -117,11 +125,12 @@ export default async function LandingPage() {
             <p className="mb-5 text-sm font-extrabold uppercase tracking-[0.18em] text-[#16C784]">
               PLAY INSTANT. GO NUTS.
             </p>
-            <h1 className="text-[54px] font-black leading-[0.96] tracking-normal sm:text-[72px] lg:text-[88px]">
-              Play now,
-              <br />
-              instantly.
+            <h1 className="text-[64px] font-black leading-[0.9] tracking-normal sm:text-[88px] lg:text-[112px]">
+              P!NUT
             </h1>
+            <p className="mt-4 text-[34px] font-black leading-none tracking-normal text-white sm:text-[48px] lg:text-[56px]">
+              Play now, instantly.
+            </p>
             <p className="mt-6 max-w-2xl text-2xl font-bold leading-tight text-white sm:text-3xl">
               피클볼에 진심인 사람들을 지금 바로 경기로 연결하는 P!NUT.
             </p>
@@ -325,6 +334,42 @@ export default async function LandingPage() {
           </a>
         </div>
       </section>
+
+      <footer className="bg-[#111827] px-6 py-10 text-white">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
+            <Link href="/" className="text-lg font-black tracking-normal">P!NUT</Link>
+            <div className="flex flex-wrap gap-4 text-sm font-semibold text-white/50">
+              <Link href="/refund-policy" className="hover:text-white">환불 및 취소 정책</Link>
+              <Link href="/account-delete" className="hover:text-white">계정 삭제 안내</Link>
+              <span>for sports nuts</span>
+            </div>
+          </div>
+          <dl className="mt-6 grid gap-x-8 gap-y-3 text-sm font-medium text-white/60 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <dt className="text-white/40">상호명</dt>
+              <dd className="mt-1 text-white/75">{businessInfo.name}</dd>
+            </div>
+            <div>
+              <dt className="text-white/40">사업자등록번호</dt>
+              <dd className="mt-1 text-white/75">{businessInfo.registrationNumber}</dd>
+            </div>
+            <div>
+              <dt className="text-white/40">대표자명</dt>
+              <dd className="mt-1 text-white/75">{businessInfo.representative}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-white/40">사업장 주소</dt>
+              <dd className="mt-1 text-white/75">{businessInfo.address}</dd>
+            </div>
+            <div>
+              <dt className="text-white/40">유선번호</dt>
+              <dd className="mt-1 text-white/75">{businessInfo.phone}</dd>
+            </div>
+          </dl>
+          <p className="mt-6 text-xs font-medium text-white/35">Copyright © 2026 P!NUT. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -47,5 +47,5 @@ export function DuprRatingCard({
 const styles = StyleSheet.create({
   card: { gap: 12 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontSize: 16, fontWeight: '800', color: '#111827' },
+  title: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
 });

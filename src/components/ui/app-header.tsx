@@ -19,7 +19,7 @@ export function AppHeader({ title, subtitle, rightIcon, onRightPress }: AppHeade
       </View>
       {rightIcon ? (
         <Pressable onPress={onRightPress} hitSlop={8} style={styles.iconButton}>
-          <Ionicons name={rightIcon} size={22} color="#111827" />
+          <Ionicons name={rightIcon} size={22} color="#F8FAFC" />
         </Pressable>
       ) : null}
     </View>
@@ -34,11 +34,11 @@ const styles = StyleSheet.create({
   },
   title: {
     ...Typography.screenTitle,
-    color: '#111827',
+    color: '#F8FAFC',
   },
   subtitle: {
     ...Typography.caption,
-    color: '#6B7280',
+    color: '#AAB4C0',
     marginTop: 4,
   },
   iconButton: {
@@ -46,10 +46,10 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 16,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
   },
 });

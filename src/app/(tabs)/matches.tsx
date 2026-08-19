@@ -107,7 +107,7 @@ export default function MatchesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="flash-outline" size={48} color="#9CA3AF" />
+              <Ionicons name="flash-outline" size={48} color="#707B87" />
               <Text style={styles.emptyTitle}>아직 모임이 없어요</Text>
               <Text style={styles.emptyBody}>첫 번개 모임을 만들어보세요.</Text>
             </View>
@@ -124,15 +124,15 @@ export default function MatchesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
   chipsScroll: { flexGrow: 0 },
   chips: { paddingHorizontal: Spacing.four, gap: 8, paddingBottom: Spacing.three, alignItems: 'center' },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
+  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  emptyBody: { fontSize: 16, color: '#6B7280' },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
+  emptyBody: { fontSize: 16, color: '#AAB4C0' },
   fab: {
     position: 'absolute',
     right: Spacing.four,

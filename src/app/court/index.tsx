@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { distanceKm, type LatLng } from '@/lib/geo';
 import { supabase } from '@/lib/supabase';
 import type { Court } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 // expo-location 은 네이티브 모듈이라 구 개발 빌드엔 없을 수 있음.
 // 없으면 크래시 대신 null → 위치 없이 '전체 + 검색' 폴백.
@@ -123,10 +124,11 @@ export default function CourtListScreen() {
           : '위치 권한이 꺼져 있어요. 전체 코트예요 — 지역으로 검색해보세요.';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <Stack.Screen
         options={{
-          title: '코트 예약',
+          headerShown: false,
+          title: '코트예약',
           headerRight: () => (
             <Pressable
               onPress={() => router.push(session ? '/court/reservations' : '/(auth)/sign-in')}
@@ -137,12 +139,23 @@ export default function CourtListScreen() {
         }}
       />
 
-      {!loading && rows.length > 0 ? (
+      {/* 헤더는 로딩 중에도 항상 노출 → 진입 시 '빈화면→콘텐츠' 전체 교체(깜빡임) 방지.
+          스피너는 아래 콘텐츠 영역에만 표시된다. (loaded·코트 없음일 때만 헤더 숨김) */}
+      {loading || rows.length > 0 ? (
         <View style={styles.header}>
+          <View style={styles.titleRow}>
+            <Text style={styles.screenTitle}>코트예약</Text>
+            <Pressable
+              onPress={() => router.push(session ? '/court/reservations' : '/(auth)/sign-in')}
+              hitSlop={8}
+              style={styles.myReservationLink}>
+              <Text style={styles.headerLink}>내 예약</Text>
+            </Pressable>
+          </View>
           <View style={styles.topRow}>
             {/* 검색 */}
             <View style={styles.search}>
-              <Ionicons name="search" size={16} color="#6B7280" />
+              <Ionicons name="search" size={16} color={AppColors.textMuted} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
@@ -153,7 +166,7 @@ export default function CourtListScreen() {
               />
               {query.length > 0 ? (
                 <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                  <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                  <Ionicons name="close-circle" size={16} color={AppColors.textMuted} />
                 </Pressable>
               ) : null}
             </View>
@@ -163,7 +176,7 @@ export default function CourtListScreen() {
                 const active = mode === m;
                 return (
                   <Pressable key={m} onPress={() => setMode(m)} style={[styles.toggleBtn, active && styles.toggleBtnActive]}>
-                    <Ionicons name={m === 'list' ? 'list' : 'map'} size={16} color={active ? '#16C784' : '#6B7280'} />
+                    <Ionicons name={m === 'list' ? 'list' : 'map'} size={16} color={active ? AppColors.primary : AppColors.textMuted} />
                   </Pressable>
                 );
               })}
@@ -205,7 +218,7 @@ export default function CourtListScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name={searching ? 'search' : 'location-outline'} size={44} color="#9CA3AF" />
+              <Ionicons name={searching ? 'search' : 'location-outline'} size={44} color={AppColors.textMuted} />
               <Text style={styles.emptyTitle}>
                 {rows.length === 0 ? '등록된 코트가 없어요' : searching ? '검색 결과가 없어요' : `주변 ${RADIUS_KM}km에 코트가 없어요`}
               </Text>
@@ -221,9 +234,12 @@ export default function CourtListScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  headerLink: { color: '#16C784', fontWeight: '700', fontSize: 15 },
-  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.two, gap: 8 },
+  safe: { flex: 1, backgroundColor: AppColors.background },
+  headerLink: { color: AppColors.primary, fontWeight: '700', fontSize: 15 },
+  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.two, gap: 12 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  screenTitle: { flex: 1, color: AppColors.textPrimary, fontSize: 28, fontWeight: '800' },
+  myReservationLink: { borderRadius: 999, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface, paddingHorizontal: 12, paddingVertical: 8 },
   topRow: { flexDirection: 'row', gap: 8 },
   search: {
     flex: 1,
@@ -232,29 +248,29 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 12,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
     paddingHorizontal: 12,
     height: 44,
   },
-  searchInput: { flex: 1, fontSize: 15, padding: 0, color: '#111827' },
+  searchInput: { flex: 1, fontSize: 15, padding: 0, color: AppColors.textPrimary },
   toggle: {
     flexDirection: 'row',
     borderRadius: 12,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
     padding: 3,
     gap: 2,
   },
   toggleBtn: { alignItems: 'center', justifyContent: 'center', width: 38, height: 36, borderRadius: 9 },
-  toggleBtnActive: { backgroundColor: '#F0FDF4' },
-  status: { fontSize: 13, color: '#6B7280' },
-  list: { padding: Spacing.four, paddingTop: Spacing.two, gap: Spacing.three, paddingBottom: 40 },
+  toggleBtnActive: { backgroundColor: 'rgba(22,199,132,0.14)' },
+  status: { fontSize: 13, color: AppColors.textSecondary },
+  list: { padding: Spacing.four, paddingTop: Spacing.two, gap: Spacing.three, paddingBottom: 124 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80, paddingHorizontal: Spacing.four },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  emptyBody: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: AppColors.textPrimary },
+  emptyBody: { fontSize: 15, color: AppColors.textSecondary, textAlign: 'center' },
 });

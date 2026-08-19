@@ -16,7 +16,7 @@ type Props = {
  * 자체적으로 안읽음 수를 구독하므로 헤더 어디에 놔도 동작한다.
  * (홈 헤더 배치는 디자인 담당이 넣는다 — 이 컴포넌트만 import 해서 우측에 두면 됨)
  */
-export function NotificationBell({ color = '#111827', size = 24 }: Props) {
+export function NotificationBell({ color = '#F8FAFC', size = 24 }: Props) {
   const router = useRouter();
   const { unread } = useNotifications();
 

@@ -1,19 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ReportBlock } from '@/components/report-block';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { ClubMemberWithProfile, ClubWithCounts } from '@/lib/types';
+
+type ClubMenu = { key: string; label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; path: '/club/sessions' | '/club/tournaments' | '/club/results' | '/club/members' };
+const CLUB_MENUS: ClubMenu[] = [
+  { key: 'sessions', label: '정기모임', desc: '참석 투표 · 아메리카노 대진', icon: 'calendar', path: '/club/sessions' },
+  { key: 'tournaments', label: '월례대회', desc: '클럽 토너먼트 개설·진행', icon: 'trophy', path: '/club/tournaments' },
+  { key: 'results', label: '경기 결과', desc: '기록 · DUPR 반영', icon: 'podium', path: '/club/results' },
+  { key: 'members', label: '회원 관리', desc: '멤버 · 임원 임명 · 가입 승인', icon: 'people', path: '/club/members' },
+];
 
 export default function ClubDetail() {
   const router = useRouter();
@@ -27,6 +33,7 @@ export default function ClubDetail() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [nowMs] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -43,17 +50,21 @@ export default function ClubDetail() {
     setLoading(false);
   }, [id]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const isOwner = club?.owner_id === uid;
   const myMembership = members.find((m) => m.user_id === uid);
   const isApprovedMember = myMembership?.status === 'approved';
   const isPending = myMembership?.status === 'pending';
-  const approved = members.filter((m) => m.status === 'approved');
-  const pending = members.filter((m) => m.status === 'pending');
+  const isTrialing = club?.premium_status === 'trialing' && !!club.premium_trial_ends_at && new Date(club.premium_trial_ends_at).getTime() > nowMs;
+  const isPremiumUsable = club?.tier === 'premium' && (club.premium_status === 'active' || isTrialing);
+  const trialDaysLeft = isTrialing && club?.premium_trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(club.premium_trial_ends_at).getTime() - nowMs) / 86400000))
+    : null;
 
   useEffect(() => {
     navigation.setOptions({
@@ -100,15 +111,26 @@ export default function ClubDetail() {
     ]);
   }
 
-  // 운영자: 가입 요청 승인/거절
-  async function approve(userId: string) {
-    if (!id) return;
-    await supabase.from('club_members').update({ status: 'approved' }).eq('club_id', id).eq('user_id', userId);
-    load();
-  }
-  async function reject(userId: string) {
-    if (!id) return;
-    await supabase.from('club_members').delete().eq('club_id', id).eq('user_id', userId);
+  async function startPremiumTrial() {
+    if (!isOwner || !id) return;
+    setActing(true);
+    const trialEnd = new Date();
+    trialEnd.setMonth(trialEnd.getMonth() + 1);
+    const { error } = await supabase
+      .from('clubs')
+      .update({
+        tier: 'premium',
+        premium_status: 'trialing',
+        premium_started_at: new Date().toISOString(),
+        premium_trial_ends_at: trialEnd.toISOString(),
+      })
+      .eq('id', id);
+    setActing(false);
+    if (error) {
+      Alert.alert('업그레이드 실패', error.message);
+      return;
+    }
+    Alert.alert('무료 체험 시작', '프리미엄 클럽 기능을 1개월 동안 사용할 수 있어요.');
     load();
   }
 
@@ -219,47 +241,48 @@ export default function ClubDetail() {
           </View>
         ) : null}
 
-        {/* 운영자: 가입 요청 대기 목록 */}
-        {isOwner && pending.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>가입 요청 {pending.length}명</Text>
-            <View style={{ gap: 10, marginTop: 8 }}>
-              {pending.map((m) => (
-                <View key={m.user_id} style={styles.mRow}>
-                  <Avatar nickname={m.profiles?.nickname ?? '?'} uri={m.profiles?.avatar_url} size={40} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.mName}>{m.profiles?.nickname ?? '알 수 없음'}</Text>
-                    <Text style={styles.mMeta}>{m.profiles?.region || '지역 미설정'}</Text>
-                  </View>
-                  <Pressable onPress={() => approve(m.user_id)} style={styles.approveBtn}>
-                    <Text style={styles.approveText}>승인</Text>
-                  </Pressable>
-                  <Pressable onPress={() => reject(m.user_id)} style={styles.rejectBtn}>
-                    <Text style={styles.rejectText}>거절</Text>
-                  </Pressable>
-                </View>
-              ))}
+        <View style={styles.premiumCard}>
+          <View style={styles.premiumTop}>
+            <View>
+              <Text style={styles.premiumEyebrow}>{isPremiumUsable ? 'PREMIUM CLUB' : 'CLUB PLAN'}</Text>
+              <Text style={styles.premiumTitle}>
+                {isPremiumUsable ? '경기 결과 관리 사용 중' : '프리미엄 클럽으로 업그레이드'}
+              </Text>
             </View>
+            <Badge
+              label={isPremiumUsable ? (trialDaysLeft ? `체험 ${trialDaysLeft}일` : 'Premium') : 'Free'}
+              color={isPremiumUsable ? '#16C784' : '#AAB4C0'}
+              bg={isPremiumUsable ? 'rgba(22,199,132,0.14)' : 'rgba(255,255,255,0.07)'}
+            />
           </View>
-        ) : null}
+          <Text style={styles.premiumBody}>
+            {isPremiumUsable
+              ? '클럽 멤버끼리 진행한 경기 결과를 기록하고 히스토리로 확인할 수 있어요.'
+              : '프리미엄 클럽은 클럽 내부 경기 결과 기록을 사용할 수 있어요. 1개월 무료 체험 후 구독으로 전환됩니다.'}
+          </Text>
+          {isOwner && !isPremiumUsable ? (
+            <Button title="1개월 무료 체험 시작" onPress={startPremiumTrial} loading={acting} style={styles.premiumButton} />
+          ) : null}
+        </View>
 
+        {/* 클럽 활동 메뉴 — 각각 전용 페이지로. 비회원은 회원 관리만 노출 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>멤버 {approved.length}명</Text>
-          <View style={{ gap: 10, marginTop: 8 }}>
-            {approved.map((m) => (
-              <View key={m.user_id} style={styles.mRow}>
-                <Avatar nickname={m.profiles?.nickname ?? '?'} uri={m.profiles?.avatar_url} size={40} />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.mNameRow}>
-                    <Text style={styles.mName}>{m.profiles?.nickname ?? '알 수 없음'}</Text>
-                    {m.role === 'owner' && <Badge label="운영자" color="#2D7FF9" bg="rgba(45,127,249,0.14)" />}
-                  </View>
-                  <Text style={styles.mMeta}>{m.profiles?.region || '지역 미설정'}</Text>
+          <Text style={styles.sectionTitle}>클럽 활동</Text>
+          <View style={styles.menuList}>
+            {(isApprovedMember || isOwner ? CLUB_MENUS : CLUB_MENUS.filter((menu) => menu.key === 'members')).map((menu) => (
+              <Pressable
+                key={menu.key}
+                onPress={() => router.push({ pathname: menu.path, params: { clubId: club.id } })}
+                style={styles.menuCard}>
+                <View style={styles.menuIcon}>
+                  <Ionicons name={menu.icon} size={20} color="#16C784" />
                 </View>
-                <Text style={styles.mSkill}>
-                  {m.profiles ? `${m.profiles.skill_level.toFixed(1)} ${skillLabel(m.profiles.skill_level)}` : ''}
-                </Text>
-              </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>{menu.label}</Text>
+                  <Text style={styles.menuDesc}>{menu.desc}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#707B87" />
+              </Pressable>
             ))}
           </View>
         </View>
@@ -281,30 +304,141 @@ export default function ClubDetail() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
-  notFound: { color: '#6B7280', fontSize: 15 },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
+  notFound: { color: '#AAB4C0', fontSize: 15 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
-  cover: { width: '100%', height: 170, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  cover: { width: '100%', height: 170, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D' },
   coverEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   coverEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  coverEmpty: { height: 96, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
+  coverEmpty: { height: 96, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
   coverEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  icon: { width: 52, height: 52, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-  meta: { fontSize: 14, color: '#6B7280', marginTop: 2 },
+  icon: { width: 52, height: 52, borderRadius: 14, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.14)', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
+  meta: { fontSize: 14, color: '#AAB4C0', marginTop: 2 },
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginTop: 6 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
+  desc: { fontSize: 15, lineHeight: 22, color: '#AAB4C0', marginTop: 6 },
+  premiumCard: {
+    marginTop: Spacing.two,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    padding: Spacing.three,
+    gap: 12,
+  },
+  premiumTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  premiumEyebrow: { color: '#16C784', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  premiumTitle: { color: '#F8FAFC', fontSize: 18, fontWeight: '900', marginTop: 6 },
+  premiumBody: { color: '#AAB4C0', fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  premiumButton: { marginTop: 2 },
+  menuList: { marginTop: 10, gap: 10 },
+  menuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    padding: Spacing.three,
+  },
+  menuIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(22,199,132,0.12)',
+  },
+  menuLabel: { color: '#F8FAFC', fontSize: 16, fontWeight: '800' },
+  menuDesc: { color: '#AAB4C0', fontSize: 13, fontWeight: '600', marginTop: 3 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  recordButton: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#16C784',
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    paddingHorizontal: 12,
+  },
+  recordButtonText: { color: '#07100D', fontSize: 13, fontWeight: '900' },
+  lockedBox: {
+    marginTop: 10,
+    minHeight: 64,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.three,
+  },
+  lockedText: { flex: 1, color: '#AAB4C0', fontSize: 14, fontWeight: '700' },
+  resultList: { marginTop: 10, gap: 10 },
+  resultCard: {
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    padding: Spacing.three,
+    gap: 10,
+  },
+  resultMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  resultDate: { color: '#AAB4C0', fontSize: 12, fontWeight: '800' },
+  resultRecorder: { color: '#707B87', fontSize: 12, fontWeight: '700' },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  teamName: { flex: 1, color: '#F8FAFC', fontSize: 14, fontWeight: '800' },
+  winnerName: { color: '#16C784' },
+  scoreText: { color: '#F8FAFC', fontSize: 18, fontWeight: '900' },
+  winnerScore: { color: '#16C784' },
+  resultNote: { color: '#AAB4C0', fontSize: 13, lineHeight: 18 },
+  duprRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 2 },
+  duprBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  duprBadgeText: { color: '#16C784', fontSize: 12, fontWeight: '800' },
+  duprHint: { color: '#707B87', fontSize: 12, fontWeight: '700' },
+  duprBtn: {
+    minHeight: 30,
+    minWidth: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#16C784',
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    paddingHorizontal: 12,
+  },
+  duprBtnText: { color: '#07100D', fontSize: 12, fontWeight: '900' },
+  tournamentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    padding: Spacing.three,
+  },
+  tournamentTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '800' },
+  tournamentMeta: { color: '#AAB4C0', fontSize: 13, fontWeight: '700', marginTop: 3 },
   mRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   mNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  mMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  mName: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
+  mMeta: { fontSize: 13, color: '#AAB4C0', marginTop: 1 },
   mSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
   approveBtn: { backgroundColor: '#16C784', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   approveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  rejectBtn: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  rejectText: { color: '#6B7280', fontSize: 13, fontWeight: '700' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
+  rejectBtn: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  rejectText: { color: '#AAB4C0', fontSize: 13, fontWeight: '700' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
 });

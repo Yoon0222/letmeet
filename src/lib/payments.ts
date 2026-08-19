@@ -1,60 +1,154 @@
-// 코트 예약 결제 오케스트레이션.
-//   흐름: 주문(pending) 생성 → 슬롯 홀드 → (mock=즉시확정 / toss=인앱 WebView 결제).
-//   toss 는 화면 전환(WebView)이 필요하므로, 여기선 주문·홀드만 하고 payload 를 돌려준다.
-//   실제 결제창·승인은 payment/webview 화면이 처리한다.
 import { supabase } from '@/lib/supabase';
 import type { Court } from '@/lib/types';
 
-const PROVIDER = process.env.EXPO_PUBLIC_PAYMENT_PROVIDER ?? 'mock';
+export type CourtPaymentResult =
+  | {
+      ok: true;
+      paymentId: string;
+      orderId: string;
+      orderName: string;
+      amount: number;
+    }
+  | { ok: false; reason: 'config' | 'slot' | 'error'; message?: string };
 
-export type WebviewPayment = { orderId: string; amount: number; orderName: string; paymentId: string };
-export type PayResult =
-  | { ok: true; free?: boolean } // 무료·mock 즉시 확정
-  | { ok: true; webview: WebviewPayment } // toss → 인앱 WebView 결제로
-  | { ok: false; reason: 'slot' | 'canceled' | 'error'; message?: string };
+export const tossClientKey = process.env.EXPO_PUBLIC_TOSS_CLIENT_KEY ?? '';
+export const isTossConfigured =
+  tossClientKey.startsWith('test_ck_') ||
+  tossClientKey.startsWith('live_ck_');
 
-export async function startCourtPayment(args: {
-  court: Pick<Court, 'id' | 'hourly_price'>;
+function randomPart() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function createOrderId() {
+  return `court_${Date.now().toString(36)}_${randomPart()}`;
+}
+
+export async function createCourtPaymentHold(args: {
+  court: Pick<Court, 'id' | 'name' | 'hourly_price'>;
   uid: string;
   slotDate: string;
   hours: number[];
   courtUnit: string;
-}): Promise<PayResult> {
+}): Promise<CourtPaymentResult> {
   const { court, uid, slotDate, hours, courtUnit } = args;
-  const amount = hours.length * court.hourly_price;
+  const amount = court.hourly_price * hours.length;
 
-  // 무료 코트: 결제 없이 바로 예약
+  if (!isTossConfigured) {
+    return { ok: false, reason: 'config', message: 'Toss client key is missing.' };
+  }
   if (amount <= 0) {
-    const { error } = await supabase
-      .from('court_reservations')
-      .insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h })));
-    if (error) return { ok: false, reason: /duplicate|unique/i.test(error.message) ? 'slot' : 'error', message: error.message };
-    return { ok: true, free: true };
+    return { ok: false, reason: 'error', message: 'Paid reservation amount must be greater than zero.' };
   }
 
-  // 1) 주문 생성(pending)
-  const orderId = `ord_${uid.slice(0, 8)}_${Date.now()}`;
-  const orderName = `피넛 코트 예약 ${hours.length}시간`;
-  const { data: pay, error: payErr } = await supabase
+  const orderId = createOrderId();
+  const orderName = `${court.name} 코트 예약`;
+  const { data: payment, error: paymentError } = await supabase
     .from('payments')
-    .insert({ order_id: orderId, user_id: uid, order_type: 'court', order_name: orderName, court_id: court.id, court_unit: courtUnit, slot_date: slotDate, hours, amount, provider: PROVIDER })
-    .select('id')
+    .insert({
+      order_id: orderId,
+      user_id: uid,
+      order_type: 'court',
+      target_id: court.id,
+      order_name: orderName,
+      court_id: court.id,
+      court_unit: courtUnit,
+      slot_date: slotDate,
+      hours,
+      amount,
+      status: 'pending',
+      provider: 'toss',
+    })
+    .select('id, order_id, order_name, amount')
     .single();
-  if (payErr || !pay) return { ok: false, reason: 'error', message: payErr?.message };
 
-  // 2) 슬롯 홀드(예약 행 생성 + 주문 연결). 중복이면 이미 예약된 슬롯.
-  const { error: resErr } = await supabase
-    .from('court_reservations')
-    .insert(hours.map((h) => ({ court_id: court.id, user_id: uid, court_unit: courtUnit, slot_date: slotDate, hour: h, payment_id: pay.id })));
-  if (resErr) {
-    await supabase.from('payments').update({ status: 'failed' }).eq('id', pay.id);
-    return { ok: false, reason: /duplicate|unique/i.test(resErr.message) ? 'slot' : 'error', message: resErr.message };
+  if (paymentError || !payment) {
+    return { ok: false, reason: 'error', message: paymentError?.message };
   }
 
-  // 3) mock: 즉시 확정 (개발용) / toss: 인앱 WebView 로 결제
-  if (PROVIDER === 'mock') {
-    await supabase.from('payments').update({ status: 'paid', provider_tx: `mock_${orderId}`, paid_at: new Date().toISOString() }).eq('id', pay.id);
-    return { ok: true };
+  const { data: holdStatus, error: holdError } = await supabase.rpc('reserve_court_hold', {
+    p_court_id: court.id,
+    p_court_unit: courtUnit,
+    p_slot_date: slotDate,
+    p_hours: hours,
+    p_user_id: uid,
+    p_payment_id: payment.id,
+    p_minutes: 10,
+  });
+
+  if (holdError || holdStatus !== 'ok') {
+    await supabase.from('payments').update({ status: 'canceled' }).eq('id', payment.id);
+    return {
+      ok: false,
+      reason: holdStatus === 'conflict' ? 'slot' : 'error',
+      message: holdError?.message ?? String(holdStatus ?? 'hold failed'),
+    };
   }
-  return { ok: true, webview: { orderId, amount, orderName, paymentId: pay.id } };
+
+  return {
+    ok: true,
+    paymentId: payment.id,
+    orderId: payment.order_id,
+    orderName: payment.order_name,
+    amount: payment.amount,
+  };
+}
+
+export async function confirmTossPayment(args: {
+  paymentId?: string;
+  paymentKey?: string;
+  orderId: string;
+  amount: number;
+}) {
+  const { data, error } = await supabase.functions.invoke('toss-confirm', { body: args });
+  if (error) {
+    const context = (error as unknown as { context?: unknown }).context;
+    if (context instanceof Response) {
+      const bodyText = await context.clone().text().catch(() => '');
+      const body = bodyText ? safeJsonParse(bodyText) : null;
+      const tossCode =
+        typeof body?.toss?.code === 'string'
+          ? body.toss.code
+          : typeof body?.code === 'string'
+            ? body.code
+            : undefined;
+      const tossMessage =
+        typeof body?.toss?.message === 'string'
+          ? body.toss.message
+          : typeof body?.message === 'string'
+            ? body.message
+            : undefined;
+      const message =
+        typeof body?.error === 'string'
+          ? [body.error, tossCode, tossMessage].filter(Boolean).join(' - ')
+          : tossMessage
+            ? [tossCode, tossMessage].filter(Boolean).join(' - ')
+            : error.message;
+      console.warn('[payment] confirm http error', { status: context.status, body, bodyText });
+      throw new Error(message);
+    }
+
+    console.warn('[payment] confirm error', {
+      message: error.message,
+      keys: typeof error === 'object' && error ? Object.keys(error) : [],
+      error,
+    });
+    throw error;
+  }
+  return data as
+    | { ok: true; reservationIds: string[] }
+    | { ok: false; pending: true; status?: string; message?: string };
+}
+
+function safeJsonParse(value: string) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+export async function cancelPendingPayment(paymentId: string) {
+  await supabase.from('court_reservations').delete().eq('payment_id', paymentId);
+  await supabase.from('payments').update({ status: 'canceled' }).eq('id', paymentId).eq('status', 'pending');
 }

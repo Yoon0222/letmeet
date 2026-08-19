@@ -1,22 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DuprRatingCard } from '@/components/dupr-rating-card';
 import { MeetupCard } from '@/components/meetup-card';
-import { ProfileSummaryCard } from '@/components/profile-summary-card';
-import { AppCard } from '@/components/ui/app-card';
-import { AppHeader } from '@/components/ui/app-header';
-import { Button } from '@/components/ui/button';
+import { Avatar } from '@/components/ui/avatar';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useI18n } from '@/contexts/i18n';
 import { confirmDestructive } from '@/lib/confirm';
+import { AppAlert as Alert } from '@/lib/feedback';
+import { formatMeetupTime, playStyleLabel, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { MeetupWithCounts } from '@/lib/types';
+
+const dark = {
+  background: '#070A0D',
+  surface: '#10161D',
+  surfaceSoft: '#151D25',
+  line: 'rgba(255,255,255,0.09)',
+  text: '#F8FAFC',
+  textSecondary: '#AAB4C0',
+  textMuted: '#707B87',
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -29,19 +37,22 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     const uid = session?.user.id;
     if (!uid) return;
-    // 받은 리뷰 요약(평균·개수)
+
     const { data: rs } = await supabase.from('player_review_stats').select('*').eq('reviewee_id', uid).maybeSingle();
     setReviewStat(rs ? { avg: rs.avg_rating ?? 0, count: rs.review_count } : null);
+
     const { data: parts } = await supabase
       .from('meetup_participants')
       .select('meetup_id')
       .eq('user_id', uid)
-      .eq('status', 'approved'); // 승인된(확정) 참가만
+      .eq('status', 'approved');
+
     const ids = (parts ?? []).map((p) => p.meetup_id);
     if (ids.length === 0) {
       setMyMeetups([]);
       return;
     }
+
     const { data } = await supabase
       .from('meetups_with_counts')
       .select('*')
@@ -56,13 +67,14 @@ export default function ProfileScreen() {
     }, [load]),
   );
 
+  const rating = profile?.dupr_rating ?? profile?.skill_level ?? 3;
+  const ratingLabel = profile?.dupr_rating ? 'DUPR Rating' : 'P!NUT Level';
+  const ratingDelta = profile?.dupr_verified ? '+0.15' : 'Self rated';
+  const recentMeetup = useMemo(() => myMeetups[0] ?? null, [myMeetups]);
+  const needsSetup = profile && !profile.region;
+
   function confirmSignOut() {
-    confirmDestructive(
-      t('profile.signOutTitle'),
-      t('profile.signOutBody'),
-      t('profile.signOut'),
-      () => signOut(),
-    );
+    confirmDestructive(t('profile.signOutTitle'), t('profile.signOutBody'), t('profile.signOut'), () => signOut());
   }
 
   async function doDelete() {
@@ -77,56 +89,89 @@ export default function ProfileScreen() {
   }
 
   function confirmDelete() {
-    confirmDestructive(
-      t('profile.deleteTitle'),
-      t('profile.deleteBody'),
-      t('profile.deleteAccount'),
-      doDelete,
-    );
+    confirmDestructive(t('profile.deleteTitle'), t('profile.deleteBody'), t('profile.deleteAccount'), doDelete);
   }
-
-  const needsSetup = profile && !profile.region;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <AppHeader title={t('profile.title')} rightIcon="create-outline" onRightPress={() => router.push('/profile/edit')} />
-
-        <ProfileSummaryCard profile={profile} meetupCount={myMeetups.length} />
-
-        {/* DUPR 레이팅 추이 — 본인은 항상 봄(개발/프리뷰는 샘플로 미리보기) */}
-        {session?.user.id ? <DuprRatingCard userId={session.user.id} allowSample /> : null}
-
-        {/* 받은 리뷰 — 요약 + 탭하면 전체 리뷰(플레이어 화면) */}
-        <AppCard onPress={() => router.push(`/player/${session?.user.id}` as never)} style={styles.reviewRow}>
-          <View style={styles.reviewIcon}>
-            <Ionicons name="star" size={18} color="#F5A623" />
+      <StatusBar style="light" />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Text style={styles.logo}>
+            P!<Text style={styles.logoAccent}>NUT</Text>
+          </Text>
+          <View style={styles.topActions}>
+            <Pressable style={styles.iconButton} onPress={() => router.push('/profile/edit')} hitSlop={8}>
+              <Ionicons name="create-outline" size={18} color={dark.text} />
+            </Pressable>
+            <Pressable style={styles.iconButton} onPress={() => router.push('/profile/connections')} hitSlop={8}>
+              <Ionicons name="link-outline" size={18} color={dark.text} />
+            </Pressable>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reviewTitle}>받은 리뷰</Text>
-            <Text style={styles.reviewSub}>
-              {reviewStat ? `평균 ★ ${reviewStat.avg.toFixed(1)} · ${reviewStat.count}개` : '아직 받은 리뷰가 없어요'}
+        </View>
+
+        <View style={styles.profileShell}>
+          <View style={styles.profileHeader}>
+            <Text style={styles.eyebrow}>{t('profile.title')}</Text>
+            <View style={[styles.verifiedBadge, !profile?.dupr_verified && styles.neutralBadge]}>
+              <Text style={[styles.verifiedText, !profile?.dupr_verified && styles.neutralBadgeText]}>
+                {profile?.dupr_verified ? 'DUPR Verified' : 'DUPR Pending'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.playerRow}>
+            <Avatar nickname={profile?.nickname ?? 'P!NUT'} uri={profile?.avatar_url} size={72} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.playerName} numberOfLines={1}>
+                {profile?.nickname ?? 'P!NUT Player'}
+              </Text>
+              <Text style={styles.playerMeta} numberOfLines={1}>
+                {profile?.region || '지역 미설정'} · {playStyleLabel(profile?.play_style ?? 'all')}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.ratingCard}>
+            <Text style={styles.ratingLabel}>{ratingLabel}</Text>
+            <View style={styles.ratingRow}>
+              <Text style={styles.ratingValue}>{rating.toFixed(2)}</Text>
+              <Text style={[styles.ratingDelta, !profile?.dupr_verified && styles.ratingDeltaMuted]}>{ratingDelta}</Text>
+            </View>
+            <Text style={styles.ratingUpdated}>
+              {profile?.dupr_synced_at ? `Updated ${profile.dupr_synced_at.slice(0, 10)}` : skillLabel(profile?.skill_level ?? 3)}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-        </AppCard>
 
-        {/* 연결된 로그인 관리 */}
-        <AppCard onPress={() => router.push('/profile/connections')} style={styles.reviewRow}>
-          <View style={[styles.reviewIcon, { backgroundColor: '#EAF1FF' }]}>
-            <Ionicons name="link-outline" size={18} color="#2D6BD6" />
+          <View style={styles.quickGrid}>
+            <QuickAction icon="analytics-outline" label="경기 기록" onPress={() => router.push(`/player/${session?.user.id}` as never)} />
+            <QuickAction icon="bar-chart-outline" label="통계" onPress={() => router.push(`/player/${session?.user.id}` as never)} />
+            <QuickAction icon="trophy-outline" label="랭킹" onPress={() => router.push('/tournaments' as never)} />
+            <QuickAction icon="shield-checkmark-outline" label="뱃지" onPress={() => router.push('/profile/edit')} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reviewTitle}>연결된 로그인</Text>
-            <Text style={styles.reviewSub}>이메일·구글 등 로그인 수단 관리</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-        </AppCard>
+        </View>
 
-        <AppCard disabled style={styles.languageCard}>
+        {needsSetup ? (
+          <Pressable onPress={() => router.push('/profile/edit')} style={styles.setupBanner}>
+            <Ionicons name="information-circle-outline" size={20} color={Brand.primary} />
+            <Text style={styles.setupText}>{t('profile.completeProfile')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={dark.textMuted} />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>최근 활동</Text>
+          <Pressable onPress={() => router.push(`/player/${session?.user.id}` as never)} hitSlop={8}>
+            <Text style={styles.moreText}>더보기</Text>
+          </Pressable>
+        </View>
+
+        <RecentActivityCard meetup={recentMeetup} reviewStat={reviewStat} />
+
+        <View style={styles.languagePanel}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.languageTitle}>{t('profile.language')}</Text>
-            <Text style={styles.languageHint}>{t('profile.languageHint')}</Text>
+            <Text style={styles.panelTitle}>{t('profile.language')}</Text>
+            <Text style={styles.panelHint}>{t('profile.languageHint')}</Text>
           </View>
           <View style={styles.languageOptions}>
             {languages.map((item) => {
@@ -136,26 +181,23 @@ export default function ProfileScreen() {
                   key={item}
                   onPress={() => setLanguage(item)}
                   style={[styles.languageButton, active && styles.languageButtonActive]}>
-                  <Text style={[styles.languageText, active && styles.languageTextActive]}>
-                    {languageLabels[item]}
-                  </Text>
+                  <Text style={[styles.languageText, active && styles.languageTextActive]}>{languageLabels[item]}</Text>
                 </Pressable>
               );
             })}
           </View>
-        </AppCard>
+        </View>
 
-        {needsSetup && (
-          <Pressable onPress={() => router.push('/profile/edit')} style={styles.setupBanner}>
-            <Ionicons name="information-circle-outline" size={20} color="#16C784" />
-            <Text style={styles.setupText}>{t('profile.completeProfile')}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-          </Pressable>
-        )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{t('profile.myMeetups')}</Text>
+          <Text style={styles.countText}>{myMeetups.length}개</Text>
+        </View>
 
-        <Text style={styles.sectionTitle}>{t('profile.myMeetups')}</Text>
         {myMeetups.length === 0 ? (
-          <Text style={styles.emptyMeetup}>{t('profile.emptyMeetups')}</Text>
+          <View style={styles.emptyPanel}>
+            <Ionicons name="calendar-clear-outline" size={24} color={dark.textMuted} />
+            <Text style={styles.emptyText}>{t('profile.emptyMeetups')}</Text>
+          </View>
         ) : (
           <View style={{ gap: Spacing.three }}>
             {myMeetups.map((m) => (
@@ -164,7 +206,9 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <Button title={t('profile.signOut')} variant="outline" onPress={confirmSignOut} style={{ marginTop: Spacing.four }} />
+        <Pressable onPress={confirmSignOut} style={styles.signOutButton}>
+          <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
+        </Pressable>
         <Text style={styles.email}>{session?.user.email}</Text>
         <Pressable onPress={confirmDelete} disabled={deleting} hitSlop={8} style={styles.deleteBtn}>
           <Text style={styles.deleteText}>{deleting ? t('profile.deleting') : t('profile.deleteAccount')}</Text>
@@ -174,33 +218,136 @@ export default function ProfileScreen() {
   );
 }
 
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.quickAction} onPress={onPress}>
+      <Ionicons name={icon} size={20} color={dark.textSecondary} />
+      <Text style={styles.quickLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function RecentActivityCard({
+  meetup,
+  reviewStat,
+}: {
+  meetup: MeetupWithCounts | null;
+  reviewStat: { avg: number; count: number } | null;
+}) {
+  if (!meetup) {
+    return (
+      <View style={styles.recentCard}>
+        <View style={styles.emptyRecentIcon}>
+          <Ionicons name="flash-outline" size={22} color={Brand.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.recentTitle}>아직 최근 활동이 없어요</Text>
+          <Text style={styles.recentSub}>번개 모임에 참여하면 이곳에 기록처럼 쌓입니다.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.recentCard}>
+      <Text style={styles.recentDate}>{formatMeetupTime(meetup.start_time)}</Text>
+      <View style={styles.matchRow}>
+        <View style={styles.duoAvatars}>
+          <Avatar nickname={meetup.host_nickname} uri={meetup.host_avatar_url} size={34} />
+          <View style={styles.avatarOverlap}>
+            <Avatar nickname="P!NUT" size={34} />
+          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.recentTitle} numberOfLines={1}>
+            {meetup.title}
+          </Text>
+          <Text style={styles.recentSub} numberOfLines={1}>
+            {meetup.location_name} · {meetup.participant_count}/{meetup.max_players}
+          </Text>
+        </View>
+        <View style={styles.winBlock}>
+          <Text style={styles.winText}>READY</Text>
+          <Text style={styles.scoreText}>{reviewStat ? `★ ${reviewStat.avg.toFixed(1)}` : '11 - ?'}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
-  reviewRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  reviewIcon: { width: 40, height: 40, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
-  reviewTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  reviewSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  languageCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  languageTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  languageHint: { fontSize: 13, color: '#6B7280', marginTop: 4 },
-  languageOptions: { flexDirection: 'row', gap: 8 },
-  languageButton: {
+  safe: { flex: 1, backgroundColor: dark.background },
+  content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: Spacing.three, paddingBottom: 124 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  logo: { fontSize: 20, fontWeight: '900', color: dark.text, letterSpacing: 0 },
+  logoAccent: { color: Brand.primary },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  iconButton: {
+    width: 38,
     height: 38,
-    paddingHorizontal: 14,
     borderRadius: 16,
     borderCurve: 'continuous',
-    backgroundColor: '#F6F7F9',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: dark.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  languageButtonActive: { backgroundColor: '#16C784' },
-  languageText: { fontSize: 13, fontWeight: '800', color: '#6B7280' },
-  languageTextActive: { color: '#FFFFFF' },
+  profileShell: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    borderRadius: 24,
+    borderCurve: 'continuous',
+    backgroundColor: dark.surface,
+    borderWidth: 1,
+    borderColor: dark.line,
+  },
+  profileHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eyebrow: { fontSize: 13, fontWeight: '800', color: dark.textSecondary },
+  verifiedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(22,199,132,0.16)',
+  },
+  neutralBadge: { backgroundColor: 'rgba(255,255,255,0.08)' },
+  verifiedText: { fontSize: 11, fontWeight: '900', color: Brand.primary },
+  neutralBadgeText: { color: dark.textMuted },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  playerName: { fontSize: 24, fontWeight: '900', color: dark.text },
+  playerMeta: { marginTop: 4, fontSize: 13, fontWeight: '600', color: dark.textSecondary },
+  ratingCard: {
+    alignItems: 'center',
+    paddingVertical: Spacing.four,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(255,255,255,0.035)',
+    borderWidth: 1,
+    borderColor: dark.line,
+  },
+  ratingLabel: { fontSize: 13, fontWeight: '700', color: dark.textSecondary },
+  ratingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.one, marginTop: 8 },
+  ratingValue: { fontSize: 52, lineHeight: 58, fontWeight: '900', color: dark.text, fontVariant: ['tabular-nums'] },
+  ratingDelta: { paddingBottom: 8, fontSize: 15, fontWeight: '900', color: '#9BE137' },
+  ratingDeltaMuted: { color: dark.textMuted },
+  ratingUpdated: { marginTop: 6, fontSize: 12, fontWeight: '600', color: dark.textMuted },
+  quickGrid: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: dark.line,
+    paddingTop: Spacing.three,
+  },
+  quickAction: { flex: 1, alignItems: 'center', gap: 7 },
+  quickLabel: { fontSize: 12, fontWeight: '700', color: dark.textSecondary },
   setupBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -208,14 +355,92 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: 18,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: dark.surfaceSoft,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: dark.line,
   },
-  setupText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111827' },
-  sectionTitle: { fontSize: 26, fontWeight: '800', color: '#111827', marginTop: Spacing.three },
-  emptyMeetup: { fontSize: 16, lineHeight: 22, color: '#6B7280' },
-  email: { fontSize: 13, textAlign: 'center', marginTop: Spacing.three, color: '#9CA3AF' },
-  deleteBtn: { alignSelf: 'center', marginTop: Spacing.three, padding: 8 },
-  deleteText: { fontSize: 13, fontWeight: '600', color: Brand.danger, textDecorationLine: 'underline' },
+  setupText: { flex: 1, fontSize: 13, fontWeight: '700', color: dark.text },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.one },
+  sectionTitle: { fontSize: 18, fontWeight: '900', color: dark.text },
+  moreText: { fontSize: 13, fontWeight: '800', color: dark.textMuted },
+  countText: { fontSize: 13, fontWeight: '800', color: dark.textMuted },
+  recentCard: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    backgroundColor: dark.surface,
+    borderWidth: 1,
+    borderColor: dark.line,
+  },
+  recentDate: { fontSize: 12, fontWeight: '700', color: dark.textMuted },
+  matchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  duoAvatars: { flexDirection: 'row', width: 60 },
+  avatarOverlap: { marginLeft: -12 },
+  recentTitle: { fontSize: 16, fontWeight: '900', color: dark.text },
+  recentSub: { marginTop: 4, fontSize: 12, lineHeight: 18, color: dark.textSecondary },
+  winBlock: { alignItems: 'flex-end' },
+  winText: { fontSize: 13, fontWeight: '900', color: '#9BE137' },
+  scoreText: { marginTop: 4, fontSize: 16, fontWeight: '900', color: dark.text },
+  emptyRecentIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(22,199,132,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languagePanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    backgroundColor: dark.surfaceSoft,
+    borderWidth: 1,
+    borderColor: dark.line,
+  },
+  panelTitle: { fontSize: 16, fontWeight: '900', color: dark.text },
+  panelHint: { marginTop: 4, fontSize: 12, color: dark.textSecondary },
+  languageOptions: { flexDirection: 'row', gap: 8 },
+  languageButton: {
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageButtonActive: { backgroundColor: Brand.primary },
+  languageText: { fontSize: 12, fontWeight: '900', color: dark.textSecondary },
+  languageTextActive: { color: '#FFFFFF' },
+  emptyPanel: {
+    alignItems: 'center',
+    gap: Spacing.one,
+    padding: Spacing.four,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    backgroundColor: dark.surface,
+    borderWidth: 1,
+    borderColor: dark.line,
+  },
+  emptyText: { fontSize: 14, lineHeight: 20, color: dark.textSecondary, textAlign: 'center' },
+  signOutButton: {
+    height: 56,
+    marginTop: Spacing.three,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: dark.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  signOutText: { fontSize: 16, fontWeight: '800', color: dark.text },
+  email: { fontSize: 13, textAlign: 'center', marginTop: Spacing.one, color: dark.textMuted },
+  deleteBtn: { alignSelf: 'center', marginTop: Spacing.one, padding: 8 },
+  deleteText: { fontSize: 13, fontWeight: '700', color: '#F87171', textDecorationLine: 'underline' },
 });

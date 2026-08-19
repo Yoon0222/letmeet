@@ -318,6 +318,10 @@ create table if not exists public.clubs (
   region      text not null default '',
   image_url   text,                                       -- 클럽 대표 사진 (0031)
   require_approval boolean not null default true,          -- 가입 승인 필요 (항상 승인제, 0032/0042)
+  tier        text not null default 'free' check (tier in ('free','premium')),
+  premium_status text not null default 'none' check (premium_status in ('none','trialing','active','past_due','canceled')),
+  premium_trial_ends_at timestamptz,
+  premium_started_at timestamptz,
   created_at  timestamptz not null default now()
 );
 create index if not exists clubs_region_idx on public.clubs (region);
@@ -331,6 +335,29 @@ create table if not exists public.club_members (
   primary key (club_id, user_id)
 );
 create index if not exists club_members_user_idx on public.club_members (user_id);
+
+create table if not exists public.club_match_results (
+  id             uuid primary key default uuid_generate_v4(),
+  club_id        uuid not null references public.clubs(id) on delete cascade,
+  recorded_by    uuid not null references public.profiles(id) on delete cascade,
+  match_date     date not null default current_date,
+  team1_player1  uuid not null references public.profiles(id) on delete cascade,
+  team1_player2  uuid references public.profiles(id) on delete set null,
+  team2_player1  uuid not null references public.profiles(id) on delete cascade,
+  team2_player2  uuid references public.profiles(id) on delete set null,
+  team1_score    int not null check (team1_score between 0 and 99),
+  team2_score    int not null check (team2_score between 0 and 99),
+  note           text not null default '',
+  -- DUPR 등록 상태(0065): 번개/대회와 동일. 엣지함수 dupr-match source='club'.
+  dupr_identifier   text unique,
+  dupr_match_code   text,
+  dupr_status       text not null default 'pending' check (dupr_status in ('pending','submitted','failed','skipped')),
+  dupr_submitted_at timestamptz,
+  dupr_error        text,
+  created_at     timestamptz not null default now(),
+  check (team1_player1 <> team2_player1)
+);
+create index if not exists club_match_results_club_date_idx on public.club_match_results (club_id, match_date desc, created_at desc);
 
 -- 클럽 생성 시 개설자를 owner 멤버로 자동 등록
 create or replace function public.handle_new_club()
@@ -353,6 +380,7 @@ create trigger on_club_created
 
 alter table public.clubs enable row level security;
 alter table public.club_members enable row level security;
+alter table public.club_match_results enable row level security;
 
 drop policy if exists "clubs_select" on public.clubs;
 create policy "clubs_select" on public.clubs for select using (true);
@@ -389,6 +417,201 @@ create policy "club_members_update_owner" on public.club_members
 drop policy if exists "club_members_delete_owner" on public.club_members;
 create policy "club_members_delete_owner" on public.club_members
   for delete using (exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid()));
+
+drop policy if exists "club_match_results_select" on public.club_match_results;
+create policy "club_match_results_select" on public.club_match_results for select using (true);
+
+drop policy if exists "club_match_results_insert_premium_member" on public.club_match_results;
+create policy "club_match_results_insert_premium_member" on public.club_match_results
+  for insert with check (
+    auth.uid() = recorded_by
+    and exists (
+      select 1 from public.club_members cm
+      where cm.club_id = club_match_results.club_id
+        and cm.user_id = auth.uid()
+        and cm.status = 'approved'
+    )
+    and exists (
+      select 1 from public.clubs c
+      where c.id = club_match_results.club_id
+        and c.tier = 'premium'
+        and (
+          c.premium_status = 'active'
+          or (c.premium_status = 'trialing' and c.premium_trial_ends_at > now())
+        )
+    )
+  );
+
+drop policy if exists "club_match_results_update_recorder_or_owner" on public.club_match_results;
+create policy "club_match_results_update_recorder_or_owner" on public.club_match_results
+  for update using (
+    auth.uid() = recorded_by
+    or exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+  );
+
+drop policy if exists "club_match_results_delete_recorder_or_owner" on public.club_match_results;
+create policy "club_match_results_delete_recorder_or_owner" on public.club_match_results
+  for delete using (
+    auth.uid() = recorded_by
+    or exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+  );
+
+-- ── 클럽 정기모임(세션): 참석 투표 → 아메리카노 대진 → 결과 (0067) ──────────
+create table if not exists public.club_sessions (
+  id           uuid primary key default gen_random_uuid(),
+  club_id      uuid not null references public.clubs(id) on delete cascade,
+  created_by   uuid not null references public.profiles(id) on delete cascade,
+  title        text not null default '',
+  session_date date not null default current_date,
+  start_at     timestamptz,
+  vote_deadline timestamptz,                                   -- 투표 마감(0068). 그 전까지만 일반 클럽원 투표
+  location     text not null default '',
+  court_count  int  not null default 1 check (court_count between 1 and 20),
+  point_target int  not null default 16 check (point_target between 1 and 99),
+  format       text not null default 'americano' check (format in ('americano')),
+  status       text not null default 'voting'
+               check (status in ('voting', 'matched', 'ongoing', 'finished', 'canceled')),
+  created_at   timestamptz not null default now()
+);
+create index if not exists club_sessions_club_idx on public.club_sessions (club_id, session_date desc, created_at desc);
+
+create table if not exists public.club_session_players (
+  session_id uuid not null references public.club_sessions(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  status     text not null default 'in' check (status in ('in', 'out')),
+  joined_at  timestamptz not null default now(),
+  primary key (session_id, user_id)
+);
+
+create table if not exists public.club_session_matches (
+  id             uuid primary key default gen_random_uuid(),
+  session_id     uuid not null references public.club_sessions(id) on delete cascade,
+  round_no       int not null,
+  court_no       int not null,
+  team1_player1  uuid not null references public.profiles(id) on delete cascade,
+  team1_player2  uuid references public.profiles(id) on delete set null,
+  team2_player1  uuid not null references public.profiles(id) on delete cascade,
+  team2_player2  uuid references public.profiles(id) on delete set null,
+  team1_score    int not null default 0 check (team1_score between 0 and 99),
+  team2_score    int not null default 0 check (team2_score between 0 and 99),
+  status         text not null default 'scheduled' check (status in ('scheduled', 'ongoing', 'done')),
+  dupr_mode      boolean not null default false,   -- 경기 시작 시 선택: true=DUPR 반영, false=일반(친선) (0070)
+  dupr_identifier   text unique,
+  dupr_match_code   text,
+  dupr_status       text not null default 'pending' check (dupr_status in ('pending', 'submitted', 'failed', 'skipped')),
+  dupr_submitted_at timestamptz,
+  dupr_error        text,
+  created_at     timestamptz not null default now()
+);
+create index if not exists club_session_matches_session_idx on public.club_session_matches (session_id, round_no, court_no);
+
+create or replace function public.is_club_session_manager(p_session_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.club_sessions s
+    join public.clubs c on c.id = s.club_id
+    where s.id = p_session_id and c.owner_id = auth.uid()
+  ) or exists (
+    select 1 from public.club_sessions s
+    join public.club_members m on m.club_id = s.club_id
+    where s.id = p_session_id and m.user_id = auth.uid()
+      and m.role = 'officer' and m.status = 'approved'
+  );
+$$;
+
+create or replace function public.is_club_session_member(p_session_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.club_sessions s
+    join public.club_members m on m.club_id = s.club_id
+    where s.id = p_session_id and m.user_id = auth.uid() and m.status = 'approved'
+  );
+$$;
+
+create or replace function public.is_club_session_voting_open(p_session_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.club_sessions s
+    where s.id = p_session_id
+      and s.status = 'voting'
+      and (s.vote_deadline is null or now() < s.vote_deadline)
+  );
+$$;
+
+create or replace function public.is_club_session_match_player(p_match_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.club_session_matches m
+    where m.id = p_match_id
+      and auth.uid() in (m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2)
+  );
+$$;
+
+alter table public.club_sessions enable row level security;
+alter table public.club_session_players enable row level security;
+alter table public.club_session_matches enable row level security;
+
+drop policy if exists "club_sessions_select" on public.club_sessions;
+create policy "club_sessions_select" on public.club_sessions for select using (true);
+drop policy if exists "club_sessions_insert_manager" on public.club_sessions;
+create policy "club_sessions_insert_manager" on public.club_sessions
+  for insert with check (
+    auth.uid() = created_by
+    and (
+      exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+      or exists (select 1 from public.club_members m
+                  where m.club_id = club_sessions.club_id and m.user_id = auth.uid()
+                    and m.role = 'officer' and m.status = 'approved')
+    )
+  );
+drop policy if exists "club_sessions_update_manager" on public.club_sessions;
+create policy "club_sessions_update_manager" on public.club_sessions
+  for update using (
+    exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+    or exists (select 1 from public.club_members m
+                where m.club_id = club_sessions.club_id and m.user_id = auth.uid()
+                  and m.role = 'officer' and m.status = 'approved')
+  );
+drop policy if exists "club_sessions_delete_manager" on public.club_sessions;
+create policy "club_sessions_delete_manager" on public.club_sessions
+  for delete using (
+    exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+  );
+
+drop policy if exists "club_session_players_select" on public.club_session_players;
+create policy "club_session_players_select" on public.club_session_players for select using (true);
+drop policy if exists "club_session_players_upsert_self" on public.club_session_players;
+create policy "club_session_players_upsert_self" on public.club_session_players
+  for insert with check (
+    (auth.uid() = user_id
+      and public.is_club_session_member(session_id)
+      and public.is_club_session_voting_open(session_id))
+    or public.is_club_session_manager(session_id)
+  );
+drop policy if exists "club_session_players_update_self" on public.club_session_players;
+create policy "club_session_players_update_self" on public.club_session_players
+  for update using (
+    (auth.uid() = user_id and public.is_club_session_voting_open(session_id))
+    or public.is_club_session_manager(session_id)
+  );
+drop policy if exists "club_session_players_delete_self" on public.club_session_players;
+create policy "club_session_players_delete_self" on public.club_session_players
+  for delete using (auth.uid() = user_id or public.is_club_session_manager(session_id));
+
+drop policy if exists "club_session_matches_select" on public.club_session_matches;
+create policy "club_session_matches_select" on public.club_session_matches for select using (true);
+drop policy if exists "club_session_matches_insert_manager" on public.club_session_matches;
+create policy "club_session_matches_insert_manager" on public.club_session_matches
+  for insert with check (public.is_club_session_manager(session_id));
+drop policy if exists "club_session_matches_update_manager" on public.club_session_matches;
+create policy "club_session_matches_update_manager" on public.club_session_matches
+  for update using (
+    public.is_club_session_manager(session_id)
+    or public.is_club_session_match_player(id)
+  );
+drop policy if exists "club_session_matches_delete_manager" on public.club_session_matches;
+create policy "club_session_matches_delete_manager" on public.club_session_matches
+  for delete using (public.is_club_session_manager(session_id));
 
 -- 편의 뷰: 클럽 + 개설자 + 멤버 수 (승인된 멤버만 카운트)
 create or replace view public.clubs_with_counts
@@ -433,6 +656,7 @@ create table if not exists public.tournaments (
                         check (format in ('group_knockout', 'kdk', 'team')),
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
   dupr_certified        boolean not null default false,       -- DUPR 인증 대회(0059): 연결자만 참가, 결과 DUPR 등록
+  club_id               uuid references public.clubs(id) on delete set null, -- 클럽 월례대회(0064). null=일반 대회
   group_count           int,                                  -- 조 개수 (대진 생성 시)
   advance_per_group     int,                                  -- 조별 진출 인원
   team_min_size         int not null default 2,               -- 단체전: 팀당 최소 인원 (0037)
@@ -633,7 +857,10 @@ drop policy if exists "tournaments_insert_organizer" on public.tournaments;
 create policy "tournaments_insert_organizer" on public.tournaments
   for insert with check (
     auth.uid() = organizer_id
-    and public.my_role() in ('organizer', 'court_manager', 'super_admin')
+    and (
+      public.my_role() in ('organizer', 'court_manager', 'super_admin')
+      or (club_id is not null and exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())) -- 클럽장 월례대회(0064)
+    )
   );
 drop policy if exists "tournaments_update_organizer" on public.tournaments;
 create policy "tournaments_update_organizer" on public.tournaments
@@ -641,6 +868,41 @@ create policy "tournaments_update_organizer" on public.tournaments
 drop policy if exists "tournaments_delete_organizer" on public.tournaments;
 create policy "tournaments_delete_organizer" on public.tournaments
   for delete using (auth.uid() = organizer_id);
+create index if not exists tournaments_club_idx on public.tournaments (club_id, start_at desc);
+
+-- 클럽 임원 임명/해제 (클럽장 전용) — 0064
+create or replace function public.set_club_officer(p_club_id uuid, p_user_id uuid, p_make_officer boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.clubs where id = p_club_id and owner_id = auth.uid()) then
+    raise exception 'forbidden: owner only';
+  end if;
+  update public.club_members
+     set role = case when p_make_officer then 'officer' else 'member' end
+   where club_id = p_club_id and user_id = p_user_id and role <> 'owner' and status = 'approved';
+end $$;
+grant execute on function public.set_club_officer(uuid, uuid, boolean) to authenticated;
+
+-- 클럽 가입 승인/거절 (클럽장 또는 임원) — 0064
+create or replace function public.review_club_member(p_club_id uuid, p_user_id uuid, p_approve boolean)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_allowed boolean;
+begin
+  select exists (select 1 from public.clubs c where c.id = p_club_id and c.owner_id = auth.uid())
+      or exists (select 1 from public.club_members m
+                  where m.club_id = p_club_id and m.user_id = auth.uid()
+                    and m.role = 'officer' and m.status = 'approved')
+    into v_allowed;
+  if not v_allowed then raise exception 'forbidden'; end if;
+  if p_approve then
+    update public.club_members set status = 'approved'
+     where club_id = p_club_id and user_id = p_user_id and status = 'pending';
+  else
+    delete from public.club_members
+     where club_id = p_club_id and user_id = p_user_id and status = 'pending';
+  end if;
+end $$;
+grant execute on function public.review_club_member(uuid, uuid, boolean) to authenticated;
 
 -- 참가 신청: 조회 공개, 신청은 본인, 수정은 본인(철회) 또는 주최자(승인/거절), 삭제는 본인
 drop policy if exists "entries_select" on public.tournament_entries;
@@ -787,8 +1049,10 @@ create table if not exists public.court_reservations (
   slot_date  date not null,
   hour       int not null check (hour >= 0 and hour <= 23),
   status     text not null default 'reserved',
+  expires_at timestamptz,                                     -- NULL=확정(영구), 미래=활성 홀드, 과거=만료
   created_at timestamptz not null default now()
 );
+create index if not exists court_reservations_expires_idx on public.court_reservations (expires_at);
 create index if not exists court_reservations_court_date_idx on public.court_reservations (court_id, slot_date);
 create index if not exists court_reservations_user_idx on public.court_reservations (user_id);
 -- 중복 방지: (코트, 면, 날짜, 시각) 단위
@@ -806,6 +1070,40 @@ create policy "reservations_update_self" on public.court_reservations
 drop policy if exists "reservations_delete_self" on public.court_reservations;
 create policy "reservations_delete_self" on public.court_reservations
   for delete using (auth.uid() = user_id);
+
+-- 홀드 생성(만료 홀드 정리 후 삽입, 충돌 시 conflict). security definer 로 만료 홀드 정리 가능.
+create or replace function public.reserve_court_hold(
+  p_court_id uuid, p_court_unit text, p_slot_date date, p_hours int[],
+  p_user_id uuid, p_payment_id uuid, p_minutes int default 10
+) returns text
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if p_user_id <> auth.uid() then return 'forbidden'; end if;
+  delete from public.court_reservations
+   where court_id = p_court_id and court_unit = p_court_unit and slot_date = p_slot_date
+     and hour = any(p_hours) and status = 'reserved' and expires_at is not null and expires_at < now();
+  insert into public.court_reservations (court_id, user_id, court_unit, slot_date, hour, payment_id, status, expires_at)
+  select p_court_id, p_user_id, p_court_unit, p_slot_date, h, p_payment_id, 'reserved', now() + make_interval(mins => p_minutes)
+  from unnest(p_hours) as h;
+  return 'ok';
+exception when unique_violation then
+  return 'conflict';
+end $$;
+grant execute on function public.reserve_court_hold(uuid, text, date, int[], uuid, uuid, int) to authenticated;
+
+-- 만료 홀드 일괄 정리(pg_cron 용)
+create or replace function public.release_expired_court_holds() returns int
+language plpgsql security definer set search_path = public
+as $$
+declare n int;
+begin
+  with del as (
+    delete from public.court_reservations
+     where status = 'reserved' and expires_at is not null and expires_at < now() returning 1
+  ) select count(*) into n from del;
+  return coalesce(n, 0);
+end $$;
 
 -- 코트 예약 가능일(오픈일) — 0024. 관리자가 연 날짜만 사용자에게 노출.
 create table if not exists public.court_open_days (

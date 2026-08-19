@@ -22,7 +22,7 @@ export function AppScaffold({ children, contentContainerStyle, ...rest }: AppSca
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: {
     paddingHorizontal: AppSpacing.md,
     paddingVertical: AppSpacing.md,

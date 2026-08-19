@@ -30,8 +30,8 @@ export function AppCard({ children, style, padded = true, disabled, ...rest }: A
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
+    backgroundColor: '#10161D',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderWidth: 1,
     borderRadius: Radius.card,
     borderCurve: 'continuous',

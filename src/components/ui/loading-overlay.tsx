@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useTheme } from '@/hooks/use-theme';
+import { AppColors } from '@/theme';
 
 // 피클볼 구멍 위치 (56px 공 기준, 9px 구멍)
 const HOLES = [
@@ -39,12 +40,12 @@ export function LoadingOverlay({ visible, message = 'loading...' }: { visible: b
   return (
     <Modal transparent visible animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
       <View style={styles.scrim}>
-        <View style={[styles.card, { backgroundColor: theme.card }]}>
+        <View style={styles.card}>
           <Animated.View style={[styles.ball, { backgroundColor: theme.primary }, spin]}>
             {HOLES.map((h, i) => (
               <View
                 key={i}
-                style={[styles.hole, { backgroundColor: theme.card, left: h.x, top: h.y }]}
+                style={[styles.hole, { left: h.x, top: h.y }]}
               />
             ))}
           </Animated.View>
@@ -58,7 +59,7 @@ export function LoadingOverlay({ visible, message = 'loading...' }: { visible: b
 const styles = StyleSheet.create({
   scrim: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.62)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -69,8 +70,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
   },
   ball: { width: 56, height: 56, borderRadius: 28 },
-  hole: { position: 'absolute', width: 9, height: 9, borderRadius: 4.5 },
+  hole: { position: 'absolute', width: 9, height: 9, borderRadius: 4.5, backgroundColor: AppColors.surface },
   text: { fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },
 });

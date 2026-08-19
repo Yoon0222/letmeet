@@ -182,9 +182,13 @@ export type PlayerReviewStats = {
 };
 
 // ---- 클럽(동호회) ----
-export type ClubRole = 'owner' | 'member';
+export type ClubRole = 'owner' | 'officer' | 'member'; // officer=임원진(가입승인·결과기록 도우미, 0064)
 
 export type ClubMemberStatus = 'pending' | 'approved';
+
+export type ClubTier = 'free' | 'premium';
+
+export type ClubPremiumStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'canceled';
 
 export type Club = {
   id: string;
@@ -194,6 +198,10 @@ export type Club = {
   region: string;
   image_url: string | null; // 클럽 대표 사진 (0031)
   require_approval: boolean; // 가입 승인 필요 여부 (0032)
+  tier: ClubTier;
+  premium_status: ClubPremiumStatus;
+  premium_trial_ends_at: string | null;
+  premium_started_at: string | null;
   created_at: string;
 };
 
@@ -215,6 +223,85 @@ export type ClubMember = {
 /** 멤버 + 프로필 (조인 결과) */
 export type ClubMemberWithProfile = ClubMember & {
   profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
+};
+
+export type ClubMatchResult = {
+  id: string;
+  club_id: string;
+  recorded_by: string;
+  match_date: string;
+  team1_player1: string;
+  team1_player2: string | null;
+  team2_player1: string;
+  team2_player2: string | null;
+  team1_score: number;
+  team2_score: number;
+  note: string;
+  dupr_identifier: string | null;
+  dupr_match_code: string | null;
+  dupr_status: 'pending' | 'submitted' | 'failed' | 'skipped';
+  dupr_submitted_at: string | null;
+  dupr_error: string | null;
+  created_at: string;
+};
+
+export type ClubMatchResultWithProfiles = ClubMatchResult & {
+  team1Player1: PartnerProfile | null;
+  team1Player2: PartnerProfile | null;
+  team2Player1: PartnerProfile | null;
+  team2Player2: PartnerProfile | null;
+  recorder: PartnerProfile | null;
+};
+
+// ---- 클럽 정기모임(세션) — 아메리카노 대진 (0067) ----
+export type ClubSessionStatus = 'voting' | 'matched' | 'ongoing' | 'finished' | 'canceled';
+
+export type ClubSession = {
+  id: string;
+  club_id: string;
+  created_by: string;
+  title: string;
+  session_date: string;
+  start_at: string | null;
+  vote_deadline: string | null;
+  location: string;
+  court_count: number;
+  point_target: number;
+  format: 'americano';
+  status: ClubSessionStatus;
+  created_at: string;
+};
+
+export type ClubSessionPlayer = {
+  session_id: string;
+  user_id: string;
+  status: 'in' | 'out';
+  joined_at: string;
+};
+
+export type ClubSessionPlayerWithProfile = ClubSessionPlayer & {
+  profiles: PartnerProfile | null;
+};
+
+export type ClubSessionMatch = {
+  id: string;
+  session_id: string;
+  round_no: number;
+  court_no: number;
+  team1_player1: string;
+  team1_player2: string | null;
+  team2_player1: string;
+  team2_player2: string | null;
+  team1_score: number;
+  team2_score: number;
+  status: 'scheduled' | 'ongoing' | 'done';
+  dupr_mode: boolean;
+  dupr_identifier: string | null;
+  dupr_match_code: string | null;
+  dupr_status: 'pending' | 'submitted' | 'failed' | 'skipped';
+  dupr_submitted_at: string | null;
+  dupr_error: string | null;
+  created_at: string;
 };
 
 // ---- 대회(tournaments) ----
@@ -261,6 +348,7 @@ export type Tournament = {
   tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
   tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)
   images: string[]; // 대회 사진 — 첫 장이 메인 커버 (0043→0044)
+  club_id: string | null; // 클럽 월례대회면 클럽 id, 일반 대회면 null (0064)
   created_at: string;
 };
 
@@ -438,11 +526,12 @@ export type CourtReservation = {
   slot_date: string; // YYYY-MM-DD
   hour: number;
   status: ReservationStatus;
-  payment_id: string | null; // null = 무료/구제도(결제 없이 확정)
+  payment_id: string | null;
+  expires_at: string | null; // null = 확정(영구), 미래 = 활성 홀드, 과거 = 만료
   created_at: string;
 };
 
-// ---- 결제 (payments, 0052 범용화: 코트+대회 공용) ----
+/** 예약 + 코트 (내 예약 조인 결과) */
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'canceled' | 'refunded';
 export type PaymentOrderType = 'court' | 'tournament';
 
@@ -451,21 +540,20 @@ export type Payment = {
   order_id: string;
   user_id: string;
   order_type: PaymentOrderType;
-  target_id: string | null; // 대회 결제 시 tournament_id
+  target_id: string | null;
   order_name: string;
-  court_id: string | null; // 코트 주문
+  court_id: string | null;
   court_unit: string;
   slot_date: string | null;
   hours: number[];
   amount: number;
   status: PaymentStatus;
-  provider: string; // portone | toss | mock
+  provider: string;
   provider_tx: string | null;
   created_at: string;
   paid_at: string | null;
 };
 
-/** 예약 + 코트 (내 예약 조인 결과) */
 export type CourtReservationWithCourt = CourtReservation & {
   courts: Pick<Court, 'id' | 'name' | 'region' | 'indoor' | 'hourly_price'>;
 };
@@ -662,6 +750,43 @@ export interface Database {
         Update: WriteDefaults<ClubMember>;
         Relationships: [];
       };
+      club_match_results: {
+        Row: ClubMatchResult;
+        Insert: {
+          club_id: string;
+          recorded_by: string;
+          team1_player1: string;
+          team2_player1: string;
+          team1_score: number;
+          team2_score: number;
+        } & WriteDefaults<ClubMatchResult>;
+        Update: WriteDefaults<ClubMatchResult>;
+        Relationships: [];
+      };
+      club_sessions: {
+        Row: ClubSession;
+        Insert: { club_id: string; created_by: string } & WriteDefaults<ClubSession>;
+        Update: WriteDefaults<ClubSession>;
+        Relationships: [];
+      };
+      club_session_players: {
+        Row: ClubSessionPlayer;
+        Insert: { session_id: string; user_id: string } & WriteDefaults<ClubSessionPlayer>;
+        Update: WriteDefaults<ClubSessionPlayer>;
+        Relationships: [];
+      };
+      club_session_matches: {
+        Row: ClubSessionMatch;
+        Insert: {
+          session_id: string;
+          round_no: number;
+          court_no: number;
+          team1_player1: string;
+          team2_player1: string;
+        } & WriteDefaults<ClubSessionMatch>;
+        Update: WriteDefaults<ClubSessionMatch>;
+        Relationships: [];
+      };
       tournaments: {
         Row: Tournament;
         Insert: WriteDefaults<Tournament> & {
@@ -726,16 +851,16 @@ export interface Database {
         Update: WriteDefaults<CourtReservation>;
         Relationships: [];
       };
+      payments: {
+        Row: Payment;
+        Insert: { order_id: string; user_id: string; amount: number } & WriteDefaults<Payment>;
+        Update: WriteDefaults<Payment>;
+        Relationships: [];
+      };
       court_open_days: {
         Row: CourtOpenDay;
         Insert: { court_id: string; day: string };
         Update: WriteDefaults<CourtOpenDay>;
-        Relationships: [];
-      };
-      payments: {
-        Row: Payment;
-        Insert: { order_id: string; user_id: string } & WriteDefaults<Payment>;
-        Update: WriteDefaults<Payment>;
         Relationships: [];
       };
       court_blocks: {
@@ -829,6 +954,29 @@ export interface Database {
       mark_notifications_read: { Args: { p_ids?: string[] | null }; Returns: undefined };
       set_tie_lineup: { Args: { p_tie_match: string; p_side: string; p_players: string[] }; Returns: undefined };
       submit_tie_lineup: { Args: { p_tie: string; p_side: string }; Returns: undefined };
+      reserve_court_hold: {
+        Args: {
+          p_court_id: string;
+          p_court_unit: string;
+          p_slot_date: string;
+          p_hours: number[];
+          p_user_id: string;
+          p_payment_id: string;
+          p_minutes?: number;
+        };
+        Returns: 'ok' | 'conflict' | 'forbidden';
+      };
+      release_expired_court_holds: { Args: Record<string, never>; Returns: number };
+      set_club_officer: {
+        Args: { p_club_id: string; p_user_id: string; p_make_officer: boolean };
+        Returns: undefined;
+      };
+      review_club_member: {
+        Args: { p_club_id: string; p_user_id: string; p_approve: boolean };
+        Returns: undefined;
+      };
+      is_club_session_manager: { Args: { p_session_id: string }; Returns: boolean };
+      is_club_session_member: { Args: { p_session_id: string }; Returns: boolean };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

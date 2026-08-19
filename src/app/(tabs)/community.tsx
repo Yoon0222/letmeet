@@ -91,7 +91,7 @@ export default function CommunityScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="chatbubble-ellipses-outline" size={48} color="#9CA3AF" />
+              <Ionicons name="chatbubble-ellipses-outline" size={48} color="#707B87" />
               <Text style={styles.emptyTitle}>아직 글이 없어요</Text>
               <Text style={styles.emptyBody}>첫 번째 글을 남겨보세요.</Text>
             </View>
@@ -113,7 +113,7 @@ function FilterChip({ label, active, onPress }: { label: string; active: boolean
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two },
   chipsWrap: { paddingBottom: Spacing.two },
   chips: { paddingHorizontal: Spacing.four, gap: 8 },
@@ -121,19 +121,19 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 16,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipActive: { backgroundColor: '#16C784', borderColor: '#16C784' },
-  chipText: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
+  chipText: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
   chipTextActive: { color: '#FFFFFF' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 100 },
+  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  emptyBody: { fontSize: 16, color: '#6B7280' },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
+  emptyBody: { fontSize: 16, color: '#AAB4C0' },
   fab: { position: 'absolute', right: Spacing.four, bottom: Spacing.four },
 });

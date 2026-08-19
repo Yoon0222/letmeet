@@ -11,6 +11,7 @@ import { formatRelative } from '@/lib/format';
 import { getBlockedIds } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 import type { CourtReviewWithAuthor } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 // 별점 표시(읽기)
 function Stars({ value, size = 15 }: { value: number; size?: number }) {
@@ -191,9 +192,9 @@ export function CourtReviews({ courtId }: { courtId: string }) {
 const styles = StyleSheet.create({
   wrap: { gap: 10 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  title: { fontSize: 18, fontWeight: '800', color: AppColors.textPrimary },
   avgRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  avgText: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  avgText: { fontSize: 14, fontWeight: '700', color: AppColors.textSecondary },
   writeBtn: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -203,36 +204,37 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-    backgroundColor: '#E7F6EC',
+    borderColor: 'rgba(22,199,132,0.28)',
+    backgroundColor: 'rgba(22,199,132,0.12)',
   },
   writeText: { fontSize: 14, fontWeight: '800', color: '#16A34A' },
   hint: { fontSize: 13, color: '#9CA3AF' },
   empty: { fontSize: 14, color: '#9CA3AF', paddingVertical: 4 },
-  review: { backgroundColor: '#F9FAFB', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three, gap: 6 },
+  review: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three, gap: 6 },
   reviewHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  author: { fontSize: 14, fontWeight: '700', color: '#374151' },
-  time: { fontSize: 12, color: '#9CA3AF' },
-  comment: { fontSize: 15, lineHeight: 21, color: '#1F2937' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: Spacing.four, gap: 16, paddingBottom: 32 },
-  sheetTitle: { fontSize: 18, fontWeight: '800', color: '#111827', textAlign: 'center' },
+  author: { fontSize: 14, fontWeight: '700', color: AppColors.textPrimary },
+  time: { fontSize: 12, color: AppColors.textMuted },
+  comment: { fontSize: 15, lineHeight: 21, color: AppColors.textSecondary },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: AppColors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: AppColors.border, padding: Spacing.four, gap: 16, paddingBottom: 32 },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: AppColors.textPrimary, textAlign: 'center' },
   starPick: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 },
   input: {
     minHeight: 100,
     fontSize: 15,
     lineHeight: 22,
-    color: '#111827',
+    color: AppColors.textPrimary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
+    backgroundColor: AppColors.surfaceSoft,
     borderRadius: 12,
     borderCurve: 'continuous',
     padding: 14,
   },
   sheetBtns: { flexDirection: 'row', gap: 10 },
   sheetBtn: { flex: 1, height: 50, borderRadius: 14, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center' },
-  cancelBtn: { backgroundColor: '#F3F4F6' },
-  cancelText: { fontSize: 16, fontWeight: '700', color: '#6B7280' },
-  saveBtn: { backgroundColor: '#16C784' },
+  cancelBtn: { backgroundColor: AppColors.surfaceSoft, borderWidth: 1, borderColor: AppColors.border },
+  cancelText: { fontSize: 16, fontWeight: '700', color: AppColors.textSecondary },
+  saveBtn: { backgroundColor: AppColors.primary },
   saveText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
 });

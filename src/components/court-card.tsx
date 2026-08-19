@@ -19,7 +19,7 @@ export function CourtCard({ court, dist, onPress }: CourtCardProps) {
         <Image source={{ uri: court.images[0] }} style={styles.thumb} />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
-          <Ionicons name="tennisball-outline" size={24} color="#9CA3AF" />
+          <Ionicons name="tennisball-outline" size={24} color="#707B87" />
         </View>
       )}
       <View style={styles.body}>
@@ -50,14 +50,14 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: Radius.card,
     borderCurve: 'continuous',
-    backgroundColor: '#F6F7F9',
+    backgroundColor: '#151D25',
   },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, gap: 6 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { flex: 1, fontSize: 20, fontWeight: '700', color: '#111827' },
-  distPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, backgroundColor: '#DCFCE7' },
+  name: { flex: 1, fontSize: 20, fontWeight: '800', color: '#F8FAFC' },
+  distPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, backgroundColor: 'rgba(22,199,132,0.14)' },
   distText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
-  meta: { fontSize: 13, color: '#6B7280' },
-  price: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  meta: { fontSize: 13, color: '#AAB4C0' },
+  price: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
 });

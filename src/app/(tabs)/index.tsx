@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
@@ -100,6 +100,7 @@ export default function HomeScreen() {
         .select('court_id, slot_date, hour, courts(name)')
         .eq('user_id', uid)
         .eq('status', 'reserved')
+        .is('expires_at', null) // 확정 예약만(미완료 홀드 제외) — 내 예약 화면과 일치
         .gte('slot_date', todayStr);
       const resv = (resvData ?? []) as unknown as { court_id: string; slot_date: string; hour: number; courts: { name: string } | null }[];
       const groups = new Map<string, { courtId: string; name: string; date: string; hours: number[] }>();
@@ -190,8 +191,15 @@ export default function HomeScreen() {
     }, [load]),
   );
 
+  // 앱 부팅 스플래시(_layout)와 동일한 BootScreen 을 이어서 보여줘 "두 번 로딩"처럼
+  // 보이지 않게 한다(메시지·비주얼 통일 → 하나의 연속 로딩으로 인지).
+  // Modal 로 감싸 탭 네비게이터 위(전체화면)에 띄운다 → 로딩 중 하단 탭바가 안 보임.
   if (initialLoading) {
-    return <BootScreen message="홈 데이터를 불러오고 있어요" />;
+    return (
+      <Modal visible animationType="none" statusBarTranslucent transparent>
+        <BootScreen />
+      </Modal>
+    );
   }
 
   return (
@@ -218,11 +226,11 @@ export default function HomeScreen() {
             <Text style={styles.sub} numberOfLines={1}>{myRegion || '지역 미설정'} · 실력 {mySkill.toFixed(1)} {skillLabel(mySkill)}</Text>
           </View>
           <View style={styles.iconBtn}>
-            <NotificationBell size={22} />
+            <NotificationBell size={22} color="#F8FAFC" />
           </View>
         </View>
 
-        <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#3E63DD" bg="#E6ECFF" />
+        <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#9BE137" bg="rgba(155,225,55,0.14)" />
         {upcoming.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
             {upcoming.map((item) => {
@@ -246,14 +254,14 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.emptyCard}>
-            <Ionicons name="calendar-outline" size={28} color="#9CA3AF" />
+            <Ionicons name="calendar-outline" size={28} color="#707B87" />
             <Text style={styles.emptyTitle}>예정된 일정이 없어요</Text>
             <Text style={styles.emptyBody}>코트 예약·번개 모임·대회에 참여하면 여기에 표시돼요.</Text>
           </View>
         )}
 
         {/* 코트 예약 — 둘러보고 예약하는 진입점 */}
-        <SectionHeader title="코트 예약" onMore={() => router.push('/court' as never)} icon="location-outline" color="#0284C7" bg="#E0F2FE" />
+        <SectionHeader title="코트 예약" onMore={() => router.push('/(tabs)/court' as never)} icon="location-outline" color="#38BDF8" bg="rgba(56,189,248,0.14)" />
         {courts.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
             {courts.map((c) => (
@@ -267,7 +275,7 @@ export default function HomeScreen() {
         {/* 모집 중인 대회 — 있을 때만 노출(비면 섹션 자체 숨김) */}
         {openTournaments.length > 0 && (
           <>
-            <SectionHeader title="대회" onMore={() => router.push('/(tabs)/tournaments')} icon="trophy-outline" color="#D97706" bg="#FEF3C7" />
+            <SectionHeader title="대회" onMore={() => router.push('/(tabs)/tournaments')} icon="trophy-outline" color="#FBBF24" bg="rgba(251,191,36,0.14)" />
             <View style={{ gap: Spacing.three }}>
               {openTournaments.map((t) => (
                 <TournamentCard key={t.id} tournament={t} onPress={() => router.push(`/tournament/${t.id}`)} />
@@ -276,7 +284,7 @@ export default function HomeScreen() {
           </>
         )}
 
-        <SectionHeader title="근처 추천 모임" onMore={() => router.push('/(tabs)/matches')} icon="flash-outline" color="#16C784" bg="#DCFCE7" />
+        <SectionHeader title="근처 추천 모임" onMore={() => router.push('/(tabs)/matches')} icon="flash-outline" color="#16C784" bg="rgba(22,199,132,0.14)" />
         {recommended.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
             {recommended.map((m) => (
@@ -287,7 +295,7 @@ export default function HomeScreen() {
           <Text style={styles.placeholder}>아직 추천할 모임이 없어요. 첫 모임을 만들어보세요.</Text>
         )}
 
-        <SectionHeader title="추천 클럽" onMore={() => router.push('/(tabs)/clubs')} icon="people-outline" color="#6366F1" bg="#EAEBFF" />
+        <SectionHeader title="추천 클럽" onMore={() => router.push('/(tabs)/clubs')} icon="people-outline" color="#A78BFA" bg="rgba(167,139,250,0.14)" />
         {clubs.length > 0 ? (
           <View style={{ gap: Spacing.three }}>
             {clubs.map((c) => (
@@ -325,35 +333,35 @@ function SectionHeader({
       </View>
       <Pressable onPress={onMore} hitSlop={8} style={styles.moreBtn}>
         <Text style={styles.more}>더 보기</Text>
-        <Ionicons name="arrow-forward" size={14} color="#6B7280" />
+        <Ionicons name="arrow-forward" size={14} color="#707B87" />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 80 },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 124 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  hello: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  sub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  iconBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
+  hello: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
+  sub: { fontSize: 13, color: '#AAB4C0', marginTop: 2 },
+  iconBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   sectionIcon: { width: 30, height: 30, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', flexShrink: 1 },
+  sectionTitle: { fontSize: 22, fontWeight: '900', color: '#F8FAFC', flexShrink: 1 },
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  more: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
+  more: { fontSize: 13, fontWeight: '800', color: '#707B87' },
   scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   scheduleIcon: { width: 40, height: 40, borderRadius: 16, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
-  scheduleTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  scheduleSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  ddayBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: '#F1F5F9', minWidth: 46, alignItems: 'center' },
-  ddayText: { fontSize: 13, fontWeight: '800', color: '#64748B' },
+  scheduleTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
+  scheduleSub: { fontSize: 13, color: '#AAB4C0', marginTop: 2 },
+  ddayBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.07)', minWidth: 46, alignItems: 'center' },
+  ddayText: { fontSize: 13, fontWeight: '800', color: '#AAB4C0' },
   ddayToday: { backgroundColor: '#16C784' },
   ddayTodayText: { color: '#FFFFFF' },
-  emptyCard: { alignItems: 'center', gap: 6, paddingVertical: 28, paddingHorizontal: Spacing.three, borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: '#FFFFFF' },
-  emptyTitle: { fontSize: 15, fontWeight: '700', color: '#374151' },
-  emptyBody: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
-  placeholder: { fontSize: 16, lineHeight: 22, color: '#6B7280' },
+  emptyCard: { alignItems: 'center', gap: 6, paddingVertical: 28, paddingHorizontal: Spacing.three, borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderStyle: 'dashed', backgroundColor: '#10161D' },
+  emptyTitle: { fontSize: 15, fontWeight: '800', color: '#F8FAFC' },
+  emptyBody: { fontSize: 13, color: '#707B87', textAlign: 'center' },
+  placeholder: { fontSize: 16, lineHeight: 22, color: '#AAB4C0' },
 });

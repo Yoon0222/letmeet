@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { AppSpacing, Radius, Typography } from '@/theme';
 import type { ClubWithCounts } from '@/lib/types';
 
@@ -17,7 +18,10 @@ export function ClubCard({ club, onPress }: { club: ClubWithCounts; onPress: () 
         </View>
       )}
       <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
+          {club.tier === 'premium' ? <Badge label="Premium" style={styles.badge} /> : null}
+        </View>
         <Text style={styles.meta} numberOfLines={1}>
           {club.region || '지역 미설정'} · 멤버 {club.member_count}명
         </Text>
@@ -38,11 +42,13 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: Radius.card,
     borderCurve: 'continuous',
-    backgroundColor: '#DCFCE7',
+    backgroundColor: 'rgba(22,199,132,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   body: { flex: 1, gap: 4 },
-  name: { ...Typography.body, fontWeight: '700', color: '#111827' },
-  meta: { ...Typography.caption, color: '#6B7280' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  name: { ...Typography.body, fontWeight: '800', color: '#F8FAFC' },
+  meta: { ...Typography.caption, color: '#AAB4C0' },
+  badge: { paddingHorizontal: 8, paddingVertical: 3 },
 });

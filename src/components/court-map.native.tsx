@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NaverMapMarkerOverlay, NaverMapView, type NaverMapViewRef } from '@mj-studio/react-native-naver-map';
 import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -22,11 +23,13 @@ const geo = (courts: Court[]) => courts.filter((c) => c.latitude != null && c.lo
 // 네이티브 전용 — 네이버 지도 SDK. (웹에서는 court-map.tsx 폴백이 로드됨)
 export default function CourtMap({ courts, onSelect, center: centerProp, focus }: CourtMapProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const ref = useRef<NaverMapViewRef>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const pts = geo(courts);
   const center = centerProp ?? (pts.length ? { latitude: avg(pts.map((p) => p.latitude as number)), longitude: avg(pts.map((p) => p.longitude as number)) } : SEOUL);
   const selected = pts.find((c) => c.id === selectedId) ?? null;
+  const cardBottom = 86 + Math.max(insets.bottom, 16);
 
   // 검색 시: 결과 코트들이 화면에 들어오도록 카메라 이동
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function CourtMap({ courts, onSelect, center: centerProp, focus }
 
       {/* 마커 탭 시 사진·정보 팝업 */}
       {selected ? (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, bottom: cardBottom }]}>
           <Pressable style={styles.cardRow} onPress={() => onSelect(selected.id)}>
             {selected.images?.[0] ? (
               <Image source={{ uri: selected.images[0] }} style={[styles.thumb, { backgroundColor: theme.backgroundElement }]} />
@@ -109,7 +112,7 @@ export default function CourtMap({ courts, onSelect, center: centerProp, focus }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  card: { position: 'absolute', left: 12, right: 12, bottom: 16, borderRadius: 16, borderWidth: 1, padding: 12, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  card: { position: 'absolute', left: 12, right: 12, borderRadius: 16, borderWidth: 1, padding: 12, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.28)' },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   thumb: { width: 60, height: 60, borderRadius: 12 },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center' },

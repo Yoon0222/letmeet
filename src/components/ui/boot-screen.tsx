@@ -6,49 +6,114 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
 import { useTheme } from '@/hooks/use-theme';
 
-const ILLUST = require('../../../assets/images/peanut-loading.png');
-const TRACK = 220;
-const SEG = 80;
+const MASCOT = require('../../../assets/images/splash-peanut-cutout.png');
+const TRACK = 240;
+const SEGMENT = 96;
 
-/** 앱 부팅(세션 확인) 중 보여주는 피넛 브랜드 스플래시 + 로딩바 */
-export function BootScreen() {
+type BootScreenProps = {
+  message?: string;
+};
+
+export function BootScreen({ message = '피넛을 준비하고 있어요' }: BootScreenProps) {
   const theme = useTheme();
-  const x = useSharedValue(-SEG);
+  const x = useSharedValue(-SEGMENT);
+  const scale = useSharedValue(0.96);
 
   useEffect(() => {
-    x.value = withRepeat(withTiming(TRACK, { duration: 1100, easing: Easing.linear }), -1);
-  }, [x]);
+    x.value = withRepeat(withTiming(TRACK, { duration: 1200, easing: Easing.inOut(Easing.cubic) }), -1);
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.03, { duration: 900, easing: Easing.inOut(Easing.cubic) }),
+        withTiming(0.96, { duration: 900, easing: Easing.inOut(Easing.cubic) }),
+      ),
+      -1,
+      false,
+    );
+  }, [scale, x]);
 
-  const bar = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const progressStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const mascotStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.background }]}>
-      <Image source={ILLUST} style={styles.illust} contentFit="contain" />
-      <Text style={[styles.brand, { color: theme.text }]}>피넛</Text>
-      <Text style={[styles.tag, { color: theme.primary }]}>for sports nuts</Text>
-      <View style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
-        <Animated.View style={[styles.seg, { backgroundColor: theme.primary }, bar]} />
+      <View style={styles.hero}>
+        <View style={styles.glow} />
+        <Animated.View style={[styles.mascotShell, mascotStyle]}>
+          <Image source={MASCOT} style={styles.mascot} contentFit="contain" />
+        </Animated.View>
       </View>
+
+      <View style={styles.copy}>
+        <Text style={styles.brand}>P!NUT</Text>
+        <Text style={styles.title}>Play instant</Text>
+        <Text style={styles.message}>{message}</Text>
+      </View>
+
+      <View style={styles.progressTrack}>
+        <Animated.View style={[styles.progressSegment, progressStyle]} />
+      </View>
+      <Text style={styles.caption}>코트, 모임, 대회를 불러오는 중</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  illust: { width: '92%', maxWidth: 420, aspectRatio: 1536 / 798 },
-  brand: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5, marginTop: 16 },
-  tag: { fontSize: 14, fontWeight: '700', marginTop: 4, letterSpacing: 0.3 },
-  track: {
+  wrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  hero: {
+    width: 176,
+    height: 176,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glow: {
+    position: 'absolute',
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    backgroundColor: '#16C784',
+    opacity: 0.18,
+  },
+  mascotShell: {
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    backgroundColor: '#10161D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.24)',
+  },
+  mascot: { width: 132, height: 132 },
+  copy: { alignItems: 'center', marginTop: 18 },
+  brand: { fontSize: 36, fontWeight: '900', color: '#F8FAFC', letterSpacing: 0 },
+  title: { marginTop: 4, fontSize: 18, fontWeight: '800', color: '#16C784' },
+  message: { marginTop: 12, fontSize: 15, fontWeight: '600', color: '#AAB4C0' },
+  progressTrack: {
     width: TRACK,
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 999,
     overflow: 'hidden',
     marginTop: 28,
+    backgroundColor: 'rgba(255,255,255,0.09)',
   },
-  seg: { width: SEG, height: 6, borderRadius: 3 },
+  progressSegment: {
+    width: SEGMENT,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#16C784',
+  },
+  caption: { marginTop: 12, fontSize: 13, fontWeight: '600', color: '#707B87' },
 });

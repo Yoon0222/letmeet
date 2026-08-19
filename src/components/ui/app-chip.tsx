@@ -28,9 +28,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: Radius.chip,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -40,8 +40,8 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: '700',
+    color: '#AAB4C0',
   },
   activeText: {
     color: '#FFFFFF',

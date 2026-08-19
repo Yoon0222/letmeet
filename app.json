@@ -40,15 +40,24 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FBFCFB",
-          "image": "./assets/images/splash-peanut.png",
-          "imageWidth": 140,
+          "image": "./assets/images/splash-wordmark.png",
+          "imageWidth": 220,
           "android": {
-            "image": "./assets/images/splash-peanut.png",
-            "imageWidth": 140
+            "image": "./assets/images/splash-wordmark.png",
+            "imageWidth": 220
           }
         }
       ],
       "@react-native-community/datetimepicker",
+      [
+        "react-native-edge-to-edge",
+        {
+          "android": {
+            "parentTheme": "Default",
+            "enforceNavigationBarContrast": false
+          }
+        }
+      ],
       "expo-apple-authentication",
       [
         "expo-image-picker",

@@ -60,19 +60,72 @@ Deno.serve(async (req) => {
   const teamA: Team = body?.teamA ?? {};
   const teamB: Team = body?.teamB ?? {};
   const games: Game[] = Array.isArray(body?.games) ? body.games : [];
-  if (!['meetup', 'tournament'].includes(source) || !matchId) return json({ error: 'bad_request' }, 400);
-  const table = source === 'meetup' ? 'meetup_matches' : 'tournament_matches';
+  if (!['meetup', 'tournament', 'club', 'club_session'].includes(source) || !matchId) return json({ error: 'bad_request' }, 400);
+  const table =
+    source === 'meetup'
+      ? 'meetup_matches'
+      : source === 'club'
+        ? 'club_match_results'
+        : source === 'club_session'
+          ? 'club_session_matches'
+          : 'tournament_matches';
 
-  // 2) 권한: meetup 은 호스트만. tournament 는 organizer/super_admin.
+  // 클럽 관리자(클럽장/임원) 여부 — 클럽 경기결과/클럽 월례대회 권한 판정에 공용.
+  async function isClubManager(clubId: string | null | undefined): Promise<boolean> {
+    if (!clubId) return false;
+    const { data: club } = await admin.from('clubs').select('owner_id').eq('id', clubId).maybeSingle();
+    if (club?.owner_id === caller.id) return true;
+    const { data: mem } = await admin
+      .from('club_members')
+      .select('role, status')
+      .eq('club_id', clubId)
+      .eq('user_id', caller.id)
+      .maybeSingle();
+    return mem?.role === 'officer' && mem?.status === 'approved';
+  }
+
+  // 2) 권한: meetup=호스트 / club=클럽장·임원 / tournament=organizer·admin 또는 클럽 대회의 클럽장·임원.
   if (source === 'meetup') {
     const { data: mm } = await admin.from('meetup_matches').select('meetup_id').eq('id', matchId).maybeSingle();
     if (!mm) return json({ error: 'not_found' }, 404);
     const { data: mt } = await admin.from('meetups').select('host_id, title').eq('id', mm.meetup_id).maybeSingle();
     if (!mt || mt.host_id !== caller.id) return json({ error: 'forbidden' }, 403);
     body.__event = body?.event ?? mt.title;
+  } else if (source === 'club') {
+    const { data: cm } = await admin
+      .from('club_match_results')
+      .select('club_id, clubs(name)')
+      .eq('id', matchId)
+      .maybeSingle();
+    if (!cm) return json({ error: 'not_found' }, 404);
+    if (!(await isClubManager(cm.club_id))) return json({ error: 'forbidden' }, 403);
+    // deno-lint-ignore no-explicit-any
+    body.__event = body?.event ?? (cm as any).clubs?.name ?? '클럽 경기';
+  } else if (source === 'club_session') {
+    // 클럽 정기모임(세션) 경기 — 그 세션 클럽의 클럽장/임원만.
+    const { data: sm } = await admin
+      .from('club_session_matches')
+      .select('session_id, club_sessions(club_id, title)')
+      .eq('id', matchId)
+      .maybeSingle();
+    if (!sm) return json({ error: 'not_found' }, 404);
+    // deno-lint-ignore no-explicit-any
+    const sess = (sm as any).club_sessions;
+    if (!(await isClubManager(sess?.club_id))) return json({ error: 'forbidden' }, 403);
+    body.__event = body?.event ?? sess?.title ?? '클럽 정기모임';
   } else {
+    // tournament: 대회가 클럽 월례대회면 그 클럽 관리자도 허용.
+    const { data: tm } = await admin
+      .from('tournament_matches')
+      .select('tournament_id')
+      .eq('id', matchId)
+      .maybeSingle();
+    const { data: tour } = tm
+      ? await admin.from('tournaments').select('club_id').eq('id', tm.tournament_id).maybeSingle()
+      : { data: null };
     const { data: prof } = await admin.from('profiles').select('role').eq('id', caller.id).maybeSingle();
-    if (!prof || !['organizer', 'court_manager', 'super_admin'].includes(prof.role)) return json({ error: 'forbidden' }, 403);
+    const isAdminOrganizer = !!prof && ['organizer', 'court_manager', 'super_admin'].includes(prof.role);
+    if (!isAdminOrganizer && !(await isClubManager(tour?.club_id))) return json({ error: 'forbidden' }, 403);
   }
 
   // 3) 현재 등록 상태(수정/삭제 판단용)

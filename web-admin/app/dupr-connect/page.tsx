@@ -76,7 +76,7 @@ export default function DuprConnectPage() {
       ) : status === 'done' ? (
         <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#16A34A' }}>DUPR 연결 완료! 앱으로 돌아갑니다…</div>
       ) : src ? (
-        <iframe title="DUPR 로그인" src={src} allow="payment" style={{ width: '100%', height: '100vh', border: 0 }} />
+        <iframe title="DUPR 로그인" src={src} style={{ width: '100%', height: '100vh', border: 0 }} />
       ) : (
         <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#9CA3AF' }}>DUPR 로그인 준비 중…</div>
       )}

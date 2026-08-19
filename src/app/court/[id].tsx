@@ -1,20 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CourtReviews } from '@/components/court-reviews';
-import { PAYMENTS_ENABLED } from '@/constants/features';
 import { MonthCalendar } from '@/components/month-calendar';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { createCourtReservation } from '@/lib/court-reservations';
 import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
-import { startCourtPayment } from '@/lib/payments';
+import { createCourtPaymentHold } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import type { Court, CourtBlock, CourtReservation } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -36,6 +37,11 @@ export default function CourtDetail() {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
 
+  // 순차 선택(날짜→코트→시간) 시 해당 섹션으로 자동 스크롤하기 위한 참조
+  const scrollRef = useRef<ScrollView>(null);
+  const courtSectionY = useRef(0);
+  const timeSectionY = useRef(0);
+
   useEffect(() => {
     if (!id) return;
     (async () => {
@@ -49,15 +55,13 @@ export default function CourtDetail() {
         supabase.from('court_blocks').select('*').eq('court_id', id),
       ]);
       const openList = (openRes.data ?? []).map((r) => r.day);
-      const autoN = courtRes.data?.auto_open_days ?? 0;
-      const unitList = Array.isArray(courtRes.data?.court_units) ? courtRes.data.court_units : [];
       setCourt(courtRes.data ?? null);
       setNowMs(now);
       setOpenDays(openList);
       setBlocks((blockRes.data as CourtBlock[]) ?? []);
-      setSelectedUnit(unitList[0]?.name ?? ''); // 첫 면 기본 선택
-      // 자동 오픈이 있으면 오늘이 가장 가까운 예약일, 없으면 가장 이른 수동 오픈일
-      setSelectedDate(autoN > 0 ? today : (openList[0] ?? ''));
+      // 순차 선택 흐름: 날짜·코트를 미리 고르지 않는다. 날짜 선택 → 코트 → 시간 순으로 열림.
+      setSelectedUnit('');
+      setSelectedDate('');
       setLoading(false);
     })();
   }, [id]);
@@ -65,6 +69,7 @@ export default function CourtDetail() {
   const loadReservations = useCallback(
     async (date: string) => {
       if (!id || !date) return;
+      // 예약 행 = 확정(expires_at null) 또는 홀드(expires_at 있음). 차단 여부는 아래에서 만료 판정.
       const { data } = await supabase
         .from('court_reservations')
         .select('*')
@@ -80,6 +85,26 @@ export default function CourtDetail() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadReservations(selectedDate);
   }, [loadReservations, selectedDate]);
+
+  // 날짜를 고르면 코트 선택(면이 없으면 시간)으로 자동 스크롤
+  useEffect(() => {
+    if (!selectedDate) return;
+    const hasUnits = Array.isArray(court?.court_units) && court.court_units.length > 0;
+    const t = setTimeout(() => {
+      const y = hasUnits ? courtSectionY.current : timeSectionY.current;
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+    }, 280);
+    return () => clearTimeout(t);
+  }, [selectedDate, court]);
+
+  // 코트(면)를 고르면 시간 선택으로 자동 스크롤
+  useEffect(() => {
+    if (!selectedUnit) return;
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, timeSectionY.current - 12), animated: true });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [selectedUnit]);
 
   if (loading) {
     return (
@@ -115,9 +140,13 @@ export default function CourtDetail() {
 
   // 시간 슬롯
   const hours = Array.from({ length: Math.max(0, court.close_hour - court.open_hour) }, (_, i) => court.open_hour + i);
-  // 선택한 면의 예약만 슬롯에 반영 (면별 독립 예약)
+  // 선택한 면의 예약만 슬롯에 반영 (면별 독립 예약).
+  // 차단 대상 = 확정(expires_at null) 또는 아직 안 만료된 홀드(expires_at > now). 만료 홀드는 무시.
   const reservedByHour = new Map<number, CourtReservation>();
-  reservations.filter((r) => r.court_unit === selectedUnit).forEach((r) => reservedByHour.set(r.hour, r));
+  reservations
+    .filter((r) => r.court_unit === selectedUnit)
+    .filter((r) => r.expires_at == null || new Date(r.expires_at).getTime() > nowMs)
+    .forEach((r) => reservedByHour.set(r.hour, r));
   const isToday = selectedDate === ymd(new Date(nowMs));
   const curHour = new Date(nowMs).getHours();
 
@@ -163,9 +192,42 @@ export default function CourtDetail() {
 
   async function reserve() {
     if (!uid || picked.length === 0) return;
+    const selectedCourt = court;
+    if (!selectedCourt) return;
     setBooking(true);
-    const result = await startCourtPayment({
-      court: { id: court!.id, hourly_price: court!.hourly_price },
+
+    if (selectedCourt.hourly_price > 0) {
+      const result = await createCourtPaymentHold({
+        court: { id: selectedCourt.id, name: selectedCourt.name, hourly_price: selectedCourt.hourly_price },
+        uid,
+        slotDate: selectedDate,
+        hours: [...picked],
+        courtUnit: selectedUnit,
+      });
+      setBooking(false);
+
+      if (!result.ok) {
+        if (result.reason === 'slot') Alert.alert('이미 예약된 시간', '선택한 시간이 이미 예약되었어요. 다른 시간을 골라주세요.');
+        else if (result.reason === 'config') Alert.alert('결제 설정 필요', '결제 설정이 아직 완료되지 않았습니다.');
+        else Alert.alert('결제 준비 실패', result.message ?? '잠시 후 다시 시도해주세요.');
+        loadReservations(selectedDate);
+        return;
+      }
+
+      router.push({
+        pathname: '/payment/court',
+        params: {
+          paymentId: result.paymentId,
+          orderId: result.orderId,
+          orderName: result.orderName,
+          amount: String(result.amount),
+        },
+      });
+      return;
+    }
+
+    const result = await createCourtReservation({
+      court: { id: selectedCourt.id, hourly_price: selectedCourt.hourly_price },
       uid,
       slotDate: selectedDate,
       hours: [...picked],
@@ -173,31 +235,15 @@ export default function CourtDetail() {
     });
     setBooking(false);
     if (!result.ok) {
-      if (result.reason === 'slot') Alert.alert('예약 실패', '방금 다른 분이 예약한 시간이 있어요. 다시 선택해주세요.');
-      else if (result.reason === 'error') Alert.alert('결제 실패', result.message ?? '잠시 후 다시 시도해주세요.');
+      if (result.reason === 'slot') Alert.alert('이미 예약된 시간', '선택한 시간에 이미 예약이 있어요. (본인 예약일 수 있어요 — 내 예약에서 확인) 다른 시간을 골라주세요.');
+      else if (result.reason === 'error') Alert.alert('예약 실패', result.message ?? '잠시 후 다시 시도해주세요.');
       loadReservations(selectedDate);
       return;
     }
-    // 유료(toss) → 네이티브 결제수단 선택 화면으로. 수단 선택 후 WebView 로 결제 진행.
-    if ('webview' in result) {
-      setPicked([]);
-      setAnchor(null);
-      router.push({
-        pathname: '/payment/method',
-        params: {
-          orderId: result.webview.orderId,
-          amount: String(result.webview.amount),
-          orderName: result.webview.orderName,
-          pid: result.webview.paymentId,
-        },
-      } as never);
-      return;
-    }
-    // 무료·mock 즉시 확정
     const hoursText = [...picked].sort((a, b) => a - b).map((h) => `${h}시`).join(', ');
     setPicked([]);
     setAnchor(null);
-    Alert.alert('예약 완료', `${selectedDate}\n${hoursText} ${result.free ? '예약됐어요.' : '결제·예약이 완료됐어요.'}`, [
+    Alert.alert('예약 완료', `${selectedDate}\n${hoursText} 예약됐어요.`, [
       { text: '계속 예약', style: 'cancel' },
       { text: '내 예약 보기', onPress: () => router.push('/court/reservations') },
     ]);
@@ -205,13 +251,18 @@ export default function CourtDetail() {
   }
 
   const total = picked.length * court.hourly_price;
-  // 결제 미오픈(토스 심사 중): 유료 코트 예약(결제)만 막고, 무료 코트는 그대로 예약.
-  const paymentBlocked = !PAYMENTS_ENABLED && court.hourly_price > 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <Stack.Screen options={{ title: court.name }} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <Stack.Screen
+        options={{
+          title: court.name,
+          headerStyle: { backgroundColor: AppColors.background },
+          headerTintColor: AppColors.textPrimary,
+          headerShadowVisible: false,
+        }}
+      />
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
         {images.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery} style={styles.galleryWrap}>
             {images.map((url) => (
@@ -246,7 +297,7 @@ export default function CourtDetail() {
         <Text style={styles.sectionTitle}>날짜 선택</Text>
         {!hasOpenDays ? (
           <View style={styles.noDays}>
-            <Ionicons name="calendar-outline" size={22} color="#6B7280" />
+            <Ionicons name="calendar-outline" size={22} color={AppColors.textMuted} />
             <Text style={styles.noDaysText}>아직 예약 가능한 날짜가 없어요.{'\n'}코트 운영자가 예약일을 열면 예약할 수 있어요.</Text>
           </View>
         ) : (
@@ -254,7 +305,9 @@ export default function CourtDetail() {
             todayYmd={todayYmd}
             selected={selectedDate || null}
             onSelectDay={(d) => {
+              // 날짜를 바꾸면 코트 선택을 리셋 → 시간 섹션은 코트를 다시 고를 때 열림(순차)
               setSelectedDate(d);
+              setSelectedUnit('');
               setPicked([]);
               setAnchor(null);
             }}
@@ -266,7 +319,13 @@ export default function CourtDetail() {
         {/* 코트(면) 선택 — 면이 여러 개면 */}
         {selectedDate && units.length > 0 ? (
           <>
-            <Text style={styles.sectionTitle}>코트 선택</Text>
+            <Text
+              style={styles.sectionTitle}
+              onLayout={(e) => {
+                courtSectionY.current = e.nativeEvent.layout.y;
+              }}>
+              코트 선택
+            </Text>
             <View style={styles.unitRow}>
               {units.map((u) => {
                 const active = u.name === selectedUnit;
@@ -279,8 +338,8 @@ export default function CourtDetail() {
                       setAnchor(null);
                     }}
                     style={[styles.unitChip, active ? styles.unitChipActive : styles.unitChipIdle]}>
-                    <Text style={[styles.unitName, { color: active ? '#fff' : '#111827' }]}>{u.name}</Text>
-                    <Text style={[styles.unitSurface, { color: active ? '#EAFBF3' : '#6B7280' }]}>{surfaceLabel(u.surface)}</Text>
+                    <Text style={[styles.unitName, { color: active ? '#fff' : AppColors.textPrimary }]}>{u.name}</Text>
+                    <Text style={[styles.unitSurface, { color: active ? '#EAFBF3' : AppColors.textSecondary }]}>{surfaceLabel(u.surface)}</Text>
                   </Pressable>
                 );
               })}
@@ -288,10 +347,16 @@ export default function CourtDetail() {
           </>
         ) : null}
 
-        {/* 시간 슬롯 */}
-        {selectedDate ? (
+        {/* 시간 슬롯 — 날짜 선택 후, (면이 있으면) 코트까지 고른 뒤에 열린다 */}
+        {selectedDate && (units.length === 0 || selectedUnit) ? (
           <>
-            <Text style={styles.sectionTitle}>시간 선택</Text>
+            <Text
+              style={styles.sectionTitle}
+              onLayout={(e) => {
+                timeSectionY.current = e.nativeEvent.layout.y;
+              }}>
+              시간 선택
+            </Text>
             <Text style={styles.rangeHint}>시작 시간을 누르고 종료 시간을 누르면 연속으로 선택돼요.</Text>
             <View style={styles.slotWrap}>
               {hours.map((h) => {
@@ -302,9 +367,9 @@ export default function CourtDetail() {
                 const sel = picked.includes(h);
                 // 연대관·예약됨(내 것 포함)·지난 시간은 선택 불가. 취소는 '내 예약' 화면에서.
                 const disabled = blocked || !!r || past;
-                const bg = sel ? '#16C784' : mine || r || blocked ? '#F0F1F3' : '#FFFFFF';
-                const fg = sel ? '#fff' : mine ? '#F59E0B' : r || past || blocked ? '#6B7280' : '#111827';
-                const borderColor = sel ? '#16C784' : mine ? '#F59E0B' : '#E5E7EB';
+                const bg = sel ? AppColors.primary : mine || r || blocked ? AppColors.surfaceSoft : AppColors.surface;
+                const fg = sel ? '#fff' : mine ? '#F59E0B' : r || past || blocked ? AppColors.textMuted : AppColors.textPrimary;
+                const borderColor = sel ? AppColors.primary : mine ? '#F59E0B' : AppColors.border;
                 return (
                   <Pressable
                     key={h}
@@ -331,16 +396,14 @@ export default function CourtDetail() {
       <View style={styles.actionBar}>
         <Button
           title={
-            paymentBlocked
-              ? '유료 코트 예약은 곧 오픈됩니다'
-              : picked.length === 0
-                ? '시간을 선택하세요'
-                : total > 0
-                  ? `${total.toLocaleString()}원 결제하기`
-                  : `${picked.length}시간 예약하기`
+            picked.length === 0
+              ? '시간을 선택하세요'
+              : total > 0
+                ? `${total.toLocaleString()}원 예약하기`
+                : `${picked.length}시간 예약하기`
           }
           onPress={reserve}
-          disabled={paymentBlocked || picked.length === 0}
+          disabled={picked.length === 0}
           loading={booking}
         />
       </View>
@@ -351,48 +414,48 @@ export default function CourtDetail() {
 function Info({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color="#16C784" />
+      <Ionicons name={icon} size={18} color={AppColors.primary} />
       <Text style={styles.infoText}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
-  notFound: { color: '#6B7280', fontSize: 15 },
+  safe: { flex: 1, backgroundColor: AppColors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: AppColors.background },
+  notFound: { color: AppColors.textSecondary, fontSize: 15 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
   galleryWrap: { marginHorizontal: -Spacing.four },
   gallery: { gap: 8, paddingHorizontal: Spacing.four },
-  galleryImg: { width: 280, height: 170, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  galleryImg: { width: 280, height: 170, borderRadius: 14, borderCurve: 'continuous', backgroundColor: AppColors.surfaceSoft },
   infoCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     borderRadius: 18,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
     padding: Spacing.three,
     gap: 12,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
+  infoText: { fontSize: 15, fontWeight: '500', color: AppColors.textPrimary, flex: 1 },
   amenityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  amenityChip: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  amenityText: { fontSize: 13, fontWeight: '600', color: '#111827' },
-  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280' },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827', marginTop: Spacing.two },
-  rangeHint: { fontSize: 12, color: '#6B7280', marginTop: -4 },
+  amenityChip: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  amenityText: { fontSize: 13, fontWeight: '600', color: AppColors.textPrimary },
+  desc: { fontSize: 15, lineHeight: 22, color: AppColors.textSecondary },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: AppColors.textPrimary, marginTop: Spacing.two },
+  rangeHint: { fontSize: 12, color: AppColors.textMuted, marginTop: -4 },
   unitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   unitChip: { minWidth: 64, alignItems: 'center', borderRadius: 12, borderCurve: 'continuous', paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
-  unitChipActive: { backgroundColor: '#16C784' },
-  unitChipIdle: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
+  unitChipActive: { backgroundColor: AppColors.primary },
+  unitChipIdle: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border },
   unitName: { fontSize: 15, fontWeight: '800' },
   unitSurface: { fontSize: 11, fontWeight: '600' },
-  noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: Spacing.three },
-  noDaysText: { fontSize: 13, lineHeight: 19, color: '#6B7280', flex: 1 },
+  noDays: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 14, padding: Spacing.three },
+  noDaysText: { fontSize: 13, lineHeight: 19, color: AppColors.textSecondary, flex: 1 },
   slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slot: { width: 72, borderWidth: 1, borderRadius: 12, borderCurve: 'continuous', paddingVertical: 8, alignItems: 'center', gap: 2 },
   slotHour: { fontSize: 15, fontWeight: '800' },
   slotState: { fontSize: 11, fontWeight: '600' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: AppColors.border, backgroundColor: AppColors.background },
 });

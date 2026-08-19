@@ -111,7 +111,7 @@ export default function TournamentsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="trophy-outline" size={48} color="#9CA3AF" />
+              <Ionicons name="trophy-outline" size={48} color="#707B87" />
               <Text style={styles.emptyTitle}>
                 {filter === 'all' ? '아직 대회가 없어요' : `${filter === 'singles' ? '단식' : '복식'} 대회가 없어요`}
               </Text>
@@ -125,20 +125,20 @@ export default function TournamentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two },
   chips: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.four, paddingBottom: Spacing.three },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 40 },
+  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
   monthHeader: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#6B7280',
-    backgroundColor: '#F6F7F9',
+    color: '#AAB4C0',
+    backgroundColor: '#070A0D',
     paddingTop: 8,
     paddingBottom: 2,
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  emptyBody: { fontSize: 16, color: '#6B7280' },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
+  emptyBody: { fontSize: 16, color: '#AAB4C0' },
 });

@@ -3,9 +3,10 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,6 +17,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourtPicker } from '@/components/court-picker';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,7 @@ import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { AppColors } from '@/theme';
 
 function defaultStart(): Date {
   const d = new Date();
@@ -34,6 +37,7 @@ function defaultStart(): Date {
 
 export default function CreateMeetup() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { show, hide } = useLoading();
 
@@ -55,6 +59,23 @@ export default function CreateMeetup() {
   const [reqAddress, setReqAddress] = useState('');
   const [reqNote, setReqNote] = useState('');
   const [reqSaving, setReqSaving] = useState(false);
+  const [keyboardBottom, setKeyboardBottom] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardBottom(Math.max(0, event.endCoordinates.height - insets.bottom));
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardBottom(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [insets.bottom]);
 
   async function submitCourtRequest() {
     if (!session?.user.id || !location.trim()) return;
@@ -151,7 +172,7 @@ export default function CreateMeetup() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TextField
           label="제목"
@@ -255,30 +276,48 @@ export default function CreateMeetup() {
       {/* 코트 등록 요청 모달 */}
       <Modal visible={reqOpen} transparent animationType="slide" onRequestClose={() => setReqOpen(false)}>
         <View style={styles.modalWrap}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>코트 등록 요청</Text>
-            <Text style={styles.modalSub}>{`'${location.trim()}' 코트를 운영자에게 등록 요청해요.`}</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="주소 (선택)"
-              placeholderTextColor="#9CA3AF"
-              value={reqAddress}
-              onChangeText={setReqAddress}
-            />
-            <TextInput
-              style={[styles.modalInput, { minHeight: 70, textAlignVertical: 'top' }]}
-              placeholder="메모 (선택) — 실내/실외, 면 수 등"
-              placeholderTextColor="#9CA3AF"
-              value={reqNote}
-              onChangeText={setReqNote}
-              multiline
-              maxLength={200}
-            />
-            <View style={styles.modalBtns}>
-              <Button title="취소" variant="secondary" onPress={() => setReqOpen(false)} style={{ flex: 1 }} />
-              <Button title={reqSaving ? '요청 중…' : '등록 요청'} onPress={submitCourtRequest} loading={reqSaving} style={{ flex: 1 }} />
+          <KeyboardAvoidingView
+            style={styles.modalKeyboard}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  marginBottom: keyboardBottom,
+                  paddingBottom: Math.max(insets.bottom, 16) + 16,
+                },
+              ]}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalContent}>
+                <Text style={styles.modalTitle}>코트 등록 요청</Text>
+                <Text style={styles.modalSub}>{`'${location.trim()}' 코트를 운영자에게 등록 요청해요.`}</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="주소 (선택)"
+                  placeholderTextColor="#9CA3AF"
+                  value={reqAddress}
+                  onChangeText={setReqAddress}
+                  returnKeyType="next"
+                />
+                <TextInput
+                  style={[styles.modalInput, styles.modalTextarea]}
+                  placeholder="메모 (선택) - 실내/실외, 면 수 등"
+                  placeholderTextColor="#9CA3AF"
+                  value={reqNote}
+                  onChangeText={setReqNote}
+                  multiline
+                  maxLength={200}
+                  textAlignVertical="top"
+                />
+                <View style={styles.modalBtns}>
+                  <Button title="취소" variant="secondary" onPress={() => setReqOpen(false)} style={{ flex: 1 }} />
+                  <Button title={reqSaving ? '요청 중...' : '등록 요청'} onPress={submitCourtRequest} loading={reqSaving} style={{ flex: 1 }} />
+                </View>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -300,10 +339,10 @@ function Stepper({ value, onMinus, onPlus }: { value: string; onMinus: () => voi
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#F6F7F9' },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
+  flex: { flex: 1, backgroundColor: AppColors.background },
+  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 120 },
   field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 2 },
+  label: { fontSize: 13, fontWeight: '600', color: AppColors.textSecondary, marginLeft: 2 },
   dateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -312,11 +351,11 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 12,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
   },
-  dateTxt: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  dateTxt: { fontSize: 16, fontWeight: '600', color: AppColors.textPrimary },
   row2: { flexDirection: 'row', gap: Spacing.three },
   stepper: {
     flexDirection: 'row',
@@ -324,15 +363,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 12,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: AppColors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: AppColors.border,
     paddingHorizontal: Spacing.two,
     height: 52,
   },
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  stepTxt: { fontSize: 26, fontWeight: '800', color: '#16C784' },
-  stepVal: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  stepTxt: { fontSize: 26, fontWeight: '800', color: AppColors.primary },
+  stepVal: { fontSize: 17, fontWeight: '700', color: AppColors.textPrimary },
   approvalNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -347,10 +386,24 @@ const styles = StyleSheet.create({
   approvalNoteText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#0F7A4D' },
   reqLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 },
   reqLinkText: { fontSize: 13, fontWeight: '700', color: '#16C784' },
-  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderCurve: 'continuous', padding: Spacing.four, gap: Spacing.three, paddingBottom: 36 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  modalSub: { fontSize: 13, color: '#6B7280' },
-  modalInput: { borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: 12, fontSize: 15, color: '#111827', backgroundColor: '#F9FAFB' },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', justifyContent: 'flex-end' },
+  modalKeyboard: { flex: 1, justifyContent: 'flex-end' },
+  modalCard: {
+    maxHeight: '82%',
+    backgroundColor: AppColors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: AppColors.border,
+    paddingTop: Spacing.four,
+    paddingHorizontal: Spacing.four,
+  },
+  modalContent: { gap: Spacing.three },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: AppColors.textPrimary },
+  modalSub: { fontSize: 13, color: AppColors.textSecondary },
+  modalInput: { borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: AppColors.border, padding: 12, fontSize: 15, color: AppColors.textPrimary, backgroundColor: AppColors.surfaceSoft },
+  modalTextarea: { minHeight: 88 },
   modalBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
 });

@@ -189,7 +189,94 @@ export default function CourtsTab() {
         <p className="mt-2 text-xs text-amber-600">모든 코트가 사용 중이에요. 진행 중인 경기가 끝나면(점수 입력) 코트가 비워져 다음 경기를 배정할 수 있어요.</p>
       )}
 
-      {/* 코트 현황 */}
+      {/* 코트별 진행 보드 */}
+      <div className="mt-4">
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">코트별 진행 현황</h2>
+            <p className="mt-0.5 text-xs text-slate-500">현재 어느 코트에 어떤 선수가 들어갔는지 운영자가 바로 확인하는 보드입니다.</p>
+          </div>
+          <div className="hidden text-xs text-slate-400 sm:block">
+            사용중 {courts.length - freeCourts.length} · 여유 {freeCourts.length}
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {courts.map((c) => {
+            const busy = busyByCourt.get(c.id);
+            return (
+              <div
+                key={c.id}
+                className={`rounded-2xl border p-4 shadow-sm ${
+                  busy ? 'border-slate-200 bg-white' : 'border-emerald-200 bg-emerald-50/70'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-extrabold tracking-tight text-slate-950">{c.name}</h3>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${c.indoor ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {c.indoor ? '실내' : '실외'}
+                      </span>
+                    </div>
+                    <p className={`mt-1 text-xs font-bold ${busy ? 'text-slate-500' : 'text-emerald-700'}`}>
+                      {busy ? '현재 배정된 경기' : '비어 있음'}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${busy ? 'bg-slate-900 text-white' : 'bg-emerald-600 text-white'}`}>
+                    {busy ? '사용중' : '여유'}
+                  </span>
+                </div>
+
+                {busy ? (
+                  <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{matchLabel(busy)}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${busy.court_confirmed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {busy.court_confirmed ? '확정' : '확정 대기'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <div className="min-w-0 rounded-lg bg-white px-3 py-2 text-center text-base font-extrabold text-slate-950 ring-1 ring-slate-200">
+                        <span className="block truncate">{name(busy.entry1_id)}</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">VS</span>
+                      <div className="min-w-0 rounded-lg bg-white px-3 py-2 text-center text-base font-extrabold text-slate-950 ring-1 ring-slate-200">
+                        <span className="block truncate">{name(busy.entry2_id)}</span>
+                      </div>
+                    </div>
+                    {isOrganizer && (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => confirmMatch(busy.id, !busy.court_confirmed)}
+                          className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold ${
+                            busy.court_confirmed
+                              ? 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                              : 'bg-slate-900 text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {busy.court_confirmed ? '확정 취소' : '경기 확정'}
+                        </button>
+                        <button
+                          onClick={() => assign(busy.id, null)}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                        >
+                          배정 해제
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4 flex min-h-28 items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-white/60 text-sm font-bold text-emerald-700">
+                    다음 경기 배정 가능
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 코트 요약 */}
       <div className="mt-3 flex flex-wrap gap-2">
         {courts.map((c) => {
           const busy = busyByCourt.get(c.id);

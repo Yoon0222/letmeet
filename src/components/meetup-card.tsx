@@ -24,9 +24,9 @@ export function MeetupCard({
       <View style={styles.topRow}>
         <Text style={styles.time}>{formatMeetupTime(meetup.start_time)}</Text>
         {closed ? (
-          <Badge label={meetup.status === 'cancelled' ? '취소됨' : '마감'} color="#DC2626" bg="#FEE2E2" />
+          <Badge label={meetup.status === 'cancelled' ? '취소됨' : '마감'} color="#F87171" bg="rgba(248,113,113,0.14)" />
         ) : full ? (
-          <Badge label="정원마감" color="#D97706" bg="#FEF3C7" />
+          <Badge label="정원마감" color="#FBBF24" bg="rgba(251,191,36,0.14)" />
         ) : (
           <Badge label="모집중" />
         )}
@@ -37,7 +37,7 @@ export function MeetupCard({
       </Text>
 
       <View style={styles.metaRow}>
-        <Ionicons name="location-outline" size={16} color="#6B7280" />
+        <Ionicons name="location-outline" size={16} color="#707B87" />
         <Text style={styles.meta} numberOfLines={1}>
           {meetup.location_name}
           {meetup.region ? ` · ${meetup.region}` : ''}
@@ -52,13 +52,13 @@ export function MeetupCard({
 
         <View style={styles.tags}>
           <View style={[styles.pill, meetup.fee > 0 && styles.feePill]}>
-            <Ionicons name="cash-outline" size={13} color={meetup.fee > 0 ? '#16C784' : '#6B7280'} />
+            <Ionicons name="cash-outline" size={13} color={meetup.fee > 0 ? '#16C784' : '#AAB4C0'} />
             <Text style={[styles.pillText, meetup.fee > 0 && styles.feePillText]}>
               {meetup.fee > 0 ? `${meetup.fee.toLocaleString()}원` : '무료'}
             </Text>
           </View>
           <View style={styles.pill}>
-            <Ionicons name="people-outline" size={13} color="#6B7280" />
+            <Ionicons name="people-outline" size={13} color="#AAB4C0" />
             <Text style={styles.pillText}>
               {meetup.participant_count}/{meetup.max_players}
             </Text>
@@ -73,12 +73,12 @@ const styles = StyleSheet.create({
   card: {
     gap: AppSpacing.xs,
   },
-  cover: { width: '100%', height: 128, borderRadius: Radius.card, borderCurve: 'continuous', backgroundColor: '#E5E7EB', marginBottom: AppSpacing.xs },
+  cover: { width: '100%', height: 128, borderRadius: Radius.card, borderCurve: 'continuous', backgroundColor: '#151D25', marginBottom: AppSpacing.xs },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm },
   time: { fontSize: 14, fontWeight: '800', color: '#16C784' }, // 날짜는 작게(제목보다), 그린 라벨
-  title: { ...Typography.cardTitle, color: '#111827' },
+  title: { ...Typography.cardTitle, color: '#F8FAFC' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  meta: { ...Typography.caption, color: '#6B7280', flex: 1 },
+  meta: { ...Typography.caption, color: '#AAB4C0', flex: 1 },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     marginTop: AppSpacing.xs,
   },
   hostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  host: { fontSize: 13, fontWeight: '600', color: '#6B7280', flex: 1 },
+  host: { fontSize: 13, fontWeight: '600', color: '#AAB4C0', flex: 1 },
   tags: { flexDirection: 'row', gap: 8 },
   pill: {
     flexDirection: 'row',
@@ -97,9 +97,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: Radius.chip,
     borderCurve: 'continuous',
-    backgroundColor: '#F6F7F9',
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  pillText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  feePill: { backgroundColor: '#EAFBF1' },
+  pillText: { fontSize: 13, fontWeight: '700', color: '#AAB4C0' },
+  feePill: { backgroundColor: 'rgba(22,199,132,0.12)' },
   feePillText: { color: '#16C784', fontWeight: '700' },
 });

@@ -28,6 +28,8 @@
 - [ ] **prod 마이그레이션 0043~0052 일괄 실행** — 심사/사용 전 필수. `scratchpad/PROD_v2.0_migrations.sql` 준비됨(2026-07-24 확인: 전부 미실행)
 - [ ] ⚠️ **5.1.1(v) 재리젝 리스크 점검** — v1.0.4 는 "비계정 기능에 로그인 강제"로 리젝됨. `ee4bf61` 로 게스트 열람을 다시 없앴으므로, **이 커밋이 심사 제출 빌드에 포함됐는지** 확인 필요. 포함 시 동일 사유 재리젝 가능
 - [ ] 결제 스테일 홀드 자동정리 스케줄 — `pg_cron` 활성화 + `release_stale_court_holds` 5분 주기 등록
+- [ ] Supabase에 `0063_club_premium_match_results.sql` 실행 — 클럽 프리미엄 상태 + 경기 결과 기록 테이블/RLS
+- [ ] Supabase에 `0064_club_officers_tournaments.sql`·`0065_club_match_dupr.sql` 실행 + `dupr-match` 엣지함수 재배포 — 클럽 임원/월례대회 + 클럽 경기결과 DUPR
 - [ ] 🔴 **알림 기능 prod 배포** — SQL(0053~0055) + Edge Function(notify-turn/tie) + 앱, **한 세트로**. 절차: `docs/PROD_NOTIFICATIONS_DEPLOY.md` (dev는 2026-07-25 적용·검증 완료)
 - [ ] 🔒 **prod `release_stale_court_holds` 권한 회수** — 지금도 열려 있어 결제·예약 일괄취소 가능. 알림 배포와 무관하게 먼저 실행 가능
 - [ ] 대회 참가비 결제 + 대기승격 결제 (Phase 2) — 결제=즉시확정, 정원초과=waitlist(무결제)→승격 시 결제. 결제 엔진 완주 검증 후 착수
@@ -72,6 +74,52 @@
 - [ ] 상점 화면 (피클볼 용품 판매) — 로드맵 가장 마지막
 
 ---
+
+## 2026-08-19
+
+### 클럽 정기모임(세션) — 참석투표→아메리카노 대진→결과 (Phase 1~3 자동흐름)
+- **결정**: 프리미엄 클럽의 핵심 기능. 흐름 = 관리자(클럽장/임원) 모임 개설(일자+투표마감) → 클럽원 참석 투표 → (당일 00:01부터) 아메리카노 복식 대진 자동 생성 → 코트별 진행 → 참여 플레이어가 결과 입력 → 개인 순위. 대진은 클라 순수함수(`src/lib/americano.ts`)로 계산해 insert.
+- **만든 것**: `0067`(club_sessions/players/matches + RLS + 헬퍼), `0068`(vote_deadline·결과입력 RLS를 매치 참여자로 확장). `americano.ts`(런타임 검증: 중복배정0·출전균등). 화면: `club/session-create.tsx`, `club/session/[id].tsx`(투표·명단·대진·순위), `club/session/score.tsx`(점수 입력). `club/[id].tsx` 정기모임 섹션. dev에 0067·0068 push 적용.
+- **남은 것**: 세션 경기 DUPR 등록(Phase 4, dupr-match source='club_session' + 배포). 정기모임은 프리미엄+관리자만 개설.
+- **검증**: tsc·lint 통과.
+
+### 클럽 상세 정리 — 활동 메뉴 카드 → 전용 페이지 분리 (회원관리 포함)
+- **결정**: 한 화면에 쌓여 길던 경기결과·정기모임·월례대회·회원관리를 상세에선 '클럽 활동' 메뉴 카드 4개로만 노출, 각각 전용 페이지로 분리. 상세는 소개+프리미엄+메뉴+하단 가입/탈퇴만.
+- **만든 것**: `club/sessions.tsx`·`club/tournaments.tsx`·`club/results.tsx`·`club/members.tsx`(가입승인·임원임명·멤버목록). 공용 권한 훅 `src/lib/use-club-access.ts`. `club/[id].tsx`에서 4개 섹션 제거+메뉴 카드. `_layout` 라우트 4개 등록.
+- **검증**: tsc·lint 통과. DB 변경 없음(순수 클라이언트).
+
+### 클럽 세션 — 경기별 DUPR/일반 모드 선택
+- **결정**: 경기 시작 시 'DUPR 모드'(레이팅 반영) / '일반 모드'(친선) 선택. 한 세션 안에서 진지한 경기만 골라 DUPR 반영. DUPR 일괄 등록은 dupr_mode=true 경기만 대상.
+- **만든 것**: `0070`(club_session_matches.dupr_mode bool, dev 적용). 세션 상세: '경기 시작' → 모드 선택 Alert, 매치 헤더에 DUPR/일반 칩, 일괄 등록·버튼 카운트를 dupr_mode로 필터.
+- **검증**: tsc·lint 통과.
+
+### 클럽 세션 경기 DUPR 일괄 등록 (Phase 4)
+- **결정**: 세션 종료 시 관리자가 'DUPR 일괄 등록' 버튼 한 번으로 완료·미등록 경기 전부 전송(트리거=일괄). 기존 dupr-match 재사용.
+- **만든 것**: `dupr-match`에 `source='club_session'`→club_session_matches 분기(권한=세션 클럽의 클럽장/임원). dev 배포. 세션 상세에 'DUPR 일괄 등록' 버튼(완료·미등록 n경기) + 등록된 경기 'DUPR 반영됨' 표시. `dupr.ts` source 유니온 확장.
+- **메모**: 참여 4명 전원 DUPR 연결(verified+basic) 필요, PARTNER 매치로 전송(클럽 소속 아님). 미연결 포함 경기는 건너뛰고 요약 안내.
+- **검증**: tsc·lint 통과, 함수 배포 확인.
+
+### 클럽 세션 — 경기 시작 상태 + 수동/자동+수정 대진 (규칙 5·7)
+- **결정**: (규칙7) 대진 배정 선수가 '경기 시작'을 눌러 매치를 진행 상태로 → 모두가 대기/진행중/완료 구분. (규칙5) 대진 자동/수동/자동후수정 전부 지원.
+- **만든 것**: `0069`(club_session_matches.status에 'ongoing' 추가, dev 적용). 세션 상세: 매치 상태 배지 + '경기 시작'(scheduled→ongoing, 참여자/임원) + 진행중만 결과입력. `club/session/match-edit.tsx`(라운드·코트 + 4슬롯 선수 배정, 새 매치 추가/기존 편집/삭제 — 관리자). 대진 헤더에 '매치 추가'·매치별 편집 연필.
+- **검증**: tsc·lint 통과.
+
+### 프리미엄 클럽 인식 버그픽스 + dev 마이그레이션 CLI 베이스라인
+- **버그**: 클럽을 프리미엄으로 만들어도 상세에서 "무료체험 시작" 버튼이 계속 노출. 원인은 `clubs_with_counts` 뷰가 프리미엄 컬럼(0063) 추가 전에 만들어져 `c.*`가 tier/premium_status를 고정 누락 → 앱에서 undefined. (0031/0032처럼 컬럼 추가 시 뷰 재생성 필요했는데 0063이 누락.)
+- **고친 것**: `0066_clubs_view_premium.sql`로 뷰 drop+재생성(c.* 재확장). dev 적용 완료. 데이터 수정 불필요(clubs 행은 이미 trialing).
+- **인프라 결정**: dev(pjfhxkvdjipvdmfsacie) CLI 링크 + `dupr-match` 배포. 그동안 마이그레이션을 SQL Editor 수동 적용 → CLI 이력 테이블이 비어 `db push`가 전체 재생 위험. **0001~0065를 `migration repair --status applied`로 베이스라인**(실행 아님, 이력만) 후 push로 0066만 적용. 이제 dev는 CLI 관리 상태 → 앞으로 `supabase db push`로 적용 가능. (운영 prod는 아직 미링크·수동.)
+
+### 클럽 임원·월례대회 + 클럽 경기결과 DUPR 등록
+- **결정**: 프리미엄 클럽 기능으로 (1) 클럽장만 `월례대회` 개설, (2) 클럽장만 `임원(officer)` 임명, (3) 임원은 가입 승인·경기결과 기록 도우미. 권한은 RLS로 컬럼 제약이 어려워 SECURITY DEFINER RPC(`set_club_officer`=클럽장 전용, `review_club_member`=클럽장/임원)로 강제. 클럽 경기결과·월례대회 매치도 DUPR에 반영(PARTNER 매치로 제출).
+- **만든 것**: `0064`(tournaments.club_id + 대회 생성정책에 클럽장 경로 + 두 RPC), `0065`(club_match_results dupr_* 컬럼). `src/app/club/tournament-create.tsx`(월례대회 개설 화면·모달 라우트). `club/[id].tsx`: 승인/거절 RPC 전환·임원 배지/임명·월례대회 섹션·경기결과 카드 `DUPR 등록` 버튼. `dupr-match` 엣지함수에 `source='club'` 분기 + tournament 권한에 클럽 대회의 클럽장/임원 허용. `dupr.ts`·`types.ts`·`schema.sql` 동반 갱신.
+- **메모/주의**: `0064`·`0065` 를 dev/운영 DB에 적용해야 하고 `dupr-match` 재배포 필요. 클럽 경기결과는 단일 게임(team1:team2) 1게임으로 DUPR 제출, 모든 선수 DUPR 연결(verified+basic) 필요. 클럽을 DUPR 클럽으로 등록하지 않아 `matchSource=PARTNER`(레이팅엔 반영, 클럽 소속 아님).
+- **검증**: `npx tsc --noEmit`, `npx expo lint` 통과.
+
+### 클럽 프리미엄 경기 결과 관리 MVP
+- **결정**: 프리미엄 클럽 1차 범위는 대진표 관리/코트 배정 없이 `경기 결과 관리`만 제공한다.
+- **만든 것**: `club_match_results` 테이블/RLS, 클럽 `tier/premium_status/trial` 필드, 클럽 상세의 프리미엄 카드와 결과 목록, `src/app/club/match-create.tsx` 단식 결과 기록 화면.
+- **메모/주의**: 구독 결제는 아직 연결하지 않았고, 운영자 버튼은 1개월 무료 체험 상태만 클럽 row에 기록한다. `0063` 마이그레이션을 테스트/운영 대상 DB에 적용해야 동작한다.
+- **검증**: `npx.cmd tsc --noEmit`, `npx.cmd expo lint` 통과.
 
 ## 2026-08-04
 

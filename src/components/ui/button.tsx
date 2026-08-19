@@ -34,15 +34,15 @@ export function Button({
 
   const bg: Record<Variant, string> = {
     primary: '#16C784',
-    secondary: '#FFFFFF',
+    secondary: 'rgba(255,255,255,0.07)',
     outline: 'transparent',
-    danger: '#FEE2E2',
+    danger: 'rgba(248,113,113,0.14)',
   };
   const fg: Record<Variant, string> = {
     primary: '#FFFFFF',
-    secondary: '#111827',
-    outline: '#111827',
-    danger: '#DC2626',
+    secondary: '#F8FAFC',
+    outline: '#F8FAFC',
+    danger: '#F87171',
   };
 
   return (
@@ -51,7 +51,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: bg[variant], opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
-        (variant === 'outline' || variant === 'secondary') && { borderWidth: 1, borderColor: '#E5E7EB' },
+        (variant === 'outline' || variant === 'secondary') && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
         style,
       ]}
       {...rest}>

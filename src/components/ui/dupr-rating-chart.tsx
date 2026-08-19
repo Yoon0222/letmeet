@@ -9,8 +9,8 @@ export type DuprPoint = { at: number; doubles: number | null; singles: number | 
 
 const GREEN = '#16C784'; // 복식
 const BLUE = '#2D6BD6'; // 단식
-const GRID = '#EEF0F3';
-const AXIS = '#9CA3AF';
+const GRID = 'rgba(255,255,255,0.09)';
+const AXIS = '#707B87';
 
 type Series = { key: 'doubles' | 'singles'; label: string; color: string };
 const SERIES: Series[] = [
@@ -61,7 +61,7 @@ function Line({
             width: 6,
             height: 6,
             borderRadius: 3,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: '#10161D',
             borderWidth: 2,
             borderColor: color,
           }}
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: 'row', gap: Spacing.three, flexWrap: 'wrap', marginBottom: 8 },
   headItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  headLabel: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
+  headLabel: { fontSize: 13, fontWeight: '700', color: '#AAB4C0' },
   headVal: { fontSize: 18, fontWeight: '800' },
   delta: { fontSize: 12, fontWeight: '800' },
   plot: { position: 'relative', width: '100%' },

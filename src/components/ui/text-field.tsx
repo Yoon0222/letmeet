@@ -15,11 +15,11 @@ export function TextField({ label, hint, style, ...rest }: TextFieldProps) {
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor="#707B87"
         style={[
           styles.input,
           {
-            borderColor: focused ? '#16C784' : '#E5E7EB',
+            borderColor: focused ? '#16C784' : 'rgba(255,255,255,0.09)',
           },
           style,
         ]}
@@ -34,7 +34,7 @@ export function TextField({ label, hint, style, ...rest }: TextFieldProps) {
 
 const styles = StyleSheet.create({
   wrap: { gap: 8, alignSelf: 'stretch' },
-  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 2 },
+  label: { fontSize: 13, fontWeight: '700', color: '#AAB4C0', marginLeft: 2 },
   input: {
     minHeight: 56,
     borderRadius: Radius.input,
@@ -44,8 +44,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     fontWeight: '500',
-    backgroundColor: '#FFFFFF',
-    color: '#111827',
+    backgroundColor: '#10161D',
+    color: '#F8FAFC',
   },
-  hint: { fontSize: 13, marginLeft: 2, color: '#9CA3AF' },
+  hint: { fontSize: 13, marginLeft: 2, color: '#707B87' },
 });
