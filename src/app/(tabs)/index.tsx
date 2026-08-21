@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClubCard } from '@/components/club-card';
 import { CourtCard } from '@/components/court-card';
 import { EventPopup } from '@/components/event-popup';
+import { HomeSessionVote } from '@/components/home-session-vote';
 import { MeetupCard } from '@/components/meetup-card';
 import { TournamentCard } from '@/components/tournament-card';
 import { AppCard } from '@/components/ui/app-card';
@@ -157,14 +158,20 @@ export default function HomeScreen() {
     const upcomingTournamentIds = new Set(items.filter((i) => i.type === 'tournament').map((i) => i.key.slice(1)));
     setOpenTournaments((tours ?? []).filter((t) => !upcomingTournamentIds.has(t.id)).slice(0, 3));
 
-    const { data: cs } = await supabase
-      .from('clubs_with_counts')
-      .select('*')
-      .order('member_count', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(3);
-    // 회원 많은 순(동수면 최근순)으로 최대 3개 노출 — 이전엔 3개↑일 때 10명↑만 노출해 작은 클럽이 사라져 혼란 → 완화
-    setClubs((cs ?? []).slice(0, 3));
+    const [{ data: cs }, { data: myMem }] = await Promise.all([
+      supabase
+        .from('clubs_with_counts')
+        .select('*')
+        .order('member_count', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(20),
+      uid
+        ? supabase.from('club_members').select('club_id').eq('user_id', uid)
+        : Promise.resolve({ data: [] as { club_id: string }[] }),
+    ]);
+    // 추천 클럽 = 내가 이미 속한/신청한 클럽 제외 후 회원 많은 순 최대 3개
+    const myClubIds = new Set(((myMem as { club_id: string }[] | null) ?? []).map((m) => m.club_id));
+    setClubs((cs ?? []).filter((c) => !myClubIds.has(c.id)).slice(0, 3));
 
     // 코트 예약 — 지역 있으면 우선, 없으면 전체에서 몇 개
     let courtQuery = supabase.from('courts').select('*').order('region', { ascending: true }).limit(6);
@@ -229,6 +236,8 @@ export default function HomeScreen() {
             <NotificationBell size={22} color="#F8FAFC" />
           </View>
         </View>
+
+        <HomeSessionVote />
 
         <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#9BE137" bg="rgba(155,225,55,0.14)" />
         {upcoming.length > 0 ? (

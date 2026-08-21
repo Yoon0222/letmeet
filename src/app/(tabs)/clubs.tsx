@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
@@ -20,6 +20,8 @@ export default function ClubsScreen() {
   const { session } = useAuth();
   const uid = session?.user.id;
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
+  const [myClubIds, setMyClubIds] = useState<Set<string>>(new Set());
+  const [pendingClubIds, setPendingClubIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
@@ -29,9 +31,12 @@ export default function ClubsScreen() {
   }, [router, session]);
 
   const load = useCallback(async () => {
-    const [{ data, error }, blocked] = await Promise.all([
+    const [{ data, error }, blocked, { data: myMem }] = await Promise.all([
       supabase.from('clubs_with_counts').select('*').order('member_count', { ascending: false }).limit(100),
       uid ? getBlockedIds(uid) : Promise.resolve([]),
+      uid
+        ? supabase.from('club_members').select('club_id, status').eq('user_id', uid)
+        : Promise.resolve({ data: [] as { club_id: string; status: string }[] }),
     ]);
     if (error) {
       console.warn('[clubs] load error', error.message);
@@ -40,6 +45,9 @@ export default function ClubsScreen() {
       const blockedSet = new Set(blocked);
       setClubs((data ?? []).filter((c) => !blockedSet.has(c.owner_id))); // 차단한 사용자 클럽 숨김
     }
+    const mem = (myMem as { club_id: string; status: string }[] | null) ?? [];
+    setMyClubIds(new Set(mem.filter((m) => m.status === 'approved').map((m) => m.club_id)));
+    setPendingClubIds(new Set(mem.filter((m) => m.status === 'pending').map((m) => m.club_id)));
     setLoading(false);
     setRefreshing(false);
   }, [uid]);
@@ -55,6 +63,18 @@ export default function ClubsScreen() {
   const visible = q
     ? clubs.filter((c) => `${c.name} ${c.region}`.toLowerCase().includes(q))
     : clubs;
+
+  // 내 클럽(가입·소유) → 가입 신청 중 → 다른 클럽 순으로 분리
+  const myClubs = visible.filter((c) => myClubIds.has(c.id));
+  const pendingClubs = visible.filter((c) => pendingClubIds.has(c.id) && !myClubIds.has(c.id));
+  const otherClubs = visible.filter((c) => !myClubIds.has(c.id) && !pendingClubIds.has(c.id));
+  const groups = [
+    { title: '내 클럽', data: myClubs },
+    { title: '가입 신청 중', data: pendingClubs },
+    { title: '다른 클럽', data: otherClubs },
+  ].filter((g) => g.data.length > 0);
+  // 그룹이 하나뿐이면 헤더 숨김(예: 안 가입한 사용자)
+  const sections = groups.map((g) => ({ ...g, showHeader: groups.length > 1 }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -93,13 +113,19 @@ export default function ClubsScreen() {
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : (
-        <FlatList
-          data={visible}
+        <SectionList
+          sections={sections}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
           renderItem={({ item }) => (
-            <ClubCard club={item} onPress={() => router.push(`/club/${item.id}`)} />
+            <View style={styles.cardWrap}>
+              <ClubCard club={item} onPress={() => router.push(`/club/${item.id}`)} />
+            </View>
           )}
+          renderSectionHeader={({ section }) =>
+            section.showHeader ? <Text style={styles.sectionHeader}>{section.title}</Text> : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -151,7 +177,9 @@ const styles = StyleSheet.create({
     height: 44,
   },
   searchInput: { flex: 1, fontSize: 15, padding: 0, color: '#F8FAFC' },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
+  list: { padding: Spacing.four, paddingTop: 0, paddingBottom: 124 },
+  cardWrap: { marginBottom: Spacing.three },
+  sectionHeader: { fontSize: 15, fontWeight: '900', color: '#F8FAFC', marginTop: Spacing.two, marginBottom: Spacing.three },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
   emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },

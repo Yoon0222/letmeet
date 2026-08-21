@@ -40,6 +40,8 @@ export function targetHref(
       return `/meetup/${targetId}`;
     case 'club':
       return `/club/${targetId}`;
+    case 'club_session':
+      return `/club/session/${targetId}`;
     case 'community_post':
       return `/community/${targetId}`;
     case 'tournament':

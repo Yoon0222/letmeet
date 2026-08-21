@@ -98,6 +98,7 @@ export default function ClubSessionDetail() {
   }, [navigation, sess]);
 
   const attending = useMemo(() => players.filter((p) => p.status === 'in'), [players]);
+  const notAttending = useMemo(() => players.filter((p) => p.status === 'out'), [players]);
   const myVote = players.find((p) => p.user_id === uid)?.status ?? null;
   const votingOpen = !!sess && sess.status === 'voting' && (!sess.vote_deadline || new Date(sess.vote_deadline).getTime() > nowMs);
   const drawOpen = !!sess && nowMs >= drawOpenAt(sess.session_date);
@@ -173,9 +174,13 @@ export default function ClubSessionDetail() {
     const n = attending.length;
     const suggest = Math.min(Math.max(4, n - 1), 12);
     const options = [Math.max(4, suggest - 2), suggest, suggest + 2].filter((v, i, a) => a.indexOf(v) === i);
+    const duprDone = matches.filter((m) => m.dupr_status === 'submitted').length;
+    const warn = matches.length
+      ? `\n(기존 대진·점수는 지워져요)${duprDone ? `\n⚠️ 이미 DUPR에 등록된 ${duprDone}경기는 DUPR엔 남고 앱에선 사라져요.` : ''}`
+      : '';
     Alert.alert(
       matches.length ? '대진 다시 생성' : '대진 생성',
-      `참석 ${n}명 · 코트 ${sess?.court_count}면. 라운드 수를 고르세요.${matches.length ? '\n(기존 대진·점수는 지워져요)' : ''}`,
+      `참석 ${n}명 · 코트 ${sess?.court_count}면. 라운드 수를 고르세요.${warn}`,
       [
         ...options.map((r) => ({ text: `${r}라운드`, onPress: () => generate(r) })),
         { text: '닫기', style: 'cancel' as const },
@@ -300,14 +305,30 @@ export default function ClubSessionDetail() {
           </View>
         ) : null}
 
-        {/* 참석 명단 */}
+        {/* 참석 현황 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>참석 {attending.length}명</Text>
-          <View style={{ gap: 8, marginTop: 8 }}>
+          <Text style={styles.sectionTitle}>참석 현황</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusPillBig, styles.statInBg]}>
+              <Ionicons name="checkmark-circle" size={15} color="#16C784" />
+              <Text style={styles.statInTxt}>참석 {attending.length}</Text>
+            </View>
+            <View style={[styles.statusPillBig, styles.statOutBg]}>
+              <Ionicons name="close-circle" size={15} color="#F26D6D" />
+              <Text style={styles.statOutTxt}>불참 {notAttending.length}</Text>
+            </View>
+            <View style={[styles.statusPillBig, styles.statNoneBg]}>
+              <Ionicons name="ellipse-outline" size={15} color="#AAB4C0" />
+              <Text style={styles.statNoneTxt}>미투표 {candidates.length}</Text>
+            </View>
+          </View>
+
+          <View style={{ gap: 8, marginTop: 12 }}>
             {attending.map((a) => (
               <View key={a.user_id} style={styles.mRow}>
                 <Avatar nickname={a.profile?.nickname ?? '?'} uri={a.profile?.avatar_url} size={36} />
                 <Text style={styles.mName}>{a.profile?.nickname ?? '알 수 없음'}</Text>
+                <View style={styles.attendTag}><Text style={styles.attendTagTxt}>참석</Text></View>
                 {isManager ? (
                   <Pressable onPress={() => removeMember(a.user_id)} style={styles.removeBtn}>
                     <Ionicons name="close" size={16} color="#AAB4C0" />
@@ -315,7 +336,14 @@ export default function ClubSessionDetail() {
                 ) : null}
               </View>
             ))}
-            {attending.length === 0 ? <Text style={styles.dimSmall}>아직 참석자가 없어요.</Text> : null}
+            {notAttending.map((a) => (
+              <View key={a.user_id} style={styles.mRow}>
+                <Avatar nickname={a.profile?.nickname ?? '?'} uri={a.profile?.avatar_url} size={36} />
+                <Text style={[styles.mName, styles.mNameOut]}>{a.profile?.nickname ?? '알 수 없음'}</Text>
+                <View style={styles.absentTag}><Text style={styles.absentTagTxt}>불참</Text></View>
+              </View>
+            ))}
+            {attending.length === 0 && notAttending.length === 0 ? <Text style={styles.dimSmall}>아직 투표한 사람이 없어요.</Text> : null}
           </View>
 
           {/* 임원: 명단에 없는 클럽원 추가 */}
@@ -494,6 +522,19 @@ const styles = StyleSheet.create({
   voteTxtOn: { color: '#07100D' },
   mRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   mName: { flex: 1, color: '#F8FAFC', fontSize: 15, fontWeight: '700' },
+  mNameOut: { color: '#AAB4C0' },
+  statusRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  statusPillBig: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 40, borderRadius: 14, borderCurve: 'continuous' },
+  statInBg: { backgroundColor: 'rgba(22,199,132,0.12)' },
+  statInTxt: { color: '#16C784', fontSize: 14, fontWeight: '900' },
+  statOutBg: { backgroundColor: 'rgba(242,109,109,0.12)' },
+  statOutTxt: { color: '#F26D6D', fontSize: 14, fontWeight: '900' },
+  statNoneBg: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  statNoneTxt: { color: '#AAB4C0', fontSize: 14, fontWeight: '900' },
+  attendTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(22,199,132,0.14)' },
+  attendTagTxt: { color: '#16C784', fontSize: 11, fontWeight: '800' },
+  absentTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(242,109,109,0.14)' },
+  absentTagTxt: { color: '#F26D6D', fontSize: 11, fontWeight: '800' },
   removeBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#151D25' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   addChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(22,199,132,0.12)', borderWidth: 1, borderColor: 'rgba(22,199,132,0.25)' },

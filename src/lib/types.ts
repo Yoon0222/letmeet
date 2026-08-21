@@ -661,6 +661,7 @@ export type NotificationType =
 export type NotificationTargetType =
   | 'meetup'
   | 'club'
+  | 'club_session'
   | 'community_post'
   | 'tournament'
   | 'court';

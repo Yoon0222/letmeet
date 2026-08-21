@@ -55,7 +55,7 @@ export default function CreateClubTournament() {
     if (!clubId || !session?.user.id) return;
     supabase
       .from('clubs')
-      .select('name, owner_id')
+      .select('name, owner_id, tier, premium_status, premium_trial_ends_at')
       .eq('id', clubId)
       .maybeSingle()
       .then(({ data }) => {
@@ -63,6 +63,13 @@ export default function CreateClubTournament() {
         setClubName(data.name);
         if (data.owner_id !== session.user.id) {
           Alert.alert('권한 없음', '클럽 월례대회는 클럽장만 개설할 수 있어요.');
+          router.back();
+          return;
+        }
+        const trialing = data.premium_status === 'trialing' && !!data.premium_trial_ends_at && new Date(data.premium_trial_ends_at).getTime() > Date.now();
+        const premiumUsable = data.tier === 'premium' && (data.premium_status === 'active' || trialing);
+        if (!premiumUsable) {
+          Alert.alert('프리미엄 필요', '월례대회는 프리미엄 클럽에서만 개설할 수 있어요.');
           router.back();
         }
       });

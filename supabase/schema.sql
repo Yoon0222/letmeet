@@ -2015,6 +2015,38 @@ drop trigger if exists on_community_comment_notify on public.community_comments;
 create trigger on_community_comment_notify
   after insert on public.community_comments
   for each row execute function public.notify_post_author_on_comment();
+
+-- (F) 정기모임 생성 → 승인 클럽원에게 참석 투표 알림 (0075) ------------------
+create or replace function public.notify_club_members_on_session()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_club_name text;
+  v_body text;
+  r record;
+begin
+  select name into v_club_name from public.clubs where id = new.club_id;
+  v_body := coalesce(v_club_name, '클럽') || ' · ' || to_char(new.session_date, 'MM/DD')
+            || ' 정기모임 참석 투표를 해주세요.';
+  for r in
+    select user_id from public.club_members
+    where club_id = new.club_id and status = 'approved' and user_id <> new.created_by
+  loop
+    perform public.push_notify(
+      r.user_id, 'session_vote', '정기모임 참석 투표', v_body,
+      'club_session', new.id, new.created_by
+    );
+  end loop;
+  return new;
+end;
+$$;
+drop trigger if exists on_club_session_notify on public.club_sessions;
+create trigger on_club_session_notify
+  after insert on public.club_sessions
+  for each row execute function public.notify_club_members_on_session();
+
 -- 0054: 내부 전용 함수의 실행 권한 회수 (보안).
 --
 --   Postgres 는 함수 생성 시 PUBLIC 에 EXECUTE 를 기본 부여한다. 그래서 아래 두

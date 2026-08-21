@@ -50,7 +50,7 @@ export default function CreateClubSession() {
     if (!clubId || !session?.user.id) return;
     (async () => {
       const [{ data: club }, { data: mem }] = await Promise.all([
-        supabase.from('clubs').select('name, owner_id').eq('id', clubId).maybeSingle(),
+        supabase.from('clubs').select('name, owner_id, tier, premium_status, premium_trial_ends_at').eq('id', clubId).maybeSingle(),
         supabase.from('club_members').select('role, status').eq('club_id', clubId).eq('user_id', session.user.id).maybeSingle(),
       ]);
       if (!club) return;
@@ -58,6 +58,13 @@ export default function CreateClubSession() {
       const isManager = club.owner_id === session.user.id || (mem?.role === 'officer' && mem?.status === 'approved');
       if (!isManager) {
         Alert.alert('권한 없음', '정기모임은 클럽장·임원만 개설할 수 있어요.');
+        router.back();
+        return;
+      }
+      const trialing = club.premium_status === 'trialing' && !!club.premium_trial_ends_at && new Date(club.premium_trial_ends_at).getTime() > Date.now();
+      const premiumUsable = club.tier === 'premium' && (club.premium_status === 'active' || trialing);
+      if (!premiumUsable) {
+        Alert.alert('프리미엄 필요', '정기모임은 프리미엄 클럽에서만 개설할 수 있어요.');
         router.back();
       }
     })();

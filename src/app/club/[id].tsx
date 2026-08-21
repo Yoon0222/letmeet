@@ -165,7 +165,7 @@ export default function ClubDetail() {
       Alert.alert('권한 필요', '사진을 올리려면 갤러리 접근 권한이 필요해요.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
     if (result.canceled) return;
     const img = result.assets[0];
     setUploading(true);
@@ -173,6 +173,7 @@ export default function ClubDetail() {
       const ext = (img.uri.split('.').pop() ?? 'jpg').toLowerCase();
       const path = `${id}/cover_${Date.now()}.${ext}`;
       const buf = await fetch(img.uri).then((r) => r.arrayBuffer());
+      if (!buf || buf.byteLength === 0) throw new Error('이미지를 읽지 못했어요 (0바이트). 다른 사진으로 시도해 주세요.');
       const { error: upErr } = await supabase.storage.from('club-images').upload(path, buf, { contentType: img.mimeType ?? 'image/jpeg', upsert: true });
       if (upErr) throw upErr;
       const url = supabase.storage.from('club-images').getPublicUrl(path).data.publicUrl;
@@ -180,7 +181,15 @@ export default function ClubDetail() {
       if (dbErr) throw dbErr;
       load();
     } catch (e) {
-      Alert.alert('사진 업로드 실패', e instanceof Error ? e.message : '다시 시도해주세요.');
+      // 실제 원인을 최대한 드러낸다(스토리지 에러는 Error 가 아닐 수 있음).
+      const detail =
+        e instanceof Error
+          ? e.message
+          : e && typeof e === 'object'
+            ? (e as { message?: string; error?: string }).message ?? (e as { error?: string }).error ?? JSON.stringify(e)
+            : String(e);
+      console.warn('[club cover] upload failed', e);
+      Alert.alert('사진 업로드 실패', detail || '알 수 없는 오류');
     } finally {
       setUploading(false);
     }
@@ -204,28 +213,22 @@ export default function ClubDetail() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 대표 사진 (있으면 표시, 운영자는 탭해서 변경) */}
-        {club.image_url ? (
-          <Pressable onPress={pickPhoto} disabled={!isOwner || uploading}>
-            <Image source={{ uri: club.image_url }} style={styles.cover} />
+        {/* 클럽 로고 (정사각) — 운영자는 탭해서 변경 */}
+        <View style={styles.titleRow}>
+          <Pressable onPress={pickPhoto} disabled={!isOwner || uploading} style={styles.logoWrap}>
+            {club.image_url ? (
+              <Image source={{ uri: club.image_url }} style={styles.logo} />
+            ) : (
+              <View style={styles.logoPlaceholder}>
+                <Ionicons name="people" size={28} color="#16C784" />
+              </View>
+            )}
             {isOwner ? (
-              <View style={styles.coverEdit}>
-                <Ionicons name="camera" size={14} color="#fff" />
-                <Text style={styles.coverEditText}>{uploading ? '올리는 중…' : '사진 변경'}</Text>
+              <View style={styles.logoBadge}>
+                <Ionicons name={uploading ? 'ellipsis-horizontal' : 'camera'} size={12} color="#fff" />
               </View>
             ) : null}
           </Pressable>
-        ) : isOwner ? (
-          <Pressable onPress={pickPhoto} disabled={uploading} style={styles.coverEmpty}>
-            <Ionicons name="image-outline" size={22} color="#16C784" />
-            <Text style={styles.coverEmptyText}>{uploading ? '올리는 중…' : '클럽 대표 사진 추가'}</Text>
-          </Pressable>
-        ) : null}
-
-        <View style={styles.titleRow}>
-          <View style={styles.icon}>
-            <Ionicons name="people" size={26} color="#16C784" />
-          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{club.name}</Text>
             <Text style={styles.meta}>
@@ -315,6 +318,10 @@ const styles = StyleSheet.create({
   coverEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   icon: { width: 52, height: 52, borderRadius: 14, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.14)', alignItems: 'center', justifyContent: 'center' },
+  logoWrap: { width: 64, height: 64 },
+  logo: { width: 64, height: 64, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D' },
+  logoPlaceholder: { width: 64, height: 64, borderRadius: 18, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.14)', alignItems: 'center', justifyContent: 'center' },
+  logoBadge: { position: 'absolute', right: -3, bottom: -3, width: 24, height: 24, borderRadius: 999, backgroundColor: '#16C784', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#070A0D' },
   title: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
   meta: { fontSize: 14, color: '#AAB4C0', marginTop: 2 },
   section: { marginTop: Spacing.two },
