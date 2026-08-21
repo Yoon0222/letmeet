@@ -88,7 +88,6 @@ export default function TossPaymentCallbackRoute() {
     let mounted = true;
 
     async function confirm() {
-      console.log('[payment] callback params', params);
       const failure = readTossFailure(params);
       if (failure) {
         if (failure.paymentId) {
@@ -105,10 +104,6 @@ export default function TossPaymentCallbackRoute() {
       }
 
       try {
-        console.log('[payment] callback confirm start', {
-          orderId: result.orderId,
-          amount: result.amount,
-        });
         await confirmTossPayment(result);
         if (!mounted) return;
         setMessage('결제가 확인되어 예약이 완료되었습니다.');

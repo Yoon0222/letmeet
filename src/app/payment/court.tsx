@@ -88,7 +88,6 @@ async function openExternalPaymentUrl(url: string) {
   const { appUrl, packageName } = convertIntentUrl(url);
 
   try {
-    console.log('[payment] external app open', { url, appUrl, packageName });
     await Linking.openURL(appUrl);
   } catch (error) {
     console.warn('[payment] external app open failed', { url, appUrl, packageName, error });
@@ -497,11 +496,6 @@ export default function CourtPaymentRoute() {
           throw new Error('결제 주문 정보가 예약 정보와 일치하지 않아요.');
         }
 
-        console.log('[payment] api-window confirm start', {
-          paymentId,
-          orderId: returnedOrderId,
-          amount: returnedAmount,
-        });
 
         const result = await confirmTossPayment({
           paymentId,
@@ -575,7 +569,6 @@ export default function CourtPaymentRoute() {
       if (completedRef.current || exitingRef.current) return true;
 
       const normalizedUrl = unwrapPaymentRedirect(url);
-      console.log('[payment] api-window incoming url', normalizedUrl);
 
       if (isBarePaymentAppReturn(normalizedUrl)) {
         setStatusText('결제 앱에서 돌아왔어요. 결제창의 완료 화면을 기다리고 있습니다.');
@@ -721,14 +714,11 @@ export default function CourtPaymentRoute() {
             onShouldStartLoadWithRequest={shouldStartLoad}
             onOpenWindow={(event) => {
               const targetUrl = event.nativeEvent.targetUrl;
-              console.log('[payment] api-window open window', targetUrl);
               if (!targetUrl || targetUrl === 'undefined') return;
               if (handleIncomingUrl(targetUrl)) return;
               void openExternalPaymentUrl(targetUrl);
             }}
-            onMessage={(event) => {
-              console.log('[payment] api-window message', event.nativeEvent.data);
-            }}
+            onMessage={() => {}}
             onLoadEnd={() => {
               if (!completedRef.current && !exitingRef.current) setStatusText('결제창이 준비되었습니다.');
             }}
