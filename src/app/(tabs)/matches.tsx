@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
 import { AppChip } from '@/components/ui/app-chip';
@@ -25,6 +25,7 @@ import type { MeetupWithCounts } from '@/lib/types';
 
 export default function MatchesScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const uid = session?.user.id;
@@ -117,7 +118,7 @@ export default function MatchesScreen() {
 
       <AppFAB
         onPress={() => router.push(session ? '/meetup/create' : '/(auth)/sign-in')}
-        style={styles.fab}
+        style={[styles.fab, { bottom: 86 + Math.max(insets.bottom, 16) }]}
       />
     </SafeAreaView>
   );
@@ -136,6 +137,5 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: Spacing.four,
-    bottom: Spacing.four,
   },
 });

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommunityPostCard } from '@/components/community-post-card';
 import { AppFAB } from '@/components/ui/app-fab';
@@ -17,6 +17,7 @@ import type { CommunityCategory, CommunityPostWithCounts } from '@/lib/types';
 
 export default function CommunityScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const uid = session?.user.id;
@@ -99,7 +100,7 @@ export default function CommunityScreen() {
         />
       )}
 
-      <AppFAB icon="create" onPress={() => router.push(session ? ('/community/create' as never) : '/(auth)/sign-in')} style={styles.fab} />
+      <AppFAB icon="create" onPress={() => router.push(session ? ('/community/create' as never) : '/(auth)/sign-in')} style={[styles.fab, { bottom: 86 + Math.max(insets.bottom, 16) }]} />
     </SafeAreaView>
   );
 }
@@ -135,5 +136,5 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
   emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
   emptyBody: { fontSize: 16, color: '#AAB4C0' },
-  fab: { position: 'absolute', right: Spacing.four, bottom: Spacing.four },
+  fab: { position: 'absolute', right: Spacing.four },
 });

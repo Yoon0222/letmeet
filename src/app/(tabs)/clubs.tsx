@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
 import { AppFAB } from '@/components/ui/app-fab';
@@ -16,6 +16,7 @@ import type { ClubWithCounts } from '@/lib/types';
 
 export default function ClubsScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const uid = session?.user.id;
@@ -154,7 +155,7 @@ export default function ClubsScreen() {
 
       <AppFAB
         onPress={openCreateClub}
-        style={styles.fab}
+        style={[styles.fab, { bottom: 86 + Math.max(insets.bottom, 16) }]}
       />
     </SafeAreaView>
   );
@@ -196,5 +197,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   emptyButtonText: { color: '#07110C', fontSize: 14, fontWeight: '900' },
-  fab: { position: 'absolute', right: Spacing.four, bottom: 118 },
+  fab: { position: 'absolute', right: Spacing.four },
 });
