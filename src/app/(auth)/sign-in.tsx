@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
@@ -18,6 +18,7 @@ import type { TranslationKey } from '@/i18n/translations';
 
 export default function SignIn() {
   const { t } = useI18n();
+  const router = useRouter();
   const { signIn, signInWithKakao, signInWithGoogle, signInWithApple } = useAuth();
   const { withLoading } = useLoading();
   const [email, setEmail] = useState('');
@@ -136,6 +137,12 @@ export default function SignIn() {
             ) : null}
           </View>
 
+          <Text style={styles.termsNotice}>
+            로그인·가입 시{' '}
+            <Text style={styles.termsLink} onPress={() => router.push('/(auth)/terms')}>이용약관</Text>
+            에 동의하는 것으로 간주됩니다. 유해 콘텐츠·악성 행위에는 무관용 정책이 적용돼요.
+          </Text>
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>{t('auth.noAccount')} </Text>
             <Link href="/(auth)/sign-up" style={styles.link}>
@@ -203,4 +210,6 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   footerText: { color: '#6B7280' },
   link: { fontWeight: '700', color: '#16C784' },
+  termsNotice: { fontSize: 12, lineHeight: 18, color: '#9CA3AF', textAlign: 'center', paddingHorizontal: Spacing.two },
+  termsLink: { color: '#16C784', fontWeight: '700', textDecorationLine: 'underline' },
 });

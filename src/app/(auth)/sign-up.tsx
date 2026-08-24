@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,11 +20,16 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit() {
     if (!nickname.trim() || !email.trim() || !password) {
       Alert.alert('입력 확인', '모든 항목을 입력해주세요.');
+      return;
+    }
+    if (!agreed) {
+      Alert.alert('약관 동의', '이용약관에 동의해야 가입할 수 있어요.');
       return;
     }
     if (password.length < 6) {
@@ -98,7 +104,20 @@ export default function SignUp() {
               onChangeText={setPasswordConfirm}
               hint={passwordConfirm.length > 0 && password !== passwordConfirm ? '비밀번호가 일치하지 않아요' : undefined}
             />
-            <Button title="가입하기" onPress={onSubmit} loading={loading} style={{ marginTop: 8 }} />
+
+            <Pressable onPress={() => setAgreed((v) => !v)} style={styles.agreeRow}>
+              <Ionicons
+                name={agreed ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={agreed ? '#16C784' : '#9CA3AF'}
+              />
+              <Text style={styles.agreeText}>
+                <Text style={styles.agreeLink} onPress={() => router.push('/(auth)/terms')}>이용약관</Text>
+                에 동의합니다. 유해 콘텐츠·악성 행위에 대한 무관용 정책을 확인했으며, 위반 시 콘텐츠 삭제·계정 정지에 동의합니다.
+              </Text>
+            </Pressable>
+
+            <Button title="가입하기" onPress={onSubmit} loading={loading} disabled={!agreed} style={{ marginTop: 8 }} />
           </View>
 
           <Button title="로그인으로 돌아가기" variant="outline" onPress={() => router.back()} />
@@ -115,4 +134,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 34, fontWeight: '800', color: '#111827' },
   sub: { fontSize: 16, fontWeight: '500', color: '#6B7280' },
   form: { gap: Spacing.three },
+  agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 4 },
+  agreeText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#6B7280' },
+  agreeLink: { color: '#16C784', fontWeight: '800', textDecorationLine: 'underline' },
 });
