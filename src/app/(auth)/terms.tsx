@@ -13,7 +13,10 @@ export default function Terms() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close}>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/sign-in'))}
+          hitSlop={10}
+          style={styles.close}>
           <Ionicons name="close" size={24} color="#111827" />
         </Pressable>
         <Text style={styles.headerTitle}>이용약관</Text>
