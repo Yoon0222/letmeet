@@ -152,3 +152,22 @@ export async function cancelPendingPayment(paymentId: string) {
   await supabase.from('court_reservations').delete().eq('payment_id', paymentId);
   await supabase.from('payments').update({ status: 'canceled' }).eq('id', paymentId).eq('status', 'pending');
 }
+
+// 확정 예약 취소 + 환불(정책: 예약일이 미래면 100% 환불, 당일이면 환불 없이 취소).
+export async function cancelCourtReservation(
+  reservationIds: string[],
+): Promise<{ ok: true; refunded: boolean; amount: number; reason: string } | { ok: false; error: string }> {
+  const { data, error } = await supabase.functions.invoke('toss-cancel', { body: { reservationIds } });
+  if (error) {
+    const context = (error as unknown as { context?: unknown }).context;
+    let message = error.message;
+    if (context instanceof Response) {
+      const bodyText = await context.clone().text().catch(() => '');
+      const body = bodyText ? safeJsonParse(bodyText) : null;
+      message = (typeof body?.error === 'string' ? body.error : undefined) ?? message;
+    }
+    return { ok: false, error: message };
+  }
+  if (data?.error) return { ok: false, error: data.error };
+  return data as { ok: true; refunded: boolean; amount: number; reason: string };
+}

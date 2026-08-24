@@ -28,6 +28,8 @@
 - [ ] **prod 마이그레이션 0043~0052 일괄 실행** — 심사/사용 전 필수. `scratchpad/PROD_v2.0_migrations.sql` 준비됨(2026-07-24 확인: 전부 미실행)
 - [ ] ⚠️ **5.1.1(v) 재리젝 리스크 점검** — v1.0.4 는 "비계정 기능에 로그인 강제"로 리젝됨. `ee4bf61` 로 게스트 열람을 다시 없앴으므로, **이 커밋이 심사 제출 빌드에 포함됐는지** 확인 필요. 포함 시 동일 사유 재리젝 가능
 - [ ] 결제 스테일 홀드 자동정리 스케줄 — `pg_cron` 활성화 + `release_stale_court_holds` 5분 주기 등록
+- [x] 코트 예약 취소 시 환불 — toss-cancel 엣지함수(당일 외 100% 환불), dev·prod 배포. **prod에 TOSS_SECRET_KEY 필요**
+- [ ] 코트별 환불 정책 설정(courts.refund_policy + 부분환불) — 현재는 전역 "당일 외 100%"만
 - [ ] Supabase에 `0063_club_premium_match_results.sql` 실행 — 클럽 프리미엄 상태 + 경기 결과 기록 테이블/RLS
 - [ ] Supabase에 `0064_club_officers_tournaments.sql`·`0065_club_match_dupr.sql` 실행 + `dupr-match` 엣지함수 재배포 — 클럽 임원/월례대회 + 클럽 경기결과 DUPR
 - [ ] 🔴 **알림 기능 prod 배포** — SQL(0053~0055) + Edge Function(notify-turn/tie) + 앱, **한 세트로**. 절차: `docs/PROD_NOTIFICATIONS_DEPLOY.md` (dev는 2026-07-25 적용·검증 완료)

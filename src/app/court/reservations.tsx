@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { cancelCourtReservation } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import type { CourtReservationWithCourt } from '@/lib/types';
 import { AppColors } from '@/theme';
@@ -89,18 +90,31 @@ export default function MyReservationsScreen() {
   const pastGroups = groups.filter((g) => g.past).sort((a, b) => b.date.localeCompare(a.date));
 
   function cancelGroup(g: Group) {
-    Alert.alert('예약 취소', `${g.courtName}\n${fmtDate(g.date)} · ${g.hours.map((h) => `${h}시`).join(', ')}\n예약을 취소할까요?`, [
-      { text: '닫기', style: 'cancel' },
-      {
-        text: '취소하기',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('court_reservations').delete().in('id', g.ids);
-          if (error) Alert.alert('취소 실패', error.message);
-          else load();
+    const sameDay = g.date <= today; // 당일(또는 과거)이면 환불 없음
+    const policyLine = sameDay ? '당일 취소는 환불되지 않아요.' : '취소하면 100% 환불돼요.';
+    Alert.alert(
+      '예약 취소',
+      `${g.courtName}\n${fmtDate(g.date)} · ${g.hours.map((h) => `${h}시`).join(', ')}\n\n${policyLine}\n예약을 취소할까요?`,
+      [
+        { text: '닫기', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await cancelCourtReservation(g.ids);
+            if (!res.ok) {
+              Alert.alert('취소 실패', res.error);
+              return;
+            }
+            Alert.alert(
+              '예약 취소 완료',
+              res.refunded ? `${res.amount.toLocaleString()}원이 환불됐어요.` : '예약이 취소됐어요.',
+            );
+            load();
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   const Card = ({ g }: { g: Group }) => (
