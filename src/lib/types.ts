@@ -273,6 +273,39 @@ export type ClubSession = {
   created_at: string;
 };
 
+export type ClubSubscriptionStatus = 'active' | 'past_due' | 'canceled';
+
+/** 프리미엄 클럽 구독(0080) — 앱에 노출되는 안전 컬럼만(빌링키·커스터머키 제외) */
+export type ClubSubscription = {
+  id: string;
+  club_id: string;
+  owner_id: string;
+  card_company: string;
+  card_number_masked: string;
+  amount: number;
+  status: ClubSubscriptionStatus;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  next_charge_at: string | null;
+  last_charge_at: string | null;
+  fail_count: number;
+  canceled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClubSubscriptionCharge = {
+  id: string;
+  subscription_id: string;
+  club_id: string;
+  amount: number;
+  status: 'paid' | 'failed';
+  toss_payment_key: string | null;
+  order_id: string | null;
+  fail_reason: string | null;
+  charged_at: string;
+};
+
 /** 정기모임 반복 스케줄(0077) — 매주 weekday 요일 자동 개설·투표오픈 */
 export type ClubSessionSchedule = {
   id: string;
@@ -798,6 +831,18 @@ export interface Database {
         Row: ClubSessionSchedule;
         Insert: { club_id: string; created_by: string; weekday: number } & WriteDefaults<ClubSessionSchedule>;
         Update: WriteDefaults<ClubSessionSchedule>;
+        Relationships: [];
+      };
+      club_subscriptions: {
+        Row: ClubSubscription;
+        Insert: WriteDefaults<ClubSubscription>;
+        Update: WriteDefaults<ClubSubscription>;
+        Relationships: [];
+      };
+      club_subscription_charges: {
+        Row: ClubSubscriptionCharge;
+        Insert: WriteDefaults<ClubSubscriptionCharge>;
+        Update: WriteDefaults<ClubSubscriptionCharge>;
         Relationships: [];
       };
       club_session_players: {

@@ -171,3 +171,47 @@ export async function cancelCourtReservation(
   if (data?.error) return { ok: false, error: data.error };
   return data as { ok: true; refunded: boolean; amount: number; reason: string };
 }
+
+// 프리미엄 클럽 구독 시작 — 카드 등록(빌링키) 후 첫 과금 또는 체험 종료 예약
+export async function startClubSubscription(args: {
+  clubId: string;
+  authKey: string;
+  customerKey: string;
+}): Promise<
+  | { ok: true; status: string; trialing: boolean; chargedNow: boolean; nextChargeAt: string; card: { company: string; masked: string } }
+  | { ok: false; error: string }
+> {
+  const { data, error } = await supabase.functions.invoke('toss-billing-issue', { body: args });
+  if (error) {
+    const context = (error as unknown as { context?: unknown }).context;
+    let message = error.message;
+    if (context instanceof Response) {
+      const bodyText = await context.clone().text().catch(() => '');
+      const body = bodyText ? safeJsonParse(bodyText) : null;
+      const tossMsg = typeof body?.toss?.message === 'string' ? body.toss.message : undefined;
+      message = [typeof body?.error === 'string' ? body.error : undefined, tossMsg].filter(Boolean).join(' - ') || message;
+    }
+    return { ok: false, error: message };
+  }
+  if (data?.error) return { ok: false, error: data.error };
+  return data as { ok: true; status: string; trialing: boolean; chargedNow: boolean; nextChargeAt: string; card: { company: string; masked: string } };
+}
+
+// 구독 해지 — 다음 과금 중단, 현재 기간 종료일까지 이용
+export async function cancelClubSubscription(
+  clubId: string,
+): Promise<{ ok: true; activeUntil: string | null } | { ok: false; error: string }> {
+  const { data, error } = await supabase.functions.invoke('toss-billing-cancel', { body: { clubId } });
+  if (error) {
+    const context = (error as unknown as { context?: unknown }).context;
+    let message = error.message;
+    if (context instanceof Response) {
+      const bodyText = await context.clone().text().catch(() => '');
+      const body = bodyText ? safeJsonParse(bodyText) : null;
+      message = (typeof body?.error === 'string' ? body.error : undefined) ?? message;
+    }
+    return { ok: false, error: message };
+  }
+  if (data?.error) return { ok: false, error: data.error };
+  return data as { ok: true; activeUntil: string | null };
+}

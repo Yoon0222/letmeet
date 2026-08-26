@@ -240,6 +240,7 @@ function RootNavigator() {
         <Stack.Screen name="court/reservations" options={{ headerShown: true, title: '내 예약' }} />
         <Stack.Screen name="court/[id]" options={{ headerShown: true, title: '코트' }} />
         <Stack.Screen name="payment/court" options={{ headerShown: false }} />
+        <Stack.Screen name="payment/subscribe" options={{ headerShown: false }} />
         <Stack.Screen name="payment/callback" options={{ headerShown: true, title: '결제 확인' }} />
         <Stack.Screen name="notifications" options={{ headerShown: true, title: '알림' }} />
         <Stack.Screen name="support" options={{ headerShown: true, title: '고객지원' }} />
