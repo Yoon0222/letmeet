@@ -59,21 +59,13 @@ function TournamentsInner() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{isSuperAdmin ? '전체 대회' : '내 대회'}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {isSuperAdmin
-              ? '모든 운영자의 대회를 조회·관리할 수 있어요.'
-              : '개설한 대회를 운영하고 참가 신청을 관리하세요.'}
-          </p>
-        </div>
-        <Link
-          href="/tournaments/new"
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          + 새 대회
-        </Link>
+      <div>
+        <h1 className="text-2xl font-semibold">{isSuperAdmin ? '전체 대회' : '내 대회'}</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {isSuperAdmin
+            ? '모든 운영자의 대회를 조회·관리할 수 있어요.'
+            : '개설한 대회를 운영하고 참가 신청을 관리하세요.'}
+        </p>
       </div>
 
       {loading ? (
@@ -123,6 +115,16 @@ function TournamentsInner() {
           ))}
         </div>
       )}
+
+      {/* 리스트 하단 — 새 대회(전용 페이지로 이동) */}
+      <div className="mt-6">
+        <Link
+          href="/tournaments/new"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+        >
+          <span className="text-base leading-none">＋</span> 새 대회
+        </Link>
+      </div>
     </div>
   );
 }
