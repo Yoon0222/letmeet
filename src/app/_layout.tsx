@@ -111,7 +111,7 @@ function RootNavigator() {
   // 로그인 필수. 비로그인 상태에선 보호 화면이 네비게이터에 아예 등록되지 않으므로
   // 리다이렉트 방식과 달리 홈이 한 프레임도 노출되지 않는다.
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, headerBackButtonDisplayMode: 'minimal', headerBackTitle: '' }}>
       {/* 비로그인 전용 */}
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />
