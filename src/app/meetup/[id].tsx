@@ -331,7 +331,7 @@ export default function MeetupDetail() {
                         <Text style={styles.pName}>{p.profiles?.nickname ?? '알 수 없음'}</Text>
                         <Text style={styles.pMeta}>{duprPart} · {reviewPart}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                      <Ionicons name="chevron-forward" size={16} color="#707B87" />
                     </Pressable>
                     <Text onPress={() => approve(p.user_id)} style={styles.approveBtn}>승인</Text>
                     <Text onPress={() => reject(p.user_id)} style={styles.rejectBtn}>거절</Text>
@@ -400,17 +400,17 @@ function InfoRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: s
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
-  notFound: { color: '#6B7280', fontSize: 15 },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
+  notFound: { color: '#AAB4C0', fontSize: 15 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
-  cover: { width: '100%', height: 180, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  cover: { width: '100%', height: 180, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#151D25' },
   coverEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   coverEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  coverEmpty: { height: 96, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
+  coverEmpty: { height: 96, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
   coverEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
   statusRow: { flexDirection: 'row', gap: 8 },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  title: { fontSize: 24, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
   duprBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -423,27 +423,27 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(45,107,214,0.18)',
   },
   duprBannerTitle: { fontSize: 15, fontWeight: '800', color: '#2D6BD6' },
-  duprBannerSub: { fontSize: 12.5, color: '#4B5563', marginTop: 2, lineHeight: 17 },
+  duprBannerSub: { fontSize: 12.5, color: '#AAB4C0', marginTop: 2, lineHeight: 17 },
   infoCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderRadius: 18,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     padding: Spacing.three,
     gap: 12,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
+  infoText: { fontSize: 15, fontWeight: '500', color: '#F8FAFC', flex: 1 },
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  sectionHint: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
-  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginTop: 6 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
+  sectionHint: { fontSize: 13, color: '#707B87', marginTop: 2 },
+  desc: { fontSize: 15, lineHeight: 22, color: '#AAB4C0', marginTop: 6 },
   pRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   pNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  pMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  pName: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
+  pMeta: { fontSize: 13, color: '#AAB4C0', marginTop: 1 },
   pSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
   approveBtn: {
     fontSize: 13,
@@ -458,13 +458,13 @@ const styles = StyleSheet.create({
   rejectBtn: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#AAB4C0',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 999,
     overflow: 'hidden',
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
 });

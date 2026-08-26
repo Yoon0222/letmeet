@@ -40,15 +40,15 @@ function Step({ n, text }: { n: number; text: string }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: { padding: Spacing.four, gap: Spacing.three, alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827', textAlign: 'center', marginTop: Spacing.two },
-  body: { fontSize: 15, color: '#6B7280', textAlign: 'center', lineHeight: 22 },
+  title: { fontSize: 24, fontWeight: '800', color: '#F8FAFC', textAlign: 'center', marginTop: Spacing.two },
+  body: { fontSize: 15, color: '#AAB4C0', textAlign: 'center', lineHeight: 22 },
   card: {
     alignSelf: 'stretch',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 18,
     borderCurve: 'continuous',
     padding: Spacing.three,
@@ -58,13 +58,13 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   num: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#16C784', alignItems: 'center', justifyContent: 'center' },
   numText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  stepText: { flex: 1, fontSize: 14, color: '#111827', lineHeight: 21 },
+  stepText: { flex: 1, fontSize: 14, color: '#F8FAFC', lineHeight: 21 },
   code: {
     alignSelf: 'stretch',
     fontFamily: 'monospace',
     fontSize: 12,
-    color: '#6B7280',
-    backgroundColor: '#F0F1F3',
+    color: '#AAB4C0',
+    backgroundColor: '#151D25',
     padding: Spacing.three,
     borderRadius: 12,
     lineHeight: 20,

@@ -244,12 +244,12 @@ export default function RecordMeetupMatch() {
               {games.map((g, i) => (
                 <View key={i} style={styles.gameRow}>
                   <Text style={styles.gameNo}>{i + 1}게임</Text>
-                  <TextInput style={styles.scoreInput} value={g.a} onChangeText={(v) => setGame(i, 'a', v)} keyboardType="number-pad" placeholder="0" placeholderTextColor="#C4C7CC" />
+                  <TextInput style={styles.scoreInput} value={g.a} onChangeText={(v) => setGame(i, 'a', v)} keyboardType="number-pad" placeholder="0" placeholderTextColor="#707B87" />
                   <Text style={styles.colon}>:</Text>
-                  <TextInput style={styles.scoreInput} value={g.b} onChangeText={(v) => setGame(i, 'b', v)} keyboardType="number-pad" placeholder="0" placeholderTextColor="#C4C7CC" />
+                  <TextInput style={styles.scoreInput} value={g.b} onChangeText={(v) => setGame(i, 'b', v)} keyboardType="number-pad" placeholder="0" placeholderTextColor="#707B87" />
                   {games.length > 1 ? (
                     <Pressable onPress={() => removeGame(i)} hitSlop={8}>
-                      <Ionicons name="close-circle" size={22} color="#D1D5DB" />
+                      <Ionicons name="close-circle" size={22} color="#707B87" />
                     </Pressable>
                   ) : (
                     <View style={{ width: 22 }} />
@@ -304,33 +304,33 @@ function statusStyle(s: MeetupMatch['dupr_status']) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 40 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: Spacing.three },
-  label: { fontSize: 15, fontWeight: '800', color: '#111827' },
-  hint: { fontSize: 12.5, color: '#9CA3AF', marginTop: 4, lineHeight: 17 },
+  card: { backgroundColor: '#10161D', borderRadius: 16, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: Spacing.three },
+  label: { fontSize: 15, fontWeight: '800', color: '#F8FAFC' },
+  hint: { fontSize: 12.5, color: '#707B87', marginTop: 4, lineHeight: 17 },
   segRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  seg: { flex: 1, paddingVertical: 12, borderRadius: 12, borderCurve: 'continuous', alignItems: 'center', backgroundColor: '#F3F4F6' },
+  seg: { flex: 1, paddingVertical: 12, borderRadius: 12, borderCurve: 'continuous', alignItems: 'center', backgroundColor: '#151D25' },
   segActive: { backgroundColor: '#16C784' },
-  segText: { fontSize: 14, fontWeight: '800', color: '#6B7280' },
+  segText: { fontSize: 14, fontWeight: '800', color: '#AAB4C0' },
   segTextActive: { color: '#fff' },
   pRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pName: { fontSize: 14.5, fontWeight: '700', color: '#111827' },
+  pName: { fontSize: 14.5, fontWeight: '700', color: '#F8FAFC' },
   pTag: { fontSize: 11.5, fontWeight: '700', marginTop: 1 },
-  teamBtn: { width: 34, height: 34, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
+  teamBtn: { width: 34, height: 34, borderRadius: 10, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center', backgroundColor: '#151D25', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
   teamA: { backgroundColor: '#16C784', borderColor: '#16C784' },
   teamB: { backgroundColor: '#2D6BD6', borderColor: '#2D6BD6' },
-  teamBtnText: { fontSize: 14, fontWeight: '800', color: '#6B7280' },
-  vs: { fontSize: 13, fontWeight: '700', color: '#374151', marginTop: 10, textAlign: 'center' },
+  teamBtnText: { fontSize: 14, fontWeight: '800', color: '#AAB4C0' },
+  vs: { fontSize: 13, fontWeight: '700', color: '#AAB4C0', marginTop: 10, textAlign: 'center' },
   gameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  gameNo: { fontSize: 13, fontWeight: '700', color: '#6B7280', width: 48 },
-  scoreInput: { flex: 1, height: 46, borderRadius: 12, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', textAlign: 'center', fontSize: 18, fontWeight: '800', color: '#111827' },
-  colon: { fontSize: 18, fontWeight: '800', color: '#9CA3AF' },
+  gameNo: { fontSize: 13, fontWeight: '700', color: '#AAB4C0', width: 48 },
+  scoreInput: { flex: 1, height: 46, borderRadius: 12, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: '#10161D', textAlign: 'center', fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
+  colon: { fontSize: 18, fontWeight: '800', color: '#707B87' },
   addGame: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 10, paddingVertical: 8 },
   addGameText: { fontSize: 14, fontWeight: '800', color: '#16C784' },
   pastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pastText: { fontSize: 13.5, color: '#374151', flex: 1 },
+  pastText: { fontSize: 13.5, color: '#AAB4C0', flex: 1 },
   pastStatus: { fontSize: 12.5, fontWeight: '800' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
 });

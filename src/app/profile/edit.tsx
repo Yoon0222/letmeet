@@ -176,7 +176,7 @@ export default function EditProfile() {
                 <Pressable
                   key={i}
                   onPress={() => choosePeanut(i)}
-                  style={[styles.peanutCell, { borderColor: selected ? '#16C784' : '#E5E7EB' }]}>
+                  style={[styles.peanutCell, { borderColor: selected ? '#16C784' : 'rgba(255,255,255,0.09)' }]}>
                   <Image source={src} style={styles.peanutImg} contentFit="cover" />
                 </Pressable>
               );
@@ -220,7 +220,7 @@ export default function EditProfile() {
                   key={s}
                   onPress={() => setStyle(s)}
                   style={[styles.styleBtn, active ? styles.styleBtnActive : styles.styleBtnIdle]}>
-                  <Text style={{ color: active ? '#fff' : '#6B7280', fontWeight: '700' }}>
+                  <Text style={{ color: active ? '#fff' : '#AAB4C0', fontWeight: '700' }}>
                     {PLAY_STYLE_LABELS[s]}
                   </Text>
                 </Pressable>
@@ -270,7 +270,7 @@ export default function EditProfile() {
                 value={duprPublic}
                 onValueChange={toggleDuprPublic}
                 trackColor={{ true: '#16C784', false: '#D1D5DB' }}
-                thumbColor="#FFFFFF"
+                thumbColor="#10161D"
               />
             </View>
           ) : null}
@@ -279,7 +279,7 @@ export default function EditProfile() {
         <Pressable onPress={() => router.push('/support' as never)} style={styles.supportRow}>
           <Ionicons name="help-buoy-outline" size={18} color="#16C784" />
           <Text style={styles.supportText}>고객지원 · 문의 (경기·레이팅 분쟁 포함)</Text>
-          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+          <Ionicons name="chevron-forward" size={16} color="#707B87" />
         </Pressable>
 
         <Button title="저장" onPress={onSave} loading={saving} style={{ marginTop: Spacing.two }} />
@@ -289,28 +289,28 @@ export default function EditProfile() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#F6F7F9' },
+  flex: { flex: 1, backgroundColor: '#070A0D' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 60 },
-  duprLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
-  duprHint: { fontSize: 12, color: '#9CA3AF', lineHeight: 17 },
+  duprLabel: { fontSize: 14, fontWeight: '600', color: '#AAB4C0' },
+  duprHint: { fontSize: 12, color: '#707B87', lineHeight: 17 },
   duprStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   duprStatusText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
   duprToggleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one },
-  duprToggleLabel: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  duprToggleLabel: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
   supportRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderRadius: 12,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     marginTop: Spacing.two,
   },
-  supportText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#374151' },
+  supportText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
   avatarWrap: { alignItems: 'center', gap: 8, marginBottom: Spacing.two },
   avatarBadge: {
     position: 'absolute',
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 2,
     backgroundColor: '#16C784',
-    borderColor: '#F6F7F9',
+    borderColor: '#070A0D',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -329,25 +329,25 @@ const styles = StyleSheet.create({
   peanutCell: { borderWidth: 2, borderRadius: 30, padding: 2 },
   peanutImg: { width: 52, height: 52, borderRadius: 26 },
   field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 2 },
+  label: { fontSize: 13, fontWeight: '600', color: '#AAB4C0', marginLeft: 2 },
   skillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: 12,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
   },
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepTxt: { fontSize: 28, fontWeight: '800', color: '#16C784' },
-  skillVal: { fontSize: 26, fontWeight: '800', color: '#111827' },
-  skillLbl: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  skillVal: { fontSize: 26, fontWeight: '800', color: '#F8FAFC' },
+  skillLbl: { fontSize: 12, fontWeight: '600', color: '#AAB4C0' },
   styleRow: { flexDirection: 'row', gap: 8 },
   styleBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderCurve: 'continuous', alignItems: 'center' },
   styleBtnActive: { backgroundColor: '#16C784' },
-  styleBtnIdle: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
+  styleBtnIdle: { backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
 });

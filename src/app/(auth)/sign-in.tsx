@@ -123,10 +123,10 @@ export default function SignIn() {
                 {GOOGLE_LOGIN_ENABLED ? (
                   <Pressable onPress={onGoogle} style={styles.googleBtn} disabled={googleLoading}>
                     {googleLoading ? (
-                      <ActivityIndicator color="#111827" />
+                      <ActivityIndicator color="#F8FAFC" />
                     ) : (
                       <>
-                        <Ionicons name="logo-google" size={20} color="#111827" />
+                        <Ionicons name="logo-google" size={20} color="#F8FAFC" />
                         <Text style={styles.googleText}>Google로 계속하기</Text>
                       </>
                     )}
@@ -177,7 +177,7 @@ function translateAuthError(
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: { flexGrow: 1, padding: Spacing.four, justifyContent: 'center', gap: Spacing.five },
   logo: { alignItems: 'center', gap: 8 },
   logoBadge: {
@@ -187,13 +187,13 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
-  brand: { fontSize: 34, fontWeight: '900', color: '#111827' },
-  tagline: { fontSize: 16, fontWeight: '500', color: '#6B7280' },
+  brand: { fontSize: 34, fontWeight: '900', color: '#F8FAFC' },
+  tagline: { fontSize: 16, fontWeight: '500', color: '#AAB4C0' },
   form: { gap: Spacing.three },
   socialArea: { gap: Spacing.three, marginTop: 8 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' },
-  dividerText: { fontSize: 13, color: '#9CA3AF' },
+  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.09)' },
+  dividerText: { fontSize: 13, color: '#707B87' },
   googleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,14 +202,14 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     borderCurve: 'continuous',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
   },
-  googleText: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  googleText: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { color: '#6B7280' },
+  footerText: { color: '#AAB4C0' },
   link: { fontWeight: '700', color: '#16C784' },
-  termsNotice: { fontSize: 12, lineHeight: 18, color: '#9CA3AF', textAlign: 'center', paddingHorizontal: Spacing.two },
+  termsNotice: { fontSize: 12, lineHeight: 18, color: '#707B87', textAlign: 'center', paddingHorizontal: Spacing.two },
   termsLink: { color: '#16C784', fontWeight: '700', textDecorationLine: 'underline' },
 });

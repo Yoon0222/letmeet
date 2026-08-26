@@ -17,7 +17,7 @@ export default function Terms() {
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/sign-in'))}
           hitSlop={10}
           style={styles.close}>
-          <Ionicons name="close" size={24} color="#111827" />
+          <Ionicons name="close" size={24} color="#F8FAFC" />
         </Pressable>
         <Text style={styles.headerTitle}>이용약관</Text>
         <View style={{ width: 24 }} />
@@ -82,15 +82,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#EEF0F3' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)' },
   close: { width: 24, alignItems: 'flex-start' },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
   content: { padding: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.three },
-  updated: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
+  updated: { fontSize: 13, color: '#707B87', fontWeight: '600' },
   section: { gap: 6 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  body: { fontSize: 14, lineHeight: 22, color: '#374151' },
-  bold: { fontWeight: '800', color: '#111827' },
-  footer: { fontSize: 13, color: '#9CA3AF', marginTop: Spacing.two },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
+  body: { fontSize: 14, lineHeight: 22, color: '#AAB4C0' },
+  bold: { fontWeight: '800', color: '#F8FAFC' },
+  footer: { fontSize: 13, color: '#707B87', marginTop: Spacing.two },
 });

@@ -332,7 +332,7 @@ export default function TournamentDetail() {
       <View style={styles.headerArea}>
         <View style={styles.badgeRow}>
           <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#2D6BD6" bg="rgba(56,132,255,0.14)" />
-          <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#7A4E00" bg="rgba(245,166,35,0.16)" />
+          <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5A623" bg="rgba(245,166,35,0.16)" />
           {t.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
           {t.status === 'registration' ? (
             <Badge label="접수중" />
@@ -353,7 +353,7 @@ export default function TournamentDetail() {
             const active = tab === it.key;
             return (
               <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
-                <Text style={[styles.tabText, { color: active ? '#16C784' : '#6B7280' }]}>{it.label}</Text>
+                <Text style={[styles.tabText, { color: active ? '#16C784' : '#AAB4C0' }]}>{it.label}</Text>
                 <View style={[styles.tabUnderline, { backgroundColor: active ? '#16C784' : 'transparent' }]} />
               </Pressable>
             );
@@ -364,17 +364,17 @@ export default function TournamentDetail() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {(approved.length > 0 || hasBracket) && (
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={16} color="#6B7280" />
+            <Ionicons name="search" size={16} color="#AAB4C0" />
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder="이름으로 검색"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#707B87"
               autoCapitalize="none"
               style={styles.searchInput}
             />
             {search.length > 0 && (
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" onPress={() => setSearch('')} />
+              <Ionicons name="close-circle" size={18} color="#707B87" onPress={() => setSearch('')} />
             )}
           </View>
         )}
@@ -446,7 +446,7 @@ export default function TournamentDetail() {
                       <Text style={[styles.pMeta, { marginTop: 6 }]}>검색 중…</Text>
                     ) : partnerQuery.trim().length > 0 && partnerResults.length === 0 ? (
                       <View style={styles.partnerNotice}>
-                        <Ionicons name="alert-circle-outline" size={16} color="#6B7280" />
+                        <Ionicons name="alert-circle-outline" size={16} color="#AAB4C0" />
                         <Text style={[styles.pMeta, { flex: 1 }]}>
                           가입되지 않은 회원이에요. 앱에 가입된 회원만 파트너로 지정할 수 있어요.
                         </Text>
@@ -486,7 +486,7 @@ export default function TournamentDetail() {
                     <View key={c.id} style={styles.courtChip}>
                       <Text style={styles.courtName}>{c.name}</Text>
                       <View style={[styles.courtTag, { backgroundColor: c.indoor ? 'rgba(56,132,255,0.14)' : 'rgba(245,166,35,0.16)' }]}>
-                        <Text style={[styles.courtTagText, { color: c.indoor ? '#2D6BD6' : '#7A4E00' }]}>
+                        <Text style={[styles.courtTagText, { color: c.indoor ? '#2D6BD6' : '#F5A623' }]}>
                           {c.indoor ? '실내' : '실외'}
                         </Text>
                       </View>
@@ -534,7 +534,7 @@ export default function TournamentDetail() {
             {/* 조추첨 미공개 (선수) */}
             {drawGenerated && !drawRevealed && drawRevealAt && (
               <View style={styles.revealBox}>
-                <Ionicons name="lock-closed-outline" size={20} color="#6B7280" />
+                <Ionicons name="lock-closed-outline" size={20} color="#AAB4C0" />
                 <Text style={styles.revealText}>조추첨은 {formatMeetupTime(drawRevealAt.toISOString())}에 공개돼요</Text>
               </View>
             )}
@@ -570,7 +570,7 @@ export default function TournamentDetail() {
                       key={String(g)}
                       onPress={() => setGroupTab(g)}
                       style={[styles.groupPill, active ? styles.groupPillActive : styles.groupPillIdle]}>
-                      <Text style={[styles.groupPillText, { color: active ? '#fff' : '#6B7280' }]}>
+                      <Text style={[styles.groupPillText, { color: active ? '#fff' : '#AAB4C0' }]}>
                         {g === 'all' ? '전체' : `${g}조`}
                       </Text>
                     </Pressable>
@@ -625,7 +625,7 @@ export default function TournamentDetail() {
               <Ionicons
                 name={myEntry.status === 'approved' ? 'checkmark-circle' : 'time'}
                 size={18}
-                color={myEntry.status === 'approved' ? '#16C784' : '#6B7280'}
+                color={myEntry.status === 'approved' ? '#16C784' : '#AAB4C0'}
               />
               <Text style={styles.statusText}>
                 {myEntry.status === 'waitlist' ? `대기 ${myWaitlistRank}번` : ENTRY_LABEL[myEntry.status]}
@@ -655,7 +655,7 @@ export default function TournamentDetail() {
           <View style={{ gap: 8 }}>
             {isDoubles && !partnerSel ? (
               <View style={styles.statusRow}>
-                <Ionicons name="people-outline" size={16} color="#6B7280" />
+                <Ionicons name="people-outline" size={16} color="#AAB4C0" />
                 <Text style={[styles.pMeta, { marginTop: 0 }]}>복식은 파트너를 먼저 선택해야 신청할 수 있어요.</Text>
               </View>
             ) : null}
@@ -700,7 +700,7 @@ function MatchRow({
   const w2 = done && !!m.winner_id && m.winner_id === m.entry2_id;
   const mine = highlight || m.entry1_id === uid || m.entry2_id === uid;
   return (
-    <View style={[styles.matchRow, { borderColor: mine ? '#16C784' : '#E5E7EB' }]}>
+    <View style={[styles.matchRow, { borderColor: mine ? '#16C784' : 'rgba(255,255,255,0.09)' }]}>
       <View style={{ flex: 1, gap: 4 }}>
         {[
           { id: m.entry1_id, score: m.score1, win: w1 },
@@ -715,7 +715,7 @@ function MatchRow({
                   {nameOf(side.id)}
                 </Text>
               </View>
-              <Text style={[styles.matchScore, { color: side.win ? '#16C784' : '#6B7280' }]}>
+              <Text style={[styles.matchScore, { color: side.win ? '#16C784' : '#AAB4C0' }]}>
                 {done ? side.score ?? 0 : '·'}
               </Text>
             </View>
@@ -735,60 +735,60 @@ function MatchRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F9' },
-  notFound: { color: '#6B7280', fontSize: 15 },
-  mutedText: { color: '#6B7280', fontSize: 14 },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
+  notFound: { color: '#AAB4C0', fontSize: 15 },
+  mutedText: { color: '#AAB4C0', fontSize: 14 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
   headerArea: { paddingHorizontal: Spacing.four, paddingTop: Spacing.four, paddingBottom: Spacing.three, gap: 10 },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingHorizontal: Spacing.four },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)', paddingHorizontal: Spacing.four },
   tabItem: { marginRight: 22, paddingTop: 8, alignItems: 'center' },
   tabText: { fontSize: 15, fontWeight: '700' },
   tabUnderline: { height: 2.5, alignSelf: 'stretch', marginTop: 8, borderRadius: 2 },
   badgeRow: { flexDirection: 'row', gap: 6 },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  title: { fontSize: 24, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
   gallery: { marginBottom: Spacing.three, gap: 8 },
-  cover: { width: '100%', height: 200, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#E5E7EB' },
+  cover: { width: '100%', height: 200, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#151D25' },
   thumbRow: { gap: 8, paddingVertical: 2 },
-  thumb: { width: 64, height: 64, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#E5E7EB', opacity: 0.6 },
+  thumb: { width: 64, height: 64, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#151D25', opacity: 0.6 },
   thumbActive: { opacity: 1, borderWidth: 2, borderColor: '#16C784' },
   infoCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderRadius: 18,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     padding: Spacing.three,
     gap: 12,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: 15, fontWeight: '500', color: '#111827', flex: 1 },
+  infoText: { fontSize: 15, fontWeight: '500', color: '#F8FAFC', flex: 1 },
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  desc: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginTop: 6 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
+  desc: { fontSize: 15, lineHeight: 22, color: '#AAB4C0', marginTop: 6 },
   pRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  pMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  pName: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
+  pMeta: { fontSize: 13, color: '#AAB4C0', marginTop: 1 },
   pSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#F6F7F9' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
-  statusText: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  statusText: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
   partnerCard: {
     marginTop: Spacing.two,
-    backgroundColor: '#F0FBF4',
+    backgroundColor: 'rgba(22,199,132,0.08)',
     borderWidth: 1,
-    borderColor: '#BCE9CD',
+    borderColor: 'rgba(22,199,132,0.28)',
     borderRadius: 16,
     borderCurve: 'continuous',
     padding: Spacing.three,
   },
   partnerHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  partnerSub: { fontSize: 13, color: '#6B7280', marginTop: 4, marginBottom: 8, lineHeight: 19 },
+  partnerSub: { fontSize: 13, color: '#AAB4C0', marginTop: 4, marginBottom: 8, lineHeight: 19 },
   partnerChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
     borderColor: '#16C784',
     borderRadius: 12,
@@ -800,40 +800,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 10,
     padding: 10,
     marginTop: 6,
   },
   courtWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  courtChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
-  courtName: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  courtChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
+  courtName: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
   courtTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   courtTagText: { fontSize: 12, fontWeight: '700' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, height: 44 },
-  searchInput: { flex: 1, fontSize: 15, color: '#111827', paddingVertical: 0 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, paddingHorizontal: 12, height: 44 },
+  searchInput: { flex: 1, fontSize: 15, color: '#F8FAFC', paddingVertical: 0 },
   groupTabRow: { gap: 8, paddingBottom: 4 },
   groupPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   groupPillActive: { backgroundColor: '#16C784' },
-  groupPillIdle: { backgroundColor: '#F0F1F3' },
+  groupPillIdle: { backgroundColor: '#151D25' },
   groupPillText: { fontSize: 14, fontWeight: '700' },
-  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, marginTop: Spacing.two },
-  revealText: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1 },
-  subLabel: { fontSize: 14, fontWeight: '700', color: '#6B7280', marginTop: 2 },
+  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 14, marginTop: Spacing.two },
+  revealText: { fontSize: 15, fontWeight: '600', color: '#F8FAFC', flex: 1 },
+  subLabel: { fontSize: 14, fontWeight: '700', color: '#AAB4C0', marginTop: 2 },
   subLabelPrimary: { fontSize: 14, fontWeight: '800', color: '#16C784', marginTop: 2 },
-  tableCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, marginTop: 6, overflow: 'hidden' },
+  tableCard: { backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, marginTop: 6, overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },
-  standRowDivider: { borderTopColor: '#F1F3F5', borderTopWidth: 1 },
-  standRank: { width: 18, fontSize: 13, fontWeight: '700', color: '#6B7280', textAlign: 'center' },
-  standName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
-  standStat: { width: 44, fontSize: 13, fontWeight: '600', color: '#111827', textAlign: 'right' },
-  standStatMuted: { width: 44, fontSize: 13, fontWeight: '600', color: '#6B7280', textAlign: 'right' },
+  standRowDivider: { borderTopColor: 'rgba(255,255,255,0.09)', borderTopWidth: 1 },
+  standRank: { width: 18, fontSize: 13, fontWeight: '700', color: '#AAB4C0', textAlign: 'center' },
+  standName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#F8FAFC' },
+  standStat: { width: 44, fontSize: 13, fontWeight: '600', color: '#F8FAFC', textAlign: 'right' },
+  standStatMuted: { width: 44, fontSize: 13, fontWeight: '600', color: '#AAB4C0', textAlign: 'right' },
   matchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 8,
@@ -842,18 +842,18 @@ const styles = StyleSheet.create({
   },
   matchSide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   matchNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  matchName: { flex: 1, fontSize: 14, color: '#111827' },
+  matchName: { flex: 1, fontSize: 14, color: '#F8FAFC' },
   matchScore: { fontSize: 15, fontWeight: '800', minWidth: 18, textAlign: 'right' },
-  matchTag: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-  matchCourt: { backgroundColor: '#F0F1F3', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  matchCourtText: { fontSize: 11, fontWeight: '700', color: '#6B7280' },
+  matchTag: { fontSize: 12, fontWeight: '600', color: '#AAB4C0' },
+  matchCourt: { backgroundColor: '#151D25', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  matchCourtText: { fontSize: 11, fontWeight: '700', color: '#AAB4C0' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 12,
     padding: 8,
   },

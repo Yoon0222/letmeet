@@ -108,7 +108,7 @@ export default function CommunityCreate() {
                   key={c.key}
                   onPress={() => setCategory(c.key)}
                   style={[styles.cat, active && { backgroundColor: c.bg, borderColor: c.color }]}>
-                  <Ionicons name={c.icon} size={14} color={active ? c.color : '#9CA3AF'} />
+                  <Ionicons name={c.icon} size={14} color={active ? c.color : '#707B87'} />
                   <Text style={[styles.catText, active && { color: c.color }]}>{c.label}</Text>
                 </Pressable>
               );
@@ -121,7 +121,7 @@ export default function CommunityCreate() {
             value={title}
             onChangeText={setTitle}
             placeholder="제목을 입력하세요"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#707B87"
             style={styles.titleInput}
             maxLength={100}
           />
@@ -132,7 +132,7 @@ export default function CommunityCreate() {
             value={body}
             onChangeText={setBody}
             placeholder="자유롭게 이야기해보세요"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#707B87"
             style={styles.bodyInput}
             multiline
             textAlignVertical="top"
@@ -155,7 +155,7 @@ export default function CommunityCreate() {
                   <ActivityIndicator color="#16C784" />
                 ) : (
                   <>
-                    <Ionicons name="camera-outline" size={22} color="#9CA3AF" />
+                    <Ionicons name="camera-outline" size={22} color="#707B87" />
                     <Text style={styles.imageAddText}>추가</Text>
                   </>
                 )}
@@ -176,9 +176,9 @@ export default function CommunityCreate() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: { padding: Spacing.four, gap: 8, paddingBottom: 40 },
-  label: { fontSize: 14, fontWeight: '800', color: '#111827', marginTop: Spacing.three },
+  label: { fontSize: 14, fontWeight: '800', color: '#F8FAFC', marginTop: Spacing.three },
   cats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   cat: {
     flexDirection: 'row',
@@ -188,16 +188,16 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: '#151D25',
   },
-  catText: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
+  catText: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
   titleInput: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 12,
     borderCurve: 'continuous',
     paddingHorizontal: 14,
@@ -206,9 +206,9 @@ const styles = StyleSheet.create({
   bodyInput: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#111827',
+    color: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 12,
     borderCurve: 'continuous',
     padding: 14,
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   imageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   imageWrap: { position: 'relative' },
-  image: { width: 84, height: 84, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#F3F4F6' },
+  image: { width: 84, height: 84, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#151D25' },
   imageRemove: {
     position: 'absolute',
     top: -6,
@@ -234,12 +234,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderStyle: 'dashed',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#151D25',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
   },
-  imageAddText: { fontSize: 12, color: '#9CA3AF', fontWeight: '600' },
+  imageAddText: { fontSize: 12, color: '#707B87', fontWeight: '600' },
 });

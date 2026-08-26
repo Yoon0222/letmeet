@@ -176,7 +176,7 @@ export default function CommunityDetail() {
 
           {/* 좋아요 */}
           <Pressable onPress={toggleLike} style={[styles.likeBtn, liked && styles.likeBtnOn]}>
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E5484D' : '#6B7280'} />
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E5484D' : '#AAB4C0'} />
             <Text style={[styles.likeText, liked && { color: '#E5484D' }]}>좋아요 {likeCount}</Text>
           </Pressable>
 
@@ -201,7 +201,7 @@ export default function CommunityDetail() {
                     </View>
                     {canDelete ? (
                       <Pressable onPress={() => deleteComment(c.id)} hitSlop={8}>
-                        <Ionicons name="trash-outline" size={16} color="#9CA3AF" />
+                        <Ionicons name="trash-outline" size={16} color="#707B87" />
                       </Pressable>
                     ) : (
                       <ReportBlock targetType="community_comment" targetId={c.id} targetUserId={c.author_id} />
@@ -219,7 +219,7 @@ export default function CommunityDetail() {
             value={input}
             onChangeText={setInput}
             placeholder="댓글을 입력하세요"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#707B87"
             style={styles.input}
             multiline
           />
@@ -233,21 +233,21 @@ export default function CommunityDetail() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  gone: { fontSize: 15, color: '#6B7280' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
+  gone: { fontSize: 15, color: '#AAB4C0' },
   content: { padding: Spacing.four, paddingBottom: 40 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   badgeText: { fontSize: 12, fontWeight: '800' },
-  title: { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 12 },
+  title: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', marginTop: 12 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  author: { fontSize: 14, fontWeight: '700', color: '#374151' },
-  dot: { color: '#D1D5DB' },
-  time: { fontSize: 13, color: '#9CA3AF' },
+  author: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
+  dot: { color: '#707B87' },
+  time: { fontSize: 13, color: '#707B87' },
   carousel: { paddingHorizontal: Spacing.four, gap: 8, marginTop: 16 },
-  postImage: { width: 280, height: 210, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#F3F4F6' },
-  body: { fontSize: 16, lineHeight: 24, color: '#1F2937', marginTop: 16 },
+  postImage: { width: 280, height: 210, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#151D25' },
+  body: { fontSize: 16, lineHeight: 24, color: '#F8FAFC', marginTop: 16 },
   likeBtn: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -257,18 +257,18 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: '#151D25',
     marginTop: 20,
   },
-  likeBtnOn: { backgroundColor: '#FDECEC', borderColor: '#F7C7C7' },
-  likeText: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
-  commentsTitle: { fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 28, marginBottom: 12 },
-  noComment: { fontSize: 14, color: '#9CA3AF', paddingVertical: 8 },
+  likeBtnOn: { backgroundColor: 'rgba(229,72,77,0.14)', borderColor: 'rgba(229,72,77,0.35)' },
+  likeText: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
+  commentsTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC', marginTop: 28, marginBottom: 12 },
+  noComment: { fontSize: 14, color: '#707B87', paddingVertical: 8 },
   comment: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   commentHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  commentAuthor: { fontSize: 13, fontWeight: '700', color: '#374151' },
-  commentBody: { fontSize: 15, lineHeight: 21, color: '#1F2937', marginTop: 3 },
+  commentAuthor: { fontSize: 13, fontWeight: '700', color: '#AAB4C0' },
+  commentBody: { fontSize: 15, lineHeight: 21, color: '#F8FAFC', marginTop: 3 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -276,16 +276,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#EEF0F2',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: '#10161D',
   },
   input: {
     flex: 1,
     maxHeight: 100,
     minHeight: 42,
     fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#F3F4F6',
+    color: '#F8FAFC',
+    backgroundColor: '#151D25',
     borderRadius: 20,
     borderCurve: 'continuous',
     paddingHorizontal: 16,
@@ -293,5 +293,5 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   send: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#16C784', alignItems: 'center', justifyContent: 'center' },
-  sendOff: { backgroundColor: '#C7CDD4' },
+  sendOff: { backgroundColor: '#232D37' },
 });

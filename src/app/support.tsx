@@ -64,29 +64,29 @@ function Row({ icon, title, sub, onPress }: { icon: keyof typeof Ionicons.glyphM
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowSub}>{sub}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+      <Ionicons name="chevron-forward" size={18} color="#707B87" />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: { padding: Spacing.four, gap: Spacing.three },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827' },
-  lead: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginBottom: Spacing.two },
+  title: { fontSize: 24, fontWeight: '800', color: '#F8FAFC' },
+  lead: { fontSize: 15, lineHeight: 22, color: '#AAB4C0', marginBottom: Spacing.two },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderRadius: 16,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     padding: Spacing.three,
   },
-  rowIcon: { width: 40, height: 40, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#E7F8EF', alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { fontSize: 15.5, fontWeight: '800', color: '#111827' },
-  rowSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  note: { fontSize: 12.5, color: '#9CA3AF', lineHeight: 18, marginTop: Spacing.two },
+  rowIcon: { width: 40, height: 40, borderRadius: 14, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.12)', alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontSize: 15.5, fontWeight: '800', color: '#F8FAFC' },
+  rowSub: { fontSize: 13, color: '#AAB4C0', marginTop: 2 },
+  note: { fontSize: 12.5, color: '#707B87', lineHeight: 18, marginTop: Spacing.two },
 });

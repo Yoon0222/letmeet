@@ -123,7 +123,7 @@ export default function PlayerProfile() {
           <Text style={styles.sub}>{profile.region || '지역 미설정'}</Text>
           <View style={styles.badgeRow}>
             <View style={styles.chip}>
-              <Ionicons name="ribbon-outline" size={14} color="#6B7280" />
+              <Ionicons name="ribbon-outline" size={14} color="#AAB4C0" />
               <Text style={styles.chipText}>실력 {profile.skill_level.toFixed(1)} {skillLabel(profile.skill_level)}</Text>
             </View>
             <View style={[styles.chip, profile.dupr_rating != null && styles.duprChip]}>
@@ -188,7 +188,7 @@ export default function PlayerProfile() {
           ))}
           {reviews.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="chatbubble-ellipses-outline" size={26} color="#9CA3AF" />
+              <Ionicons name="chatbubble-ellipses-outline" size={26} color="#707B87" />
               <Text style={styles.muted}>아직 리뷰가 없어요.</Text>
             </View>
           ) : null}
@@ -210,7 +210,7 @@ export default function PlayerProfile() {
             <TextInput
               style={styles.input}
               placeholder="한줄평 (선택) — 매너, 실력, 시간 약속 등"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#707B87"
               value={comment}
               onChangeText={setComment}
               multiline
@@ -228,39 +228,39 @@ export default function PlayerProfile() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 40 },
-  muted: { fontSize: 14, color: '#9CA3AF' },
-  hint: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', marginTop: 2 },
+  muted: { fontSize: 14, color: '#707B87' },
+  hint: { fontSize: 13, color: '#707B87', textAlign: 'center', marginTop: 2 },
 
-  headerCard: { backgroundColor: '#FFFFFF', borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: Spacing.four, alignItems: 'center', gap: 6 },
-  name: { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 4 },
-  sub: { fontSize: 14, color: '#6B7280' },
+  headerCard: { backgroundColor: '#10161D', borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: Spacing.four, alignItems: 'center', gap: 6 },
+  name: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', marginTop: 4 },
+  sub: { fontSize: 14, color: '#AAB4C0' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 6 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#F6F7F9' },
-  duprChip: { backgroundColor: '#EAF1FF' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#151D25' },
+  duprChip: { backgroundColor: 'rgba(45,107,214,0.14)' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#AAB4C0' },
   selfInput: { fontSize: 11, fontWeight: '600', color: '#9CA3AF' },
-  bio: { fontSize: 14, lineHeight: 20, color: '#374151', textAlign: 'center', marginTop: 6 },
+  bio: { fontSize: 14, lineHeight: 20, color: '#AAB4C0', textAlign: 'center', marginTop: 6 },
 
-  summaryCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: Spacing.three },
-  summaryTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  summarySub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  avgNum: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  summaryCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#10161D', borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: Spacing.three },
+  summaryTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
+  summarySub: { fontSize: 13, color: '#AAB4C0', marginTop: 2 },
+  avgNum: { fontSize: 26, fontWeight: '800', color: '#F8FAFC' },
 
-  reviewCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: Spacing.three, gap: 8 },
+  reviewCard: { backgroundColor: '#10161D', borderRadius: 16, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: Spacing.three, gap: 8 },
   reviewHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  reviewer: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  reviewDate: { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
-  reviewComment: { fontSize: 14, lineHeight: 20, color: '#374151' },
+  reviewer: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
+  reviewDate: { fontSize: 12, color: '#707B87', marginTop: 1 },
+  reviewComment: { fontSize: 14, lineHeight: 20, color: '#AAB4C0' },
 
-  emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 28, borderRadius: 16, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: '#FFFFFF' },
+  emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 28, borderRadius: 16, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderStyle: 'dashed', backgroundColor: '#10161D' },
 
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderCurve: 'continuous', padding: Spacing.four, gap: Spacing.three, paddingBottom: 36 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  modalCard: { backgroundColor: '#10161D', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderCurve: 'continuous', padding: Spacing.four, gap: Spacing.three, paddingBottom: 36 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
   starPick: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 },
-  input: { minHeight: 84, borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: '#E5E7EB', padding: 12, fontSize: 15, color: '#111827', textAlignVertical: 'top', backgroundColor: '#F9FAFB' },
+  input: { minHeight: 84, borderRadius: 14, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: 12, fontSize: 15, color: '#F8FAFC', textAlignVertical: 'top', backgroundColor: '#151D25' },
   modalBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
 });

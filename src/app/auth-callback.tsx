@@ -38,6 +38,6 @@ export default function AuthCallback() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#F6F7F9' },
-  text: { fontSize: 15, color: '#6B7280' },
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#070A0D' },
+  text: { fontSize: 15, color: '#AAB4C0' },
 });

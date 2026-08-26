@@ -91,10 +91,10 @@ export default function Connections() {
   }
 
   const rows: Row[] = [
-    { key: 'email', label: '이메일', icon: 'mail-outline', color: '#6B7280', linkProvider: null, enabled: true },
-    { key: 'google', label: '구글', icon: 'logo-google', color: '#111827', linkProvider: 'google', enabled: GOOGLE_LOGIN_ENABLED },
-    { key: 'apple', label: '애플', icon: 'logo-apple', color: '#111827', linkProvider: null, enabled: APPLE_LOGIN_ENABLED },
-    { key: 'kakao', label: '카카오', icon: 'chatbubble-ellipses-outline', color: '#3C1E1E', linkProvider: 'kakao', enabled: KAKAO_LOGIN_ENABLED },
+    { key: 'email', label: '이메일', icon: 'mail-outline', color: '#AAB4C0', linkProvider: null, enabled: true },
+    { key: 'google', label: '구글', icon: 'logo-google', color: '#F8FAFC', linkProvider: 'google', enabled: GOOGLE_LOGIN_ENABLED },
+    { key: 'apple', label: '애플', icon: 'logo-apple', color: '#F8FAFC', linkProvider: null, enabled: APPLE_LOGIN_ENABLED },
+    { key: 'kakao', label: '카카오', icon: 'chatbubble-ellipses-outline', color: '#F8FAFC', linkProvider: 'kakao', enabled: KAKAO_LOGIN_ENABLED },
   ];
 
   return (
@@ -146,27 +146,27 @@ export default function Connections() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: 40 },
   center: { paddingVertical: 40, alignItems: 'center' },
-  desc: { fontSize: 14, lineHeight: 20, color: '#6B7280' },
+  desc: { fontSize: 14, lineHeight: 20, color: '#AAB4C0' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10161D',
     borderRadius: 16,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.09)',
     padding: Spacing.three,
   },
-  iconWrap: { width: 40, height: 40, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#F6F7F9', alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  state: { fontSize: 13, color: '#9CA3AF', marginTop: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#151D25', alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 16, fontWeight: '700', color: '#F8FAFC' },
+  state: { fontSize: 13, color: '#707B87', marginTop: 1 },
   stateOn: { color: '#16C784', fontWeight: '600' },
   linkBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#16C784' },
   linkText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
   unlink: { fontSize: 13, fontWeight: '700', color: '#E5484D', padding: 6 },
-  hint: { fontSize: 12, lineHeight: 18, color: '#9CA3AF', marginTop: 4 },
+  hint: { fontSize: 12, lineHeight: 18, color: '#707B87', marginTop: 4 },
 });

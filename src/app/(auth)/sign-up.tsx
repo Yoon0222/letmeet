@@ -109,7 +109,7 @@ export default function SignUp() {
               <Ionicons
                 name={agreed ? 'checkbox' : 'square-outline'}
                 size={22}
-                color={agreed ? '#16C784' : '#9CA3AF'}
+                color={agreed ? '#16C784' : '#707B87'}
               />
               <Text style={styles.agreeText}>
                 <Text style={styles.agreeLink} onPress={() => router.push('/(auth)/terms')}>이용약관</Text>
@@ -128,13 +128,13 @@ export default function SignUp() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F7F9' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   content: { flexGrow: 1, padding: Spacing.four, justifyContent: 'center', gap: Spacing.four },
   header: { gap: 8 },
-  title: { fontSize: 34, fontWeight: '800', color: '#111827' },
-  sub: { fontSize: 16, fontWeight: '500', color: '#6B7280' },
+  title: { fontSize: 34, fontWeight: '800', color: '#F8FAFC' },
+  sub: { fontSize: 16, fontWeight: '500', color: '#AAB4C0' },
   form: { gap: Spacing.three },
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 4 },
-  agreeText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#6B7280' },
+  agreeText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#AAB4C0' },
   agreeLink: { color: '#16C784', fontWeight: '800', textDecorationLine: 'underline' },
 });

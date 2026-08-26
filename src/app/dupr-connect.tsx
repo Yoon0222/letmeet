@@ -115,8 +115,8 @@ export default function DuprConnectScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  safe: { flex: 1, backgroundColor: '#070A0D' },
   center: { alignItems: 'center', justifyContent: 'center' },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.85)' },
-  errText: { color: '#6B7280', fontSize: 15, textAlign: 'center', padding: 24 },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
+  errText: { color: '#AAB4C0', fontSize: 15, textAlign: 'center', padding: 24 },
 });
