@@ -19,6 +19,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         // 탭 씬(화면 뒷면) 배경을 앱 다크로 고정 → 탭 전환/lazy 마운트 때 라이트 배경이
