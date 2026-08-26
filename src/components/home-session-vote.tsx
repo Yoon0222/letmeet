@@ -31,6 +31,8 @@ export function HomeSessionVote() {
       setSessions([]);
       return;
     }
+    // 반복 스케줄로 도래한 회차 보충(내 클럽만) — cron 미설정이어도 홈에서 materialize
+    await Promise.all(clubIds.map((id) => supabase.rpc('generate_due_club_sessions', { p_club_id: id })));
     const nowIso = new Date().toISOString();
     const { data: rows } = await supabase
       .from('club_sessions')

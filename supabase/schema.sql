@@ -456,10 +456,45 @@ create policy "club_match_results_delete_recorder_or_owner" on public.club_match
     or exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
   );
 
+-- ── 정기모임 반복 스케줄 (0077): 매주 지정 요일 자동 개설·투표오픈 ──────────
+create table if not exists public.club_session_schedules (
+  id              uuid primary key default gen_random_uuid(),
+  club_id         uuid not null references public.clubs(id) on delete cascade,
+  created_by      uuid not null references public.profiles(id) on delete cascade,
+  weekday         int  not null check (weekday between 0 and 6),   -- 0=일 … 6=토
+  start_time      time not null default '19:00',
+  vote_open_days  int  not null default 5 check (vote_open_days between 0 and 21),
+  vote_close_days int  not null default 1 check (vote_close_days between 0 and 21),
+  title           text not null default '정기모임',
+  location        text not null default '',
+  court_count     int  not null default 2 check (court_count between 1 and 20),
+  point_target    int  not null default 16 check (point_target between 1 and 99),
+  format          text not null default 'americano' check (format in ('americano')),
+  active          boolean not null default true,
+  created_at      timestamptz not null default now(),
+  constraint css_vote_order_chk check (vote_open_days >= vote_close_days)
+);
+create index if not exists club_session_schedules_club_idx on public.club_session_schedules (club_id);
+alter table public.club_session_schedules enable row level security;
+drop policy if exists "css_select" on public.club_session_schedules;
+create policy "css_select" on public.club_session_schedules for select using (
+  exists (select 1 from public.club_members m
+          where m.club_id = club_session_schedules.club_id and m.user_id = auth.uid() and m.status = 'approved')
+  or exists (select 1 from public.clubs c
+             where c.id = club_session_schedules.club_id and c.owner_id = auth.uid())
+);
+drop policy if exists "css_write_owner" on public.club_session_schedules;
+create policy "css_write_owner" on public.club_session_schedules for all using (
+  exists (select 1 from public.clubs c where c.id = club_session_schedules.club_id and c.owner_id = auth.uid())
+) with check (
+  exists (select 1 from public.clubs c where c.id = club_session_schedules.club_id and c.owner_id = auth.uid())
+);
+
 -- ── 클럽 정기모임(세션): 참석 투표 → 아메리카노 대진 → 결과 (0067) ──────────
 create table if not exists public.club_sessions (
   id           uuid primary key default gen_random_uuid(),
   club_id      uuid not null references public.clubs(id) on delete cascade,
+  schedule_id  uuid references public.club_session_schedules(id) on delete set null, -- 반복 스케줄로 자동생성된 회차(0077)
   created_by   uuid not null references public.profiles(id) on delete cascade,
   title        text not null default '',
   session_date date not null default current_date,
@@ -474,6 +509,56 @@ create table if not exists public.club_sessions (
   created_at   timestamptz not null default now()
 );
 create index if not exists club_sessions_club_idx on public.club_sessions (club_id, session_date desc, created_at desc);
+create unique index if not exists club_sessions_schedule_date_uniq
+  on public.club_sessions (schedule_id, session_date) where schedule_id is not null;
+
+-- 반복 스케줄에서 도래한 회차 자동 생성 (0077). p_club_id 주면 해당 클럽만, null=전체(cron).
+create or replace function public.generate_due_club_sessions(p_club_id uuid default null)
+returns int
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count int := 0;
+  r record;
+  v_today date := (now() at time zone 'Asia/Seoul')::date;
+  v_next date;
+begin
+  for r in
+    select s.* from public.club_session_schedules s
+    join public.clubs c on c.id = s.club_id
+    where s.active
+      and (p_club_id is null or s.club_id = p_club_id)
+      and c.tier = 'premium'
+      and (c.premium_status = 'active'
+           or (c.premium_status = 'trialing' and c.premium_trial_ends_at is not null and c.premium_trial_ends_at > now()))
+  loop
+    v_next := v_today + ((r.weekday - extract(dow from v_today)::int + 7) % 7);
+    if v_today > (v_next - r.vote_close_days) then
+      v_next := v_next + 7;
+    end if;
+    if v_today >= (v_next - r.vote_open_days)
+       and not exists (select 1 from public.club_sessions where schedule_id = r.id and session_date = v_next) then
+      begin
+        insert into public.club_sessions
+          (club_id, created_by, schedule_id, title, session_date, start_at, vote_deadline,
+           location, court_count, point_target, format, status)
+        values
+          (r.club_id, r.created_by, r.id, r.title, v_next,
+           (v_next + r.start_time) at time zone 'Asia/Seoul',
+           ((v_next - r.vote_close_days) + r.start_time) at time zone 'Asia/Seoul',
+           r.location, r.court_count, r.point_target, r.format, 'voting');
+        v_count := v_count + 1;
+      exception when unique_violation then
+        null;
+      end;
+    end if;
+  end loop;
+  return v_count;
+end;
+$$;
+revoke execute on function public.generate_due_club_sessions(uuid) from public, anon;
+grant execute on function public.generate_due_club_sessions(uuid) to authenticated;
 
 create table if not exists public.club_session_players (
   session_id uuid not null references public.club_sessions(id) on delete cascade,

@@ -187,6 +187,17 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="club/session-schedule"
+          options={{
+            presentation: 'modal',
+            headerShown: true,
+            title: '반복 스케줄',
+            headerStyle: { backgroundColor: '#070A0D' },
+            headerTintColor: '#F8FAFC',
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
           name="club/session/[id]"
           options={{
             headerShown: true,

@@ -259,6 +259,7 @@ export type ClubSessionStatus = 'voting' | 'matched' | 'ongoing' | 'finished' | 
 export type ClubSession = {
   id: string;
   club_id: string;
+  schedule_id: string | null; // 반복 스케줄로 자동생성된 회차(0077)
   created_by: string;
   title: string;
   session_date: string;
@@ -269,6 +270,24 @@ export type ClubSession = {
   point_target: number;
   format: 'americano';
   status: ClubSessionStatus;
+  created_at: string;
+};
+
+/** 정기모임 반복 스케줄(0077) — 매주 weekday 요일 자동 개설·투표오픈 */
+export type ClubSessionSchedule = {
+  id: string;
+  club_id: string;
+  created_by: string;
+  weekday: number; // 0=일 … 6=토 (JS getDay 기준)
+  start_time: string; // 'HH:MM:SS'
+  vote_open_days: number; // 세션 며칠 전 투표 오픈(=자동 생성)
+  vote_close_days: number; // 세션 며칠 전 투표 마감
+  title: string;
+  location: string;
+  court_count: number;
+  point_target: number;
+  format: 'americano';
+  active: boolean;
   created_at: string;
 };
 
@@ -775,6 +794,12 @@ export interface Database {
         Update: WriteDefaults<ClubSession>;
         Relationships: [];
       };
+      club_session_schedules: {
+        Row: ClubSessionSchedule;
+        Insert: { club_id: string; created_by: string; weekday: number } & WriteDefaults<ClubSessionSchedule>;
+        Update: WriteDefaults<ClubSessionSchedule>;
+        Relationships: [];
+      };
       club_session_players: {
         Row: ClubSessionPlayer;
         Insert: { session_id: string; user_id: string } & WriteDefaults<ClubSessionPlayer>;
@@ -983,6 +1008,7 @@ export interface Database {
       };
       is_club_session_manager: { Args: { p_session_id: string }; Returns: boolean };
       is_club_session_member: { Args: { p_session_id: string }; Returns: boolean };
+      generate_due_club_sessions: { Args: { p_club_id?: string | null }; Returns: number };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

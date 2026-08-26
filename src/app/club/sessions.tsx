@@ -14,12 +14,14 @@ const STATUS: Record<string, string> = { voting: '투표 중', matched: '대진 
 export default function ClubSessions() {
   const router = useRouter();
   const { clubId } = useLocalSearchParams<{ clubId: string }>();
-  const { isPremiumUsable, canManage, loading: accessLoading } = useClubAccess(clubId);
+  const { isPremiumUsable, canManage, isOwner, loading: accessLoading } = useClubAccess(clubId);
   const [sessions, setSessions] = useState<ClubSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!clubId) return;
+    // 반복 스케줄로 도래한 회차 자동 보충(on-read)
+    await supabase.rpc('generate_due_club_sessions', { p_club_id: clubId });
     const { data } = await supabase
       .from('club_sessions')
       .select('*')
@@ -43,6 +45,13 @@ export default function ClubSessions() {
           <Pressable onPress={() => router.push({ pathname: '/club/session-create', params: { clubId } })} style={styles.createBtn}>
             <Ionicons name="add" size={18} color="#07100D" />
             <Text style={styles.createTxt}>정기모임 개설</Text>
+          </Pressable>
+        ) : null}
+
+        {isPremiumUsable && isOwner ? (
+          <Pressable onPress={() => router.push({ pathname: '/club/session-schedule', params: { clubId } })} style={styles.scheduleBtn}>
+            <Ionicons name="repeat" size={16} color="#16C784" />
+            <Text style={styles.scheduleTxt}>반복 스케줄 설정 (매주 자동 개설)</Text>
           </Pressable>
         ) : null}
 
@@ -80,6 +89,8 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.three },
   createBtn: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#16C784', borderRadius: 16, borderCurve: 'continuous' },
   createTxt: { color: '#07100D', fontSize: 15, fontWeight: '900' },
+  scheduleBtn: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(22,199,132,0.35)', borderRadius: 16, borderCurve: 'continuous' },
+  scheduleTxt: { color: '#16C784', fontSize: 14, fontWeight: '800' },
   emptyBox: { minHeight: 80, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.three },
   emptyTxt: { flex: 1, color: '#AAB4C0', fontSize: 14, fontWeight: '700' },
   card: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: Spacing.three },
