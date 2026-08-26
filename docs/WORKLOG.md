@@ -79,6 +79,11 @@
 
 ## 2026-08-26
 
+### 정기모임 반복 스케줄 — 매주 자동 개설·투표오픈
+- **결정**: 회차별 수동 개설 → 클럽장이 요일/시각/투표리드(오픈·마감 며칠 전)를 정하면 매주 자동 개설. 생성 **2중화**(pg_cron 일1회 + 앱 on-read RPC)로 cron 미설정(운영 관례상 수동)이어도 앱 열람 시 보충. 세션 insert 시 기존 0075 트리거가 알림 → 투표 유도 자동. 반복 규칙은 **클럽장 전용**(오너 정책).
+- **만든 것**: `0077`(club_session_schedules + club_sessions.schedule_id unique + generate_due_club_sessions SECURITY DEFINER), `0078·0079`(anon/public 실행권한 회수, authenticated 전용). `club/session-schedule.tsx`(규칙 목록+추가/수정폼: 요일칩·시각·리드·코트·점수·활성토글·삭제). `sessions.tsx` 진입버튼+on-read, `home-session-vote.tsx` on-read 보충. 커밋 `735b727`.
+- **메모**: 날짜 로직(다음요일·도래판정) JS미러 검증. Supabase 기본 default privileges가 anon에도 EXECUTE 부여 → 명시 revoke 필요(0079). **dev 적용·검증 완료**. prod = `docs/PROD_APPLY_0077_0079.sql`. cron 등록은 선택(주석). expo-router 타입은 새 라우트 추가 시 Metro 1회 부팅으로 재생성됨.
+
 ### 어드민 등록/수정 폼 → 모달 팝업 (코트·이벤트) + 대회 버튼 위치 통일
 - **결정**: 상시 노출되던 인라인 등록/수정 폼이 목록 가독성을 해쳐, **리스트 하단 '추가' 버튼 → 모달 팝업** 패턴으로 통일. 사용자가 제안했던 "단계별 마법사"는 곧 철회 → **단일 폼 모달**로 진행. 대회 생성은 필드가 많아(20+) 모달 대신 **전용 페이지 유지**, 진입 버튼만 하단으로 이동해 위치만 통일.
 - **만든 것**: `web-admin/components/modal.tsx`(공용, Esc·✕·취소 닫힘·배경클릭 닫힘 기본 off). `courts`·`events` 폼을 모달로(하단 '코트 추가'/'팝업 추가'). `tournaments` '새 대회' 버튼 상단→하단. 커밋 `c6e6556`·`747dcdc`.
