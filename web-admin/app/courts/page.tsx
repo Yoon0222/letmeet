@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { MonthCalendar } from '@/components/month-calendar';
 import { Protected } from '@/components/protected';
-import { AMENITIES, SURFACES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
+import { AMENITIES, REFUND_PRESETS, SURFACES, amenityLabel, refundPolicyLabel, sanitizeRefundPolicy, surfaceLabel } from '@/lib/court-meta';
 import { supabase } from '@/lib/supabase';
-import type { Court, CourtBlock, CourtUnit } from '@/lib/types';
+import type { Court, CourtBlock, CourtUnit, RefundTier } from '@/lib/types';
 import { useRole } from '@/lib/use-role';
 import { useSession } from '@/lib/use-session';
 
@@ -65,6 +65,7 @@ type Form = {
   lessons: boolean;
   auto_open_days: number;
   images: string[];
+  refund_policy: RefundTier[];
 };
 
 const EMPTY: Form = {
@@ -84,6 +85,7 @@ const EMPTY: Form = {
   lessons: false,
   auto_open_days: 0,
   images: [],
+  refund_policy: [{ days_before: 1, rate: 100 }],
 };
 
 function CourtsInner() {
@@ -230,6 +232,7 @@ function CourtsInner() {
       lessons: !!c.lessons,
       auto_open_days: c.auto_open_days ?? 0,
       images: Array.isArray(c.images) ? c.images : [],
+      refund_policy: Array.isArray(c.refund_policy) && c.refund_policy.length ? c.refund_policy : [{ days_before: 1, rate: 100 }],
     });
     setError('');
     setGeoStatus(c.latitude != null ? { ok: true, msg: '저장된 좌표가 있어요.' } : null);
@@ -293,6 +296,13 @@ function CourtsInner() {
   const toggleAmenity = (key: string) =>
     setForm((f) => ({ ...f, amenities: f.amenities.includes(key) ? f.amenities.filter((a) => a !== key) : [...f.amenities, key] }));
 
+  // 환불 정책 단계 편집
+  const addTier = () => setForm((f) => ({ ...f, refund_policy: [...f.refund_policy, { days_before: 0, rate: 0 }] }));
+  const setTier = (i: number, patch: Partial<RefundTier>) =>
+    setForm((f) => ({ ...f, refund_policy: f.refund_policy.map((t, idx) => (idx === i ? { ...t, ...patch } : t)) }));
+  const removeTier = (i: number) => setForm((f) => ({ ...f, refund_policy: f.refund_policy.filter((_, idx) => idx !== i) }));
+  const applyRefundPreset = (tiers: RefundTier[]) => setForm((f) => ({ ...f, refund_policy: tiers.map((t) => ({ ...t })) }));
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -325,6 +335,7 @@ function CourtsInner() {
       lessons: form.lessons,
       auto_open_days: form.auto_open_days,
       images: form.images,
+      refund_policy: sanitizeRefundPolicy(form.refund_policy),
     };
     // owner_id 는 최고관리자만 지정/변경(코트관리자는 자기 코트 소유권 못 바꿈)
     const payload = isSuper ? { ...base, owner_id: form.owner_id } : base;
@@ -542,6 +553,66 @@ function CourtsInner() {
                 코트를 먼저 등록·저장한 뒤, 수정 화면에서 특정일을 추가로 열 수 있어요.
               </p>
             )}
+          </div>
+
+          {/* 환불 정책 — 예약 취소 시 남은 일수별 환불율 */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-slate-700">환불 정책 (예약 취소 시)</span>
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap gap-2">
+                {REFUND_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => applyRefundPreset(p.tiers)}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {form.refund_policy.length > 0 ? (
+                <div className="space-y-2">
+                  {form.refund_policy.map((t, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                      <span>예약</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={t.days_before}
+                        onChange={(e) => setTier(i, { days_before: Number(e.target.value) })}
+                        className="w-16 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                      <span>일 전까지 취소 시</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={t.rate}
+                        onChange={(e) => setTier(i, { rate: Number(e.target.value) })}
+                        className="w-16 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                      <span>% 환불</span>
+                      <button type="button" onClick={() => removeTier(i)} className="rounded-full px-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">단계가 없으면 모든 취소가 환불 없음(0%)으로 처리돼요.</p>
+              )}
+              <button type="button" onClick={addTier} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+                + 단계 추가
+              </button>
+              <p className="text-xs text-slate-500">
+                미리보기: <span className="font-medium text-slate-700">{refundPolicyLabel(form.refund_policy)}</span>
+              </p>
+              <p className="text-xs text-slate-400">
+                남은 일수가 큰 단계부터 적용돼요. 어떤 단계에도 안 드는(더 임박한) 취소는 환불이 없어요(0%). 당일(0일 전) 단계를 넣으면 당일 취소 환불율을 지정할 수 있어요.
+              </p>
+            </div>
           </div>
 
           {/* 연대관(정기 대관) — 매주 반복 예약 차단. 자동 오픈이어도 이 시간은 예약 불가 */}

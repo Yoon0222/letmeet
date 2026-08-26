@@ -1026,6 +1026,7 @@ create table if not exists public.courts (
   lessons      boolean not null default false,        -- 레슨 가능 여부
   images       text[] not null default '{}'::text[], -- 코트 사진 URL 배열
   auto_open_days int not null default 0 check (auto_open_days >= 0 and auto_open_days <= 60), -- 예약 자동 오픈 롤링 기간(일). 0=수동만
+  refund_policy jsonb not null default '[{"days_before":1,"rate":100}]'::jsonb, -- 취소 환불 단계: [{days_before, rate%}] 내림차순 평가, 해당 없으면 0%
   created_at   timestamptz not null default now(),
   constraint courts_hours_chk check (open_hour >= 0 and close_hour <= 24 and open_hour < close_hour)
 );
@@ -1135,6 +1136,7 @@ create table if not exists public.payments (
   slot_date    date,
   hours        int[] not null default '{}',
   amount       int not null default 0,
+  refund_amount int not null default 0 check (refund_amount >= 0),        -- 실제 환불 금액(부분환불 대응). 0=미환불
   status       text not null default 'pending' check (status in ('pending','paid','failed','canceled','refunded')),
   provider     text not null default 'portone',
   provider_tx  text,

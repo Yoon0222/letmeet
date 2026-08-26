@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/auth';
 import { createCourtReservation } from '@/lib/court-reservations';
 import { AMENITIES, amenityLabel, surfaceLabel } from '@/lib/court-meta';
 import { createCourtPaymentHold } from '@/lib/payments';
+import { refundPolicyText } from '@/lib/refund';
 import { supabase } from '@/lib/supabase';
 import type { Court, CourtBlock, CourtReservation } from '@/lib/types';
 import { AppColors } from '@/theme';
@@ -275,6 +276,7 @@ export default function CourtDetail() {
           <Info icon="home-outline" text={court.indoor ? '실내 코트' : '실외 코트'} />
           <Info icon="time-outline" text={`운영 ${court.open_hour}시 – ${court.close_hour}시`} />
           <Info icon="cash-outline" text={court.hourly_price > 0 ? `시간당 ${court.hourly_price.toLocaleString()}원` : '무료'} />
+          {court.hourly_price > 0 ? <Info icon="refresh-outline" text={`취소 환불 · ${refundPolicyText(court.refund_policy)}`} /> : null}
           {units.length > 0 ? <Info icon="grid-outline" text={unitText} /> : null}
           {court.lessons ? <Info icon="school-outline" text="레슨 가능" /> : null}
         </View>

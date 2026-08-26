@@ -9,8 +9,9 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { cancelCourtReservation } from '@/lib/payments';
+import { refundRateFor } from '@/lib/refund';
 import { supabase } from '@/lib/supabase';
-import type { CourtReservationWithCourt } from '@/lib/types';
+import type { CourtReservationWithCourt, RefundTier } from '@/lib/types';
 import { AppColors } from '@/theme';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -31,6 +32,7 @@ type Group = {
   date: string;
   hours: number[];
   price: number;
+  refundPolicy: RefundTier[];
   ids: string[];
   past: boolean;
 };
@@ -49,7 +51,7 @@ export default function MyReservationsScreen() {
     // 확정 예약만 표시한다.
     const { data } = await supabase
       .from('court_reservations')
-      .select('*, courts(id,name,region,indoor,hourly_price)')
+      .select('*, courts(id,name,region,indoor,hourly_price,refund_policy)')
       .eq('user_id', uid)
       .eq('status', 'reserved')
       .is('expires_at', null)
@@ -74,7 +76,7 @@ export default function MyReservationsScreen() {
     const k = `${r.court_id}|${r.court_unit}|${r.slot_date}`;
     let g = map.get(k);
     if (!g) {
-      g = { key: k, courtId: r.court_id, courtName: r.courts?.name ?? '코트', unit: r.court_unit ?? '', region: r.courts?.region ?? '', date: r.slot_date, hours: [], price: r.courts?.hourly_price ?? 0, ids: [], past: false };
+      g = { key: k, courtId: r.court_id, courtName: r.courts?.name ?? '코트', unit: r.court_unit ?? '', region: r.courts?.region ?? '', date: r.slot_date, hours: [], price: r.courts?.hourly_price ?? 0, refundPolicy: r.courts?.refund_policy ?? [], ids: [], past: false };
       map.set(k, g);
     }
     g.hours.push(r.hour);
@@ -90,8 +92,18 @@ export default function MyReservationsScreen() {
   const pastGroups = groups.filter((g) => g.past).sort((a, b) => b.date.localeCompare(a.date));
 
   function cancelGroup(g: Group) {
-    const sameDay = g.date <= today; // 당일(또는 과거)이면 환불 없음
-    const policyLine = sameDay ? '당일 취소는 환불되지 않아요.' : '취소하면 100% 환불돼요.';
+    // 코트 환불 정책 → 남은 일수 기준 환불율/금액
+    const rate = refundRateFor(g.refundPolicy, g.date, today);
+    const total = g.hours.length * g.price;
+    const refund = Math.floor((total * rate) / 100);
+    const policyLine =
+      total <= 0
+        ? '무료 예약이에요. 취소만 진행돼요.'
+        : rate <= 0
+          ? '지금 취소하면 환불되지 않아요.'
+          : rate >= 100
+            ? `취소하면 ${refund.toLocaleString()}원(전액) 환불돼요.`
+            : `취소하면 ${refund.toLocaleString()}원(${rate}%) 환불돼요.`;
     Alert.alert(
       '예약 취소',
       `${g.courtName}\n${fmtDate(g.date)} · ${g.hours.map((h) => `${h}시`).join(', ')}\n\n${policyLine}\n예약을 취소할까요?`,

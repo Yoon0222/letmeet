@@ -146,6 +146,9 @@ export type TieMatch = {
 /** 면(코트) 1개 — 이름 + 바닥 종류 */
 export type CourtUnit = { name: string; surface: string };
 
+/** 코트 환불 정책 단계 — "예약일 days_before일 전까지 취소하면 rate% 환불". 해당 없으면 0%. */
+export type RefundTier = { days_before: number; rate: number };
+
 export type Court = {
   id: string;
   name: string;
@@ -165,6 +168,7 @@ export type Court = {
   lessons: boolean;
   images: string[]; // 코트 사진 URL 배열
   auto_open_days: number; // 예약 자동 오픈 롤링 기간(일). 0=수동만
+  refund_policy: RefundTier[]; // 취소 환불 단계(내림차순 평가)
   created_at: string;
 };
 
