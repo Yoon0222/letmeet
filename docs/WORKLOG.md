@@ -77,6 +77,13 @@
 
 ---
 
+## 2026-08-26
+
+### 라이트 잔재 화면 15개 다크 테마 통일
+- **결정**: 앱 전역은 다크(#070A0D)인데 일부 화면이 흰 배경(#F6F7F9/#FFFFFF)으로 남아 톤이 튀었다 → 전부 다크 팔레트로 교체. 색상만 1:1 치환(구조/로직 무변, +241/−241 대칭)이라 회귀 위험 최소.
+- **만든 것**: (auth) sign-in/sign-up/terms, auth-callback, config-missing, community [id]/create, dupr-connect, meetup [id]/record, player [id], profile connections/edit, support, tournament [id]. 매핑: bg→#070A0D, card→#10161D, border→rgba(255,255,255,.09), text→#F8FAFC/#AAB4C0/#707B87. 브랜드 그린·컬러버튼 위 흰 텍스트 유지, 저대비 앰버(#7A4E00→#F5A623) 보정. 커밋 `cf45314`.
+- **메모**: 프리뷰 페인 미가용으로 라이브 시각확인은 못 함 — tsc·lint 통과 + 라이트배경 잔재 grep 0 + 대칭 diff로 검증. `profile/edit.tsx`는 최초 14개 목록에서 누락됐다 grep 재검색으로 발견해 포함.
+
 ## 2026-08-19
 
 ### 클럽 정기모임(세션) — 참석투표→아메리카노 대진→결과 (Phase 1~3 자동흐름)
