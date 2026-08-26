@@ -85,6 +85,7 @@ export default function ClubsScreen() {
           subtitle="함께 꾸준히 칠 동호회를 찾거나 만들어보세요"
           rightIcon="add"
           onRightPress={openCreateClub}
+          onBack={router.canGoBack() ? () => router.back() : undefined}
         />
       </View>
 

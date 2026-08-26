@@ -68,7 +68,7 @@ export default function TournamentsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <AppHeader title="대회" subtitle="참가 신청하고 대진·결과를 확인하세요" />
+        <AppHeader title="대회" subtitle="참가 신청하고 대진·결과를 확인하세요" onBack={router.canGoBack() ? () => router.back() : undefined} />
       </View>
 
       {/* 단식/복식 구분 필터 */}

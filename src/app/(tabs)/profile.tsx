@@ -97,9 +97,16 @@ export default function ProfileScreen() {
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <Text style={styles.logo}>
-            P!<Text style={styles.logoAccent}>NUT</Text>
-          </Text>
+          <View style={styles.topLeft}>
+            {router.canGoBack() ? (
+              <Pressable onPress={() => router.back()} hitSlop={8} style={styles.iconButton} accessibilityLabel="뒤로" accessibilityRole="button">
+                <Ionicons name="chevron-back" size={18} color={dark.text} />
+              </Pressable>
+            ) : null}
+            <Text style={styles.logo}>
+              P!<Text style={styles.logoAccent}>NUT</Text>
+            </Text>
+          </View>
           <View style={styles.topActions}>
             <Pressable style={styles.iconButton} onPress={() => router.push('/profile/edit')} hitSlop={8}>
               <Ionicons name="create-outline" size={18} color={dark.text} />
@@ -287,6 +294,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: dark.background },
   content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: Spacing.three, paddingBottom: 124 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   logo: { fontSize: 20, fontWeight: '900', color: dark.text, letterSpacing: 0 },
   logoAccent: { color: Brand.primary },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
