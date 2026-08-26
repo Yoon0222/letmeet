@@ -79,6 +79,11 @@
 
 ## 2026-08-26
 
+### 프리미엄 클럽 구독 결제 — Toss 빌링키 정기결제(월 5,500원)
+- **결정**: 무료체험만 있고 결제가 없던 구멍을 메움. 월 **5,500원**, 무료체험 중 구독 시 **카드만 등록·첫 과금은 체험 종료일**(체험 혜택 유지). 정기 과금은 **cron 필수**(온리드 불가). 빌링키/커스터머키는 **컬럼 권한으로 클라 차단**(민감).
+- **만든 것**: DB `0080`(club_subscriptions + charges, RLS 오너, 안전컬럼만 grant). 엣지함수 3개: `toss-billing-issue`(authKey→billingKey+첫과금/체험예약), `toss-billing-charge`(정기과금·실패3회 재시도후 강등·해지만료 강등, x-cron-secret), `toss-billing-cancel`(기간말 유지). 앱 `payment/subscribe`(빌링 WebView `requestBillingAuth`) + `payments.ts` 헬퍼 + 클럽상세 구독/해지·카드·다음결제 UI. 커밋 `c577321`.
+- **메모**: dev 적용·함수배포·컬럼보호(anon 401·billing_key 42501) 검증. **남은 배포**: prod `docs/PROD_APPLY_0080.sql` + 엣지함수 3개 배포 + **CRON_SECRET 시크릿(dev도 필요)** + pg_cron(net.http_post) + **Toss 자동결제(빌링) 계약**(운영). 실제 카드흐름은 앱+Toss 필요 → 빌드 후 테스트. 가격상수 5500(추후 관리자 변경 여지).
+
 ### 정기모임 반복 스케줄 — 매주 자동 개설·투표오픈
 - **결정**: 회차별 수동 개설 → 클럽장이 요일/시각/투표리드(오픈·마감 며칠 전)를 정하면 매주 자동 개설. 생성 **2중화**(pg_cron 일1회 + 앱 on-read RPC)로 cron 미설정(운영 관례상 수동)이어도 앱 열람 시 보충. 세션 insert 시 기존 0075 트리거가 알림 → 투표 유도 자동. 반복 규칙은 **클럽장 전용**(오너 정책).
 - **만든 것**: `0077`(club_session_schedules + club_sessions.schedule_id unique + generate_due_club_sessions SECURITY DEFINER), `0078·0079`(anon/public 실행권한 회수, authenticated 전용). `club/session-schedule.tsx`(규칙 목록+추가/수정폼: 요일칩·시각·리드·코트·점수·활성토글·삭제). `sessions.tsx` 진입버튼+on-read, `home-session-vote.tsx` on-read 보충. 커밋 `735b727`.
