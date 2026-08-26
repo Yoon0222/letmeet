@@ -79,6 +79,11 @@
 
 ## 2026-08-26
 
+### 코트별 환불 정책 — 관리자 등록/수정 + 취소 시 기간별 부분환불
+- **결정**: 그동안 전역("당일 외 100%")이던 환불을 **코트마다** 설정. 모델 = 단계 배열 `[{days_before, rate}]`, "예약일 N일 전까지 취소 시 R% 환불", 해당 없으면 0%. 남은 일수는 slot_date 기준(KST). days 단위 선택 이유 = 코트 오너에게 직관적 + 기존 date 기반 데이터와 정합 + 기본값이 기존 정책을 정확히 재현(`[{1,100}]`).
+- **만든 것**: `0076`(courts.refund_policy jsonb + payments.refund_amount) + schema.sql. `src/lib/refund.ts`(평가/문구 유틸). 관리자 `web-admin/app/courts` 단계 편집기(프리셋 4·미리보기). `toss-cancel` 함수: 정책 조회→rate→전액=cancelAmount생략/부분=전달/0%=미환불, refund_amount 기록. 앱: 내예약 취소확인에 실제 환불액/율, 코트상세에 정책 노출. 커밋 `2fb7881`.
+- **메모**: 평가 규칙 3계층 동일(알고리즘 10/10 검증). **dev 적용·함수배포·컬럼검증 완료**. prod = `docs/PROD_APPLY_0076.sql` 실행 후 `toss-cancel` prod 배포(순서 중요). 후속: 부분환불 시 payments.status는 'refunded'로만(부분 상태 별도 없음).
+
 ### 라이트 잔재 화면 15개 다크 테마 통일
 - **결정**: 앱 전역은 다크(#070A0D)인데 일부 화면이 흰 배경(#F6F7F9/#FFFFFF)으로 남아 톤이 튀었다 → 전부 다크 팔레트로 교체. 색상만 1:1 치환(구조/로직 무변, +241/−241 대칭)이라 회귀 위험 최소.
 - **만든 것**: (auth) sign-in/sign-up/terms, auth-callback, config-missing, community [id]/create, dupr-connect, meetup [id]/record, player [id], profile connections/edit, support, tournament [id]. 매핑: bg→#070A0D, card→#10161D, border→rgba(255,255,255,.09), text→#F8FAFC/#AAB4C0/#707B87. 브랜드 그린·컬러버튼 위 흰 텍스트 유지, 저대비 앰버(#7A4E00→#F5A623) 보정. 커밋 `cf45314`.
