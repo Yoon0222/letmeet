@@ -289,6 +289,7 @@ export default function ClubDetail() {
           </View>
         ) : null}
 
+        {isOwner ? (
         <View style={styles.premiumCard}>
           <View style={styles.premiumTop}>
             <View>
@@ -337,6 +338,7 @@ export default function ClubDetail() {
             )
           ) : null}
         </View>
+        ) : null}
 
         {/* 클럽 활동 메뉴 — 각각 전용 페이지로. 비회원은 회원 관리만 노출 */}
         <View style={styles.section}>
