@@ -2237,8 +2237,9 @@ comment on column public.profiles.dupr_status is
 update public.profiles set dupr_status = 'verified'
   where dupr_verified = true and dupr_status = 'none';
 
--- 🔒 DUPR 결과 컬럼은 service_role 만 변경 가능. 일반 사용자 업데이트는 이전 값 유지.
---    dupr_id 는 사용자가 입력하는 조회 키라 변경 허용.
+-- 🔒 DUPR 결과·엔티틀먼트 컬럼은 service_role(Edge) 만 변경 가능. 일반 사용자 업데이트는 이전 값 유지.
+--    (0061과 동일 — dupr_basic/premium 도 보호해 BASIC_L1 자가위조로 매치 게이트 우회 방지.)
+--    dupr_id 는 현재 조회 키라 변경 허용(SSO-only 강화 시 함께 보호 예정).
 create or replace function public.protect_dupr_columns()
 returns trigger
 language plpgsql
@@ -2252,6 +2253,9 @@ begin
     new.dupr_verified  := old.dupr_verified;
     new.dupr_status    := old.dupr_status;
     new.dupr_synced_at := old.dupr_synced_at;
+    new.dupr_basic     := old.dupr_basic;
+    new.dupr_premium   := old.dupr_premium;
+    new.dupr_entitlements_synced_at := old.dupr_entitlements_synced_at;
   end if;
   return new;
 end;
