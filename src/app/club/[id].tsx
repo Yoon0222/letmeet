@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge } from '@/components/ui/badge';
 import { ReportBlock } from '@/components/report-block';
 import { Button } from '@/components/ui/button';
+import { CLUB_SUBSCRIPTION_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { cancelClubSubscription } from '@/lib/payments';
@@ -309,10 +310,10 @@ export default function ClubDetail() {
               ? '클럽 멤버끼리 진행한 경기 결과를 기록하고 히스토리로 확인할 수 있어요.'
               : '프리미엄 클럽은 클럽 내부 경기 결과 기록을 사용할 수 있어요. 1개월 무료 체험 후 구독으로 전환됩니다.'}
           </Text>
-          {isOwner ? (
-            club?.premium_status === 'none' || club?.tier !== 'premium' ? (
-              <Button title="1개월 무료 체험 시작" onPress={startPremiumTrial} loading={acting} style={styles.premiumButton} />
-            ) : sub && sub.status === 'active' ? (
+          {club?.premium_status === 'none' || club?.tier !== 'premium' ? (
+            <Button title="1개월 무료 체험 시작" onPress={startPremiumTrial} loading={acting} style={styles.premiumButton} />
+          ) : CLUB_SUBSCRIPTION_ENABLED ? (
+            sub && sub.status === 'active' ? (
               <View style={styles.subInfo}>
                 <Text style={styles.subLine}>
                   {sub.card_company ? `${sub.card_company} ` : ''}
@@ -336,7 +337,9 @@ export default function ClubDetail() {
                 <Button title="구독하기 (월 5,500원)" onPress={goSubscribe} loading={acting} style={styles.premiumButton} />
               </View>
             )
-          ) : null}
+          ) : (
+            <Text style={styles.subSub}>구독 결제는 곧 지원될 예정이에요.</Text>
+          )}
         </View>
         ) : null}
 
