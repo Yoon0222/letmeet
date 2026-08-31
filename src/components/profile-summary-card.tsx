@@ -22,11 +22,11 @@ export function ProfileSummaryCard({ profile, meetupCount }: ProfileSummaryCardP
       <Text style={styles.region}>
         {profile?.region || '지역 미설정'} · {playStyleLabel(profile?.play_style ?? 'all')}
       </Text>
-      {profile?.dupr_id ? (
+      {profile?.dupr_verified ? (
         <Badge
-          label={profile.dupr_verified ? `DUPR ${profile.dupr_rating?.toFixed(1) ?? ''} 인증` : `DUPR ${profile.dupr_id}`}
-          color={profile.dupr_verified ? '#16A34A' : '#6B7280'}
-          bg={profile.dupr_verified ? '#DCFCE7' : '#F6F7F9'}
+          label={`DUPR ${profile.dupr_rating?.toFixed(1) ?? ''} 인증`}
+          color="#16A34A"
+          bg="#DCFCE7"
           style={{ marginTop: 8 }}
         />
       ) : null}

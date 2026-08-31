@@ -88,28 +88,18 @@ async function lookupPlayer(token: string, duprId: string): Promise<Found | null
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const id = duprId.trim();
   try {
-    // 1) DUPR ID 로 직접 조회 — 200 이면 유저 존재로 간주(레이팅 없어도 OK)
+    // DUPR ID 로 직접 조회 — 200 이면 유저 존재로 간주(레이팅 없어도 OK).
+    // (SSO 로 받은 정확한 duprId 만 사용. 이름 검색 폴백은 SSO-only 정책상 제거.)
     const res = await fetch(`${BASE}/user/${VERSION}/${encodeURIComponent(id)}`, { headers });
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      const u = data?.result ?? data;
-      // deno-lint-ignore no-explicit-any
-      const any = u as any;
-      if (any && (any.id || any.fullName || any.ratings)) {
-        return { found: true, ...parseUser(any) };
-      }
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const u = data?.result ?? data;
+    // deno-lint-ignore no-explicit-any
+    const any = u as any;
+    if (any && (any.id || any.fullName || any.ratings)) {
+      return { found: true, ...parseUser(any) };
     }
-    // 2) 이름 검색 → 첫 결과(직접 조회가 안 됐을 때만)
-    const sres = await fetch(`${BASE}/user/${VERSION}/search`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ query: id, offset: 0, limit: 1 }),
-    });
-    if (!sres.ok) return null;
-    const sdata = await sres.json().catch(() => null);
-    const first = (sdata?.result?.hits ?? sdata?.hits ?? [])[0] ?? null;
-    if (!first) return null;
-    return { found: true, ...parseUser(first) };
+    return null;
   } catch {
     return null;
   }
@@ -358,21 +348,33 @@ Deno.serve(async (req) => {
     return json({ ok: true, count: pts.length });
   }
 
-  // 4) 조회 — 유저가 존재하면 레이팅이 없어도(NR) 연결 성공. 아예 못 찾을 때만 실패.
-  const found = await lookupPlayer(token, duprId);
-  if (!found) {
-    return json({ error: 'not_found', message: 'DUPR 에서 계정을 찾지 못했어요. ID 를 확인해 주세요.' }, 404);
+  // 4) SSO 전용 — DUPR 연결은 SSO 인증으로만. 수동 DUPR ID/이름 연동 경로 제거.
+  const sso = body?.sso;
+  if (!sso?.userToken) {
+    return json({ error: 'sso_required', message: 'DUPR 연결은 SSO 인증으로만 가능해요.' }, 403);
   }
 
-  // 5) 본인 프로필에 저장 (service_role → protect_dupr 트리거 통과)
-  //    verified=true(SSO 동의 경유) → 소유 인증. 아니면 표시 연동.
-  const isVerified = body?.verified === true;
-  const status = isVerified ? 'verified' : 'linked';
-  const primary = found.doubles ?? found.singles ?? null;
+  // 5) 조회 — 유저가 존재하면 레이팅이 없어도(NR) 연결 성공. 아예 못 찾을 때만 실패.
+  const found = await lookupPlayer(token, duprId);
+  if (!found) {
+    return json({ error: 'not_found', message: 'DUPR 에서 계정을 찾지 못했어요.' }, 404);
+  }
 
-  // SSO 로 온 경우: 자격(엔티틀먼트) + 토큰 저장 (운영 요건)
-  const sso = body?.sso;
-  const ent = sso ? parseEntitlements(sso.subscriptions) : null;
+  // 5.5) 한 DUPR 계정은 한 피넛 계정에만 연결 — 다른 계정이 이미 이 dupr_id 를 쓰면 거부.
+  const { data: taken } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('dupr_id', duprId)
+    .neq('id', caller.id)
+    .maybeSingle();
+  if (taken) {
+    return json({ error: 'dupr_already_linked', message: '이 DUPR 계정은 이미 다른 피넛 계정에 연결돼 있어요.' }, 409);
+  }
+
+  // 6) 본인 프로필에 저장 (service_role → protect_dupr 트리거 통과). SSO 경유이므로 항상 verified.
+  const status = 'verified';
+  const primary = found.doubles ?? found.singles ?? null;
+  const ent = parseEntitlements(sso.subscriptions);
   // deno-lint-ignore no-explicit-any
   const profilePatch: any = {
     dupr_id: duprId,
@@ -380,14 +382,12 @@ Deno.serve(async (req) => {
     dupr_singles: found.singles,
     dupr_rating: primary,
     dupr_status: status,
-    dupr_verified: isVerified,
+    dupr_verified: true,
     dupr_synced_at: new Date().toISOString(),
+    dupr_basic: ent.basic,
+    dupr_premium: ent.premium,
+    dupr_entitlements_synced_at: new Date().toISOString(),
   };
-  if (ent) {
-    profilePatch.dupr_basic = ent.basic;
-    profilePatch.dupr_premium = ent.premium;
-    profilePatch.dupr_entitlements_synced_at = new Date().toISOString();
-  }
   await admin.from('profiles').update(profilePatch).eq('id', caller.id);
 
   // 사용자 access/refresh 토큰 저장(비공개 테이블 — service_role 만 접근)

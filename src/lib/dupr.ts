@@ -91,18 +91,16 @@ export async function getDuprSsoConfig(): Promise<{ clientKeyB64: string; ssoBas
   return { clientKeyB64: data.clientKeyB64, ssoBase: data.ssoBase };
 }
 
-// DUPR ID 로 레이팅을 불러와 본인 프로필에 연동. 서버(dupr-verify)가 처리한다.
-// verified=true 면 SSO 동의를 거친 소유 인증(Level B) → dupr_status='verified' 로 저장.
-// SSO 로 온 자격/토큰(운영요건: 엔티틀먼트 확인 + 토큰 저장)
+// DUPR 계정 연결 — SSO 인증으로만. 서버(dupr-verify)가 처리하며 항상 dupr_status='verified'.
+// sso: SSO 동의 후 받은 사용자 토큰 + 자격(엔티틀먼트). userToken 없으면 서버가 403(sso_required).
 export type DuprSso = { userToken?: string; refreshToken?: string; subscriptions?: unknown };
 
 export async function verifyDupr(
   duprId: string,
-  verified = false,
-  sso?: DuprSso,
+  sso: DuprSso,
 ): Promise<{ ok: boolean; result?: DuprVerifyResult; error?: string }> {
   const { data, error } = await supabase.functions.invoke('dupr-verify', {
-    body: { dupr_id: duprId.trim(), verified, sso },
+    body: { dupr_id: duprId.trim(), sso },
   });
 
   // 서버가 4xx/5xx 로 준 에러 메시지 최대한 사람 친화적으로.

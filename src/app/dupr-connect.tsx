@@ -51,7 +51,7 @@ export default function DuprConnectScreen() {
     setSaving(true);
 
     // 동의 완료 → 파트너 API 로 이제 조회 가능. 자격/토큰(SSO)도 함께 저장.
-    const { ok, result, error } = await verifyDupr(candidate, true, {
+    const { ok, result, error } = await verifyDupr(candidate, {
       userToken: data.userToken,
       refreshToken: data.refreshToken,
       subscriptions: data.subscriptions,
