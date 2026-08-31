@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppAlert as Alert } from '@/lib/feedback';
+import { checkStoreUpdate } from '@/lib/store-update';
 import { supabase } from '@/lib/supabase';
 import type { AppConfig } from '@/lib/types';
 import { isBelow } from '@/lib/version';
@@ -21,26 +21,23 @@ function openStore(cfg: AppConfig) {
 //   min_version 미만 = 강제(차단 화면), latest_version 미만 = 권장(1회 안내). 기본값이면 아무것도 안 함.
 export function UpdateGate({ children }: { children: React.ReactNode }) {
   const [forced, setForced] = useState<AppConfig | null>(null);
-  const softShown = useRef(false);
+  const checked = useRef(false);
 
   useEffect(() => {
     let alive = true;
     (async () => {
+      // 1) 강제 업데이트(cross-platform) — app_config.min_version 미만이면 차단.
       const { data } = await supabase.from('app_config').select('*').eq('id', 1).maybeSingle();
-      if (!alive || !data) return;
-      const cfg = data as AppConfig;
-      if (isBelow(CURRENT, cfg.min_version)) {
+      if (!alive) return;
+      const cfg = data as AppConfig | null;
+      if (cfg && isBelow(CURRENT, cfg.min_version)) {
         setForced(cfg);
-      } else if (isBelow(CURRENT, cfg.latest_version) && !softShown.current) {
-        softShown.current = true;
-        Alert.alert(
-          '새 버전이 있어요',
-          cfg.notice || '더 나은 사용을 위해 최신 버전으로 업데이트해 주세요.',
-          [
-            { text: '나중에', style: 'cancel' },
-            { text: '업데이트', onPress: () => openStore(cfg) },
-          ],
-        );
+        return;
+      }
+      // 2) 강제가 아니면 → 스토어 인앱 업데이트 체크(권유). 네이티브 모듈 없으면 no-op.
+      if (!checked.current) {
+        checked.current = true;
+        void checkStoreUpdate();
       }
     })();
     return () => {

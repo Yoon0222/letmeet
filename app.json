@@ -19,7 +19,9 @@
       "bundleIdentifier": "com.pinut.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "AppStoreID": "0000000000",
+        "AppStoreCountry": "kr"
       }
     },
     "android": {
