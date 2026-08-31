@@ -28,9 +28,21 @@ description: 버전 태그(vX.Y.Z)를 남기는 릴리스를 처리한다. app.j
    - 이번 릴리스에 포함된 기능들의 상태를 **🔵 미배포 → 🟡 테스트 배포**(TestFlight/비공개 테스트) 또는 **🟢 공개 출시**(스토어 정식 공개) 로 바꾸고, 버전 칸을 실제 버전으로 채운다.
    - 표기: 🟢 공개 출시 · 🟡 테스트 배포 · 🟠 심사 대기 · 🔵 개발 완료·미배포 · ⚪ 보류
 9. **기록**: `docs/WORKLOG.md`(worklog 스킬)와 `docs/HANDOFF.md`(handoff)에 "버전 X.Y.Z 릴리스 + Vercel 배포" 남기기.
+10. **버전 게이트 쿼리 안내 (app_config) — 새 버전을 낼 때마다 매번**: 빌드/제출을 안내한 뒤, 사용자에게 아래 `app_config` **UPDATE 쿼리를 방금 낸 버전으로 채워서 함께 준다**. "구버전을 강제/권유 업데이트 시킬 때만 실행 — 안 돌리면 게이트는 그대로"라고 반드시 명시(대부분 릴리스는 손 안 대도 됨).
+    - 운영 Supabase SQL Editor 용 템플릿:
+      ```sql
+      update public.app_config set
+        latest_version = 'X.Y.Z',   -- 이 미만은 '업데이트 권유'(닫기 가능). 넛지 원할 때만.
+        -- min_version = 'X.Y.Z',   -- 이 미만은 '강제 차단'. breaking 변경 때만(신중히).
+        ios_url     = 'https://apps.apple.com/app/id<앱스토어ID>',
+        android_url = 'https://play.google.com/store/apps/details?id=com.pinut.app',
+        updated_at  = now()
+      where id = 1;
+      ```
+    - `min_version`=set-and-forget(최소지원 바닥), `latest_version`=원할 때만 넛지. iOS URL 은 App Store ID 확보 후 채움. **게이트는 3.1.1+ 부터 효력**(그 이전 버전 사용자에겐 안 뜸).
 
 ## 주의
-- 앱 스토어 빌드(EAS)는 별개다. 필요하면 `eas build -p android/ios --profile production` 도 안내(태그와 함께 자주 같이 감).
+- 앱 스토어 빌드(EAS)는 별개다. 필요하면 `eas build -p android/ios --profile production` 도 안내(태그와 함께 자주 같이 감). **빌드/제출을 안내했으면 위 10번(app_config 업데이트 쿼리)도 반드시 함께 알려준다.**
 - Vercel 배포에 로그인/권한이 없으면 **건너뛰지 말고** 사용자에게 명령을 그대로 주고 실행하게 한 뒤 확인한다.
 - `.vercel` 폴더는 커밋 대상 아님(로컬 링크). `.gitignore` 확인.
 - 운영 DB 마이그레이션이 필요한 릴리스면(스키마 변경 포함) 그 SQL도 함께 챙긴다.
