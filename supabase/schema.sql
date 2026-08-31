@@ -2269,6 +2269,24 @@ create trigger on_profile_protect_dupr
 -- DUPR 계정 1:1 — 한 dupr_id 는 한 프로필에만(0082).
 create unique index if not exists profiles_dupr_id_uniq
   on public.profiles (dupr_id) where dupr_id is not null;
+
+-- 앱 버전 게이트 설정(0083). min_version 미만=강제, latest_version 미만=권장. '0.0.0'=비활성.
+create table if not exists public.app_config (
+  id             int primary key default 1 check (id = 1),
+  min_version    text not null default '0.0.0',
+  latest_version text not null default '0.0.0',
+  ios_url        text not null default '',
+  android_url    text not null default 'https://play.google.com/store/apps/details?id=com.pinut.app',
+  notice         text not null default '',
+  updated_at     timestamptz not null default now()
+);
+insert into public.app_config (id) values (1) on conflict (id) do nothing;
+alter table public.app_config enable row level security;
+drop policy if exists "app_config_read" on public.app_config;
+create policy "app_config_read" on public.app_config for select using (true);
+drop policy if exists "app_config_write" on public.app_config;
+create policy "app_config_write" on public.app_config for all
+  using (public.my_role() = 'super_admin') with check (public.my_role() = 'super_admin');
 -- 0057: 대회 코트 배정 방식 (auto=자동배정+수동수정 / manual=완전 수동).
 --   auto: 점수 입력 등 진행 시 빈 코트에 자동 배정, 운영자가 이후 수동 변경 가능.
 --   manual: 운영자가 경기마다 직접 코트 지정(자동 배정 안 함).

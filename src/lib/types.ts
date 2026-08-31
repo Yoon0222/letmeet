@@ -306,6 +306,17 @@ export type ClubSubscriptionCharge = {
   charged_at: string;
 };
 
+/** 앱 버전 게이트 설정(0083). min_version 미만=강제, latest_version 미만=권장. */
+export type AppConfig = {
+  id: number;
+  min_version: string;
+  latest_version: string;
+  ios_url: string;
+  android_url: string;
+  notice: string;
+  updated_at: string;
+};
+
 /** 정기모임 반복 스케줄(0077) — 매주 weekday 요일 자동 개설·투표오픈 */
 export type ClubSessionSchedule = {
   id: string;
@@ -843,6 +854,12 @@ export interface Database {
         Row: ClubSubscriptionCharge;
         Insert: WriteDefaults<ClubSubscriptionCharge>;
         Update: WriteDefaults<ClubSubscriptionCharge>;
+        Relationships: [];
+      };
+      app_config: {
+        Row: AppConfig;
+        Insert: WriteDefaults<AppConfig>;
+        Update: WriteDefaults<AppConfig>;
         Relationships: [];
       };
       club_session_players: {

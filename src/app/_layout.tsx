@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BootScreen } from '@/components/ui/boot-screen';
 import { FeedbackHost } from '@/components/ui/feedback-host';
+import { UpdateGate } from '@/components/update-gate';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/contexts/auth';
 import { I18nProvider } from '@/contexts/i18n';
@@ -271,7 +272,9 @@ export default function RootLayout() {
               <NotificationsProvider>
                 <LoadingProvider>
                   <View style={{ flex: 1, backgroundColor: Colors[scheme].background }}>
-                    <RootNavigator />
+                    <UpdateGate>
+                      <RootNavigator />
+                    </UpdateGate>
                     <FeedbackHost />
                   </View>
                 </LoadingProvider>
