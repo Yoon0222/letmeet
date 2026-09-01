@@ -38,6 +38,7 @@ export type Profile = {
   dupr_public: boolean; // 레이팅 그래프 공개 여부(0058). 본인은 항상 봄, 남은 이 값이 true 일 때만.
   dupr_basic: boolean; // BASIC_L1 자격 보유(active) — 인증 경기 참가/등록 최소조건 (0061)
   dupr_premium: boolean; // PREMIUM_L1(DUPR+) 보유 (0061)
+  dupr_verified_l1: boolean; // VERIFIED_L1 자격 — DUPR+ 전용 이벤트 참가 조건 (0084)
   dupr_entitlements_synced_at: string | null; // 자격 마지막 동기화 (0061)
   role: UserRole;
   created_at: string;
@@ -54,6 +55,7 @@ export type DuprVerifyResult = {
   unrated?: boolean; // 계정은 연결됐지만 아직 레이팅 없음(NR)
   basic?: boolean | null; // BASIC_L1 자격
   premium?: boolean | null; // PREMIUM_L1 자격
+  verified_l1?: boolean | null; // VERIFIED_L1 자격 (0084)
 };
 
 // DUPR 레이팅 히스토리 캐시(0058) — 그래프용 스냅샷.
@@ -84,6 +86,7 @@ export type Meetup = {
   image_url: string | null; // 코트/장소 사진 (0034)
   court_id: string | null; // 등록 코트 연결(선택) (0046)
   dupr_certified: boolean; // DUPR 인증 번개: 연결자만 참여, 결과를 DUPR 등록 (0059)
+  dupr_premium: boolean; // DUPR+ 전용: PREMIUM_L1+VERIFIED_L1 만 참가 (0084)
   status: MeetupStatus;
   created_at: string;
 };
@@ -407,6 +410,7 @@ export type Tournament = {
   advance_per_group: number | null;
   court_assign_mode: 'auto' | 'manual'; // 코트 배정 방식 (0057)
   dupr_certified: boolean; // DUPR 인증 대회: 연결자만 참가, 결과를 DUPR 등록 (0059)
+  dupr_premium: boolean; // DUPR+ 전용: PREMIUM_L1+VERIFIED_L1 만 참가 (0084)
   team_min_size: number; // 단체전: 팀당 최소 인원 (0037)
   tie_singles: number; // 단체전: 타이당 단식 매치 수 (0037)
   tie_doubles: number; // 단체전: 타이당 복식 매치 수 (0037)

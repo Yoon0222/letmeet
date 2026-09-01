@@ -34,6 +34,7 @@ function NewTournamentInner() {
   const [format, setFormat] = useState<TournamentFormat>('group_knockout');
   const [discipline, setDiscipline] = useState<'singles' | 'doubles'>('singles');
   const [duprCertified, setDuprCertified] = useState(false);
+  const [duprPremium, setDuprPremium] = useState(false); // DUPR+ 전용 (0084)
   // 단체전 설정
   const [teamMinSize, setTeamMinSize] = useState(2);
   const [tieSingles, setTieSingles] = useState(2);
@@ -169,6 +170,7 @@ function NewTournamentInner() {
         images,
         court_assign_mode: courtMode,
         dupr_certified: duprCertified,
+        dupr_premium: duprCertified && duprPremium,
       })
       .select('id')
       .single();
@@ -241,12 +243,28 @@ function NewTournamentInner() {
               type="checkbox"
               className="h-5 w-5 accent-[#2D6BD6]"
               checked={duprCertified}
-              onChange={(e) => setDuprCertified(e.target.checked)}
+              onChange={(e) => {
+                setDuprCertified(e.target.checked);
+                if (!e.target.checked) setDuprPremium(false);
+              }}
             />
             <span className="text-sm text-gray-600">
               DUPR 연결된 선수만 참가 · 경기 결과가 DUPR 공식 레이팅에 반영됩니다.
             </span>
           </label>
+          {duprCertified ? (
+            <label className="mt-2 flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-[#8B5CF6]"
+                checked={duprPremium}
+                onChange={(e) => setDuprPremium(e.target.checked)}
+              />
+              <span className="text-sm text-gray-600">
+                <span className="font-semibold text-[#8B5CF6]">DUPR+ 전용</span> — PREMIUM + VERIFIED 자격 보유 선수만 참가할 수 있습니다.
+              </span>
+            </label>
+          ) : null}
         </Field>
 
         <div className="grid grid-cols-2 gap-4">

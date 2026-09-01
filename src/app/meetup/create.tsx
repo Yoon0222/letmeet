@@ -13,6 +13,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -38,7 +39,7 @@ function defaultStart(): Date {
 export default function CreateMeetup() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { show, hide } = useLoading();
 
   const [title, setTitle] = useState('');
@@ -52,6 +53,9 @@ export default function CreateMeetup() {
   const [skillMin, setSkillMin] = useState(2.0);
   const [skillMax, setSkillMax] = useState(8.0);
   const [fee, setFee] = useState(''); // 게스트비(원). 빈값=무료
+  // DUPR 인증/프리미엄 옵션 (0059·0084) — 인증: 연결자만 참가·결과 DUPR 등록 / 프리미엄: DUPR+ 만 참가
+  const [duprCertified, setDuprCertified] = useState(false);
+  const [duprPremium, setDuprPremium] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // 코트 등록 요청 모달 (검색에 없는 코트)
@@ -155,6 +159,8 @@ export default function CreateMeetup() {
         fee: Math.max(0, parseInt(fee.replace(/[^0-9]/g, ''), 10) || 0),
         require_approval: true,
         court_id: courtId,
+        dupr_certified: duprCertified,
+        dupr_premium: duprCertified && duprPremium,
       })
       .select('id')
       .single();
@@ -254,6 +260,53 @@ export default function CreateMeetup() {
               : '비워두면 무료로 표시돼요'
           }
         />
+
+        {/* DUPR 인증/프리미엄 옵션 (0059·0084) */}
+        <View style={styles.field}>
+          <Text style={styles.label}>DUPR</Text>
+          <View style={styles.duprBox}>
+            <View style={styles.duprRow}>
+              <View style={styles.duprRowText}>
+                <Text style={styles.duprRowTitle}>DUPR 인증 번개</Text>
+                <Text style={styles.duprRowSub}>DUPR 연결 회원만 참가 · 경기 결과가 DUPR 공식 레이팅에 반영돼요.</Text>
+              </View>
+              <Switch
+                value={duprCertified}
+                onValueChange={(v) => {
+                  if (v && !(profile?.dupr_status === 'verified' && profile?.dupr_basic)) {
+                    Alert.alert(
+                      'DUPR 연결이 필요해요',
+                      'DUPR 인증 번개를 만들려면 호스트가 먼저 DUPR 계정을 연결해야 해요(활성 BASIC 자격).',
+                      [
+                        { text: '나중에', style: 'cancel' },
+                        { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
+                      ],
+                    );
+                    return;
+                  }
+                  setDuprCertified(v);
+                  if (!v) setDuprPremium(false);
+                }}
+                trackColor={{ false: AppColors.border, true: '#2D6BD6' }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+            {duprCertified ? (
+              <View style={[styles.duprRow, styles.duprRowDivider]}>
+                <View style={styles.duprRowText}>
+                  <Text style={[styles.duprRowTitle, { color: '#8B5CF6' }]}>DUPR+ 전용</Text>
+                  <Text style={styles.duprRowSub}>DUPR+ 회원(PREMIUM + VERIFIED 자격)만 참가할 수 있어요.</Text>
+                </View>
+                <Switch
+                  value={duprPremium}
+                  onValueChange={setDuprPremium}
+                  trackColor={{ false: AppColors.border, true: '#8B5CF6' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            ) : null}
+          </View>
+        </View>
 
         <View style={styles.approvalNote}>
           <Ionicons name="shield-checkmark-outline" size={18} color="#16C784" />
@@ -372,6 +425,19 @@ const styles = StyleSheet.create({
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepTxt: { fontSize: 26, fontWeight: '800', color: AppColors.primary },
   stepVal: { fontSize: 17, fontWeight: '700', color: AppColors.textPrimary },
+  duprBox: {
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    paddingHorizontal: Spacing.three,
+  },
+  duprRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 12 },
+  duprRowDivider: { borderTopWidth: 1, borderTopColor: AppColors.border },
+  duprRowText: { flex: 1, gap: 2 },
+  duprRowTitle: { fontSize: 15, fontWeight: '700', color: AppColors.textPrimary },
+  duprRowSub: { fontSize: 12, lineHeight: 17, color: AppColors.textSecondary },
   approvalNote: {
     flexDirection: 'row',
     alignItems: 'center',

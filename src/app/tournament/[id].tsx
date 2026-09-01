@@ -225,6 +225,22 @@ export default function TournamentDetail() {
 
   // 참가 신청 전 확인 알럿
   function confirmApply() {
+    // DUPR+ 전용 대회는 PREMIUM_L1 + VERIFIED_L1 보유자만 참가 (0084)
+    if (t?.dupr_premium && !(profile?.dupr_status === 'verified' && profile?.dupr_premium && profile?.dupr_verified_l1)) {
+      if (profile?.dupr_status !== 'verified') {
+        Alert.alert(
+          'DUPR+ 전용 대회예요',
+          '이 대회는 DUPR+ 회원(PREMIUM + VERIFIED)만 참가할 수 있어요. 먼저 DUPR 계정을 연결해 주세요.',
+          [
+            { text: '나중에', style: 'cancel' },
+            { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
+          ],
+        );
+      } else {
+        Alert.alert('DUPR+ 자격 필요', 'DUPR+ 전용 대회는 PREMIUM 구독과 VERIFIED 자격이 모두 필요해요. DUPR 앱에서 구독·인증 상태를 확인해 주세요.');
+      }
+      return;
+    }
     // DUPR 인증 대회는 연결(verified) + BASIC_L1(활성 회원)만 참가
     if (t?.dupr_certified && !(profile?.dupr_status === 'verified' && profile?.dupr_basic)) {
       if (profile?.dupr_status === 'verified' && !profile?.dupr_basic) {
@@ -334,6 +350,7 @@ export default function TournamentDetail() {
           <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#2D6BD6" bg="rgba(56,132,255,0.14)" />
           <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5A623" bg="rgba(245,166,35,0.16)" />
           {t.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
+          {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#8B5CF6" bg="rgba(139,92,246,0.14)" /> : null}
           {t.status === 'registration' ? (
             <Badge label="접수중" />
           ) : (

@@ -30,6 +30,7 @@ create table if not exists public.profiles (
   dupr_public    boolean not null default false,   -- 레이팅 그래프 공개 여부(본인은 항상 봄)
   dupr_basic     boolean not null default false,   -- BASIC_L1 자격(active) — 인증경기 최소조건(0061)
   dupr_premium   boolean not null default false,   -- PREMIUM_L1(DUPR+) 자격(0061)
+  dupr_verified_l1 boolean not null default false, -- VERIFIED_L1 자격 — DUPR+ 전용 이벤트 조건(0084)
   dupr_entitlements_synced_at timestamptz,         -- 자격 마지막 동기화(0061)
   -- 권한(역할): player < organizer < court_manager < super_admin. 부여는 super_admin 만.
   role        text not null default 'player'
@@ -82,6 +83,7 @@ create table if not exists public.meetups (
   image_url     text,                              -- 코트/장소 사진 (0034)
   court_id      uuid,                              -- 등록 코트 연결(선택) (0046). FK는 courts 정의 뒤(파일 끝)에서 추가
   dupr_certified boolean not null default false,   -- DUPR 인증 번개(0059): 연결자만 참여, 결과 DUPR 등록
+  dupr_premium  boolean not null default false,    -- DUPR+ 전용(0084): PREMIUM_L1+VERIFIED_L1 만 참가
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
 );
@@ -791,6 +793,7 @@ create table if not exists public.tournaments (
                         check (format in ('group_knockout', 'kdk', 'team')),
   status                text not null default 'registration', -- registration | ongoing | finished | cancelled
   dupr_certified        boolean not null default false,       -- DUPR 인증 대회(0059): 연결자만 참가, 결과 DUPR 등록
+  dupr_premium          boolean not null default false,       -- DUPR+ 전용(0084): PREMIUM_L1+VERIFIED_L1 만 참가
   club_id               uuid references public.clubs(id) on delete set null, -- 클럽 월례대회(0064). null=일반 대회
   group_count           int,                                  -- 조 개수 (대진 생성 시)
   advance_per_group     int,                                  -- 조별 진출 인원
@@ -2255,6 +2258,7 @@ begin
     new.dupr_synced_at := old.dupr_synced_at;
     new.dupr_basic     := old.dupr_basic;
     new.dupr_premium   := old.dupr_premium;
+    new.dupr_verified_l1 := old.dupr_verified_l1;
     new.dupr_entitlements_synced_at := old.dupr_entitlements_synced_at;
   end if;
   return new;

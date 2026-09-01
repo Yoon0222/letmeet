@@ -68,10 +68,11 @@ function parseUser(user: Record<string, unknown> | null) {
 // 유저를 찾으면 레이팅이 없어도(NR/null) found=true 로 돌려준다.
 // (레이팅 유무는 연결 성공 여부와 별개 — 미채점 계정도 정상 연결.)
 type Found = { found: true; name: string | null; doubles: number | null; singles: number | null };
-// SSO 응답의 subscriptions 에서 자격(BASIC_L1/PREMIUM_L1) 활성 여부를 뽑는다.
+// SSO 응답의 subscriptions 에서 자격(BASIC_L1/PREMIUM_L1/VERIFIED_L1) 활성 여부를 뽑는다.
 //   subscriptions: [{ status:'active', entitlements:{ tournaments:['BASIC_L1', ...] } }]
+//   VERIFIED_L1: DUPR+ 전용 이벤트 참가 조건(PREMIUM_L1 과 함께) — 0084.
 // deno-lint-ignore no-explicit-any
-function parseEntitlements(subs: any): { basic: boolean; premium: boolean } {
+function parseEntitlements(subs: any): { basic: boolean; premium: boolean; verified: boolean } {
   const list = Array.isArray(subs) ? subs : [];
   const tags = new Set<string>();
   for (const s of list) {
@@ -81,7 +82,7 @@ function parseEntitlements(subs: any): { basic: boolean; premium: boolean } {
       if (Array.isArray(arr)) for (const t of arr) tags.add(String(t));
     }
   }
-  return { basic: tags.has('BASIC_L1'), premium: tags.has('PREMIUM_L1') };
+  return { basic: tags.has('BASIC_L1'), premium: tags.has('PREMIUM_L1'), verified: tags.has('VERIFIED_L1') };
 }
 
 async function lookupPlayer(token: string, duprId: string): Promise<Found | null> {
@@ -176,6 +177,7 @@ async function disconnectDupr(admin: any, userId: string, duprId: string | null,
       dupr_verified: false,
       dupr_basic: false,
       dupr_premium: false,
+      dupr_verified_l1: false,
       dupr_rating: null,
       dupr_doubles: null,
       dupr_singles: null,
@@ -298,7 +300,7 @@ Deno.serve(async (req) => {
         // refresh 토큰도 만료 → 재연결 필요. 데이터는 보존하되 자격만 내려 게이트가 재연결 유도.
         await admin
           .from('profiles')
-          .update({ dupr_basic: false, dupr_entitlements_synced_at: new Date().toISOString() })
+          .update({ dupr_basic: false, dupr_premium: false, dupr_verified_l1: false, dupr_entitlements_synced_at: new Date().toISOString() })
           .eq('id', caller.id);
         return json({ ok: true, reconnect_required: true, basic: false });
       }
@@ -324,9 +326,9 @@ Deno.serve(async (req) => {
     const ent = parseEntitlements(subs);
     await admin
       .from('profiles')
-      .update({ dupr_basic: ent.basic, dupr_premium: ent.premium, dupr_entitlements_synced_at: new Date().toISOString() })
+      .update({ dupr_basic: ent.basic, dupr_premium: ent.premium, dupr_verified_l1: ent.verified, dupr_entitlements_synced_at: new Date().toISOString() })
       .eq('id', caller.id);
-    return json({ ok: true, basic: ent.basic, premium: ent.premium });
+    return json({ ok: true, basic: ent.basic, premium: ent.premium, verified: ent.verified });
   }
 
   // 2) 조회할 DUPR ID
@@ -386,6 +388,7 @@ Deno.serve(async (req) => {
     dupr_synced_at: new Date().toISOString(),
     dupr_basic: ent.basic,
     dupr_premium: ent.premium,
+    dupr_verified_l1: ent.verified,
     dupr_entitlements_synced_at: new Date().toISOString(),
   };
   await admin.from('profiles').update(profilePatch).eq('id', caller.id);
