@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -26,6 +25,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
+import { AppAlert as Alert } from '@/lib/feedback'; // RN Alert 는 웹 no-op — 웹에서도 뜨는 대체
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { AppColors } from '@/theme';
@@ -269,6 +269,9 @@ export default function CreateMeetup() {
               <View style={styles.duprRowText}>
                 <Text style={styles.duprRowTitle}>DUPR 인증 번개</Text>
                 <Text style={styles.duprRowSub}>DUPR 연결 회원만 참가 · 경기 결과가 DUPR 공식 레이팅에 반영돼요.</Text>
+                {!(profile?.dupr_status === 'verified' && profile?.dupr_basic) ? (
+                  <Text style={styles.duprRowWarn}>호스트가 먼저 DUPR을 연결해야 켤 수 있어요 (프로필 → DUPR 연결)</Text>
+                ) : null}
               </View>
               <Switch
                 value={duprCertified}
@@ -438,6 +441,7 @@ const styles = StyleSheet.create({
   duprRowText: { flex: 1, gap: 2 },
   duprRowTitle: { fontSize: 15, fontWeight: '700', color: AppColors.textPrimary },
   duprRowSub: { fontSize: 12, lineHeight: 17, color: AppColors.textSecondary },
+  duprRowWarn: { fontSize: 12, lineHeight: 17, fontWeight: '700', color: '#F59E0B', marginTop: 2 },
   approvalNote: {
     flexDirection: 'row',
     alignItems: 'center',
