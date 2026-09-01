@@ -288,6 +288,9 @@ export default function MeetupDetail() {
           ) : (
             <Badge label="모집중" />
           )}
+          {meetup.discipline !== 'any' ? (
+            <Badge label={meetup.discipline === 'doubles' ? '복식' : '단식'} color="#0EA5E9" bg="rgba(14,165,233,0.12)" />
+          ) : null}
           {meetup.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
           {meetup.dupr_premium ? <Badge label="DUPR+ 전용" color="#8B5CF6" bg="rgba(139,92,246,0.14)" /> : null}
         </View>

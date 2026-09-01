@@ -87,6 +87,7 @@ export type Meetup = {
   court_id: string | null; // 등록 코트 연결(선택) (0046)
   dupr_certified: boolean; // DUPR 인증 번개: 연결자만 참여, 결과를 DUPR 등록 (0059)
   dupr_premium: boolean; // DUPR+ 전용: PREMIUM_L1+VERIFIED_L1 만 참가 (0084)
+  discipline: 'any' | 'singles' | 'doubles'; // 종목: 자유/단식/복식 (0086)
   status: MeetupStatus;
   created_at: string;
 };

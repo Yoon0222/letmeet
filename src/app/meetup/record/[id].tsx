@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -41,6 +41,8 @@ export default function RecordMeetupMatch() {
   const [games, setGames] = useState<{ a: string; b: string }[]>([{ a: '', b: '' }]);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<MeetupMatch | null>(null); // 수정 중인 기존 경기(DUPR 미제출만 직접 수정 가능)
+  const [confirmOpen, setConfirmOpen] = useState(false); // DUPR 전송 전 최종 점검 모달
+  const formatInit = useRef(false); // 모임 종목으로 형식 기본값을 1회만 설정
 
   // DUPR 등록된 경기는 직접 수정/삭제 불가(0085) → 운영자에게 요청
   const [pendingReqs, setPendingReqs] = useState<Record<string, MatchChangeRequest>>({});
@@ -52,7 +54,7 @@ export default function RecordMeetupMatch() {
   const load = useCallback(async () => {
     if (!id) return;
     const [{ data: m }, { data: p }, { data: mm }, { data: rq }] = await Promise.all([
-      supabase.from('meetups').select('title, host_id').eq('id', id).maybeSingle(),
+      supabase.from('meetups').select('title, host_id, discipline').eq('id', id).maybeSingle(),
       supabase
         .from('meetup_participants')
         .select('user_id, status, profiles(id, nickname, avatar_url, dupr_status)')
@@ -62,6 +64,11 @@ export default function RecordMeetupMatch() {
       supabase.from('match_change_requests').select('*').eq('meetup_id', id).eq('status', 'pending'),
     ]);
     setTitle(m?.title ?? '');
+    // 모임 종목이 단식/복식으로 정해져 있으면 형식 기본값으로 (최초 로드 시 1회만)
+    if (!formatInit.current && (m?.discipline === 'singles' || m?.discipline === 'doubles')) {
+      formatInit.current = true;
+      setFormat(m.discipline);
+    }
     // deno/ts: 조인 결과 프로필
     const list: Part[] = ((p as unknown as { user_id: string; profiles: { nickname: string; avatar_url: string | null; dupr_status: string } | null }[]) ?? []).map((r) => ({
       user_id: r.user_id,
@@ -111,16 +118,21 @@ export default function RecordMeetupMatch() {
     setGames((g) => (g.length <= 1 ? g : g.filter((_, idx) => idx !== i)));
   }
 
-  async function onSubmit() {
+  // 현재 입력에서 유효한 게임 점수만 추출
+  function parsedGames(): { a: number; b: number }[] {
+    return games
+      .map((g) => ({ a: parseInt(g.a, 10), b: parseInt(g.b, 10) }))
+      .filter((g) => Number.isFinite(g.a) && Number.isFinite(g.b));
+  }
+
+  // 1단계: 입력 검증 → 최종 점검 모달 열기 (DUPR 전송 전 확인)
+  function openConfirm() {
     if (!id || !session?.user.id) return;
     if (teamA.length !== perTeam || teamB.length !== perTeam) {
       Alert.alert('선수 선택', `양 팀 각 ${perTeam}명씩 선택해주세요.`);
       return;
     }
-    const gameRows = games
-      .map((g) => ({ a: parseInt(g.a, 10), b: parseInt(g.b, 10) }))
-      .filter((g) => Number.isFinite(g.a) && Number.isFinite(g.b));
-    if (gameRows.length === 0) {
+    if (parsedGames().length === 0) {
       Alert.alert('점수 입력', '최소 한 게임의 점수를 입력해주세요.');
       return;
     }
@@ -129,6 +141,15 @@ export default function RecordMeetupMatch() {
       Alert.alert('DUPR 미연결', `${notConnected.map((p) => p.nickname).join(', ')} 님은 DUPR 연결이 안 돼 등록할 수 없어요.`);
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  // 2단계: 점검 완료 → 저장 + DUPR 전송
+  async function onSubmit() {
+    if (!id || !session?.user.id) return;
+    const gameRows = parsedGames();
+    if (gameRows.length === 0) return;
+    setConfirmOpen(false);
     setSaving(true);
     // 1) 경기기록 저장 (RLS: 호스트만) — 수정 모드면 기존 행 update, 아니면 insert
     const fields = {
@@ -405,8 +426,64 @@ export default function RecordMeetupMatch() {
               </Pressable>
             </View>
           ) : null}
-          <Button title={editing ? '경기 수정 + DUPR 반영' : '경기 기록 + DUPR 등록'} onPress={onSubmit} loading={saving} />
+          <Button title={editing ? '경기 수정 + DUPR 반영' : '경기 기록 + DUPR 등록'} onPress={openConfirm} loading={saving} />
         </View>
+
+        {/* DUPR 전송 전 최종 점검 모달 */}
+        <Modal visible={confirmOpen} transparent animationType="slide" onRequestClose={() => setConfirmOpen(false)}>
+          <View style={styles.reqModalWrap}>
+            <View style={styles.reqModalCard}>
+              <Text style={styles.reqModalTitle}>{editing ? '수정 내용 최종 점검' : '경기 결과 최종 점검'}</Text>
+              <Text style={styles.reqModalSub}>
+                전송하면 DUPR 공식 레이팅에 반영돼요. 전송 후에는 직접 수정·삭제할 수 없고 운영자 요청이 필요해요.
+              </Text>
+
+              {/* 팀 구성 */}
+              <View style={styles.confirmTeams}>
+                <View style={styles.confirmTeamCol}>
+                  <Text style={[styles.confirmTeamTag, { color: '#16C784' }]}>A팀</Text>
+                  {teamA.map((p) => (
+                    <Text key={p.user_id} style={styles.confirmPlayer} numberOfLines={1}>{p.nickname}</Text>
+                  ))}
+                </View>
+                <Text style={styles.confirmVs}>VS</Text>
+                <View style={styles.confirmTeamCol}>
+                  <Text style={[styles.confirmTeamTag, { color: '#2D6BD6' }]}>B팀</Text>
+                  {teamB.map((p) => (
+                    <Text key={p.user_id} style={styles.confirmPlayer} numberOfLines={1}>{p.nickname}</Text>
+                  ))}
+                </View>
+              </View>
+
+              {/* 게임 점수 */}
+              <View style={styles.confirmGames}>
+                {parsedGames().map((g, i) => (
+                  <View key={i} style={styles.confirmGameRow}>
+                    <Text style={styles.confirmGameNo}>{i + 1}게임</Text>
+                    <Text style={[styles.confirmScore, g.a > g.b && styles.confirmScoreWin]}>{g.a}</Text>
+                    <Text style={styles.confirmColon}>:</Text>
+                    <Text style={[styles.confirmScore, g.b > g.a && styles.confirmScoreWin]}>{g.b}</Text>
+                  </View>
+                ))}
+                {(() => {
+                  const rows = parsedGames();
+                  const aW = rows.filter((g) => g.a > g.b).length;
+                  const bW = rows.filter((g) => g.b > g.a).length;
+                  return (
+                    <Text style={styles.confirmSummary}>
+                      {format === 'doubles' ? '복식' : '단식'} · {aW > bW ? 'A팀 승' : bW > aW ? 'B팀 승' : '무승부'} ({aW} : {bW})
+                    </Text>
+                  );
+                })()}
+              </View>
+
+              <View style={styles.reqModalBtns}>
+                <Button title="다시 수정" variant="secondary" onPress={() => setConfirmOpen(false)} style={{ flex: 1 }} />
+                <Button title="DUPR로 전송" onPress={onSubmit} loading={saving} style={{ flex: 1 }} />
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* DUPR 등록 경기 수정/삭제 요청 모달 (0085) */}
         <Modal visible={!!reqTarget} transparent animationType="slide" onRequestClose={() => setReqTarget(null)}>
@@ -508,4 +585,17 @@ const styles = StyleSheet.create({
   reqModalMatch: { fontSize: 13.5, fontWeight: '700', color: '#F8FAFC', backgroundColor: '#151D25', borderRadius: 10, borderCurve: 'continuous', paddingHorizontal: 12, paddingVertical: 8 },
   reqModalInput: { minHeight: 84, borderRadius: 12, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: '#151D25', padding: 12, fontSize: 14.5, color: '#F8FAFC' },
   reqModalBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  // DUPR 전송 전 최종 점검 모달
+  confirmTeams: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: '#151D25', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
+  confirmTeamCol: { flex: 1, alignItems: 'center', gap: 3 },
+  confirmTeamTag: { fontSize: 12, fontWeight: '900', marginBottom: 2 },
+  confirmPlayer: { fontSize: 14.5, fontWeight: '700', color: '#F8FAFC' },
+  confirmVs: { fontSize: 13, fontWeight: '900', color: '#707B87', marginTop: 18 },
+  confirmGames: { gap: 6, backgroundColor: '#151D25', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
+  confirmGameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  confirmGameNo: { fontSize: 12.5, fontWeight: '700', color: '#707B87', width: 44 },
+  confirmScore: { fontSize: 18, fontWeight: '800', color: '#AAB4C0', width: 34, textAlign: 'center' },
+  confirmScoreWin: { color: '#16C784' },
+  confirmColon: { fontSize: 16, fontWeight: '800', color: '#707B87' },
+  confirmSummary: { marginTop: 6, fontSize: 13, fontWeight: '800', color: '#F8FAFC', textAlign: 'center' },
 });

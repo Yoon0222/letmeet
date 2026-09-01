@@ -49,6 +49,7 @@ export default function CreateMeetup() {
   const [description, setDescription] = useState('');
   const [start, setStart] = useState<Date>(defaultStart());
   const [showIosPicker, setShowIosPicker] = useState(false);
+  const [discipline, setDiscipline] = useState<'any' | 'singles' | 'doubles'>('doubles'); // 종목 (0086)
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [skillMin, setSkillMin] = useState(2.0);
   const [skillMax, setSkillMax] = useState(8.0);
@@ -163,6 +164,7 @@ export default function CreateMeetup() {
         court_id: courtId,
         dupr_certified: duprCertified,
         dupr_premium: duprCertified && duprPremium,
+        discipline,
       })
       .select('id')
       .single();
@@ -220,6 +222,26 @@ export default function CreateMeetup() {
               onChange={(_e, date) => date && setStart(date)}
             />
           )}
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>종목</Text>
+          <View style={styles.segRow}>
+            {(
+              [
+                { key: 'doubles', label: '복식' },
+                { key: 'singles', label: '단식' },
+                { key: 'any', label: '자유' },
+              ] as const
+            ).map((d) => (
+              <Pressable
+                key={d.key}
+                onPress={() => setDiscipline(d.key)}
+                style={[styles.seg, discipline === d.key && styles.segActive]}>
+                <Text style={[styles.segText, discipline === d.key && styles.segTextActive]}>{d.label}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <View style={styles.field}>
@@ -445,6 +467,21 @@ const styles = StyleSheet.create({
   stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepTxt: { fontSize: 26, fontWeight: '800', color: AppColors.primary },
   stepVal: { fontSize: 17, fontWeight: '700', color: AppColors.textPrimary },
+  segRow: { flexDirection: 'row', gap: 8 },
+  seg: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+  },
+  segActive: { backgroundColor: AppColors.primary, borderColor: AppColors.primary },
+  segText: { fontSize: 14, fontWeight: '800', color: AppColors.textSecondary },
+  segTextActive: { color: '#FFFFFF' },
   duprBox: {
     borderRadius: 12,
     borderCurve: 'continuous',

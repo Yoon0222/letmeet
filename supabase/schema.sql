@@ -84,6 +84,8 @@ create table if not exists public.meetups (
   court_id      uuid,                              -- 등록 코트 연결(선택) (0046). FK는 courts 정의 뒤(파일 끝)에서 추가
   dupr_certified boolean not null default false,   -- DUPR 인증 번개(0059): 연결자만 참여, 결과 DUPR 등록
   dupr_premium  boolean not null default false,    -- DUPR+ 전용(0084): PREMIUM_L1+VERIFIED_L1 만 참가
+  discipline    text not null default 'any'        -- 종목(0086): any=자유 / singles=단식 / doubles=복식
+                check (discipline in ('any', 'singles', 'doubles')),
   status        text not null default 'open',     -- 'open' | 'closed' | 'cancelled'
   created_at    timestamptz not null default now()
 );
