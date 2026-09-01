@@ -18,7 +18,9 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { formatMeetupTime, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { ClubWithCounts, Court, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
+import type { ClubPostWithAuthor, ClubWithCounts, Court, MeetupWithCounts, TournamentWithCounts } from '@/lib/types';
+
+type HomeNotice = ClubPostWithAuthor & { club_name: string };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -41,6 +43,7 @@ export default function HomeScreen() {
   const [recommended, setRecommended] = useState<MeetupWithCounts[]>([]);
   const [openTournaments, setOpenTournaments] = useState<TournamentWithCounts[]>([]);
   const [clubs, setClubs] = useState<ClubWithCounts[]>([]);
+  const [clubNotices, setClubNotices] = useState<HomeNotice[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -174,6 +177,27 @@ export default function HomeScreen() {
     const myClubIds = new Set(((myMem as { club_id: string }[] | null) ?? []).map((m) => m.club_id));
     setClubs((cs ?? []).filter((c) => !myClubIds.has(c.id)).slice(0, 3));
 
+    // 내 클럽 공지 (0088) — RLS 가 멤버인 클럽 것만 돌려주므로 필터 불필요. 최신 3개.
+    if (uid) {
+      const { data: nts } = await supabase
+        .from('club_posts_with_authors')
+        .select('*')
+        .eq('is_notice', true)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      const list = (nts as ClubPostWithAuthor[] | null) ?? [];
+      if (list.length > 0) {
+        const clubIds = [...new Set(list.map((n) => n.club_id))];
+        const { data: cn } = await supabase.from('clubs').select('id, name').in('id', clubIds);
+        const nameMap = new Map(((cn as { id: string; name: string }[] | null) ?? []).map((c) => [c.id, c.name]));
+        setClubNotices(list.map((n) => ({ ...n, club_name: nameMap.get(n.club_id) ?? '클럽' })));
+      } else {
+        setClubNotices([]);
+      }
+    } else {
+      setClubNotices([]);
+    }
+
     // 코트 예약 — 지역 있으면 우선, 없으면 전체에서 몇 개
     let courtQuery = supabase.from('courts').select('*').order('region', { ascending: true }).limit(6);
     if (regionPrefix) courtQuery = courtQuery.ilike('region', `${regionPrefix}%`);
@@ -270,6 +294,36 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* 내 클럽 공지 (0088) — 공지가 있을 때만 노출 */}
+        {clubNotices.length > 0 ? (
+          <>
+            <SectionHeader
+              title="클럽 공지"
+              onMore={() => router.push({ pathname: '/club/board', params: { clubId: clubNotices[0].club_id } } as never)}
+              icon="megaphone-outline"
+              color="#F59E0B"
+              bg="rgba(245,158,11,0.14)"
+            />
+            <View style={{ gap: Spacing.two }}>
+              {clubNotices.map((n) => (
+                <AppCard
+                  key={n.id}
+                  onPress={() => router.push({ pathname: '/club/post/[id]', params: { id: n.id, clubId: n.club_id } } as never)}
+                  style={styles.noticeCard}>
+                  <View style={styles.noticeIcon}>
+                    <Ionicons name="megaphone" size={15} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.noticeClub} numberOfLines={1}>{n.club_name}</Text>
+                    <Text style={styles.noticeTitle} numberOfLines={1}>{n.title}</Text>
+                  </View>
+                  <Text style={styles.noticeTime}>{formatMeetupTime(n.created_at)}</Text>
+                </AppCard>
+              ))}
+            </View>
+          </>
+        ) : null}
+
         {/* 코트 예약 — 둘러보고 예약하는 진입점 */}
         <SectionHeader title="코트 예약" onMore={() => router.push('/(tabs)/court' as never)} icon="location-outline" color="#38BDF8" bg="rgba(56,189,248,0.14)" />
         {courts.length > 0 ? (
@@ -363,6 +417,11 @@ const styles = StyleSheet.create({
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   more: { fontSize: 13, fontWeight: '800', color: '#707B87' },
   scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  noticeCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  noticeIcon: { width: 34, height: 34, borderRadius: 12, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(245,158,11,0.14)' },
+  noticeClub: { fontSize: 12, fontWeight: '800', color: '#F59E0B' },
+  noticeTitle: { fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginTop: 1 },
+  noticeTime: { fontSize: 11.5, fontWeight: '600', color: '#707B87' },
   scheduleIcon: { width: 40, height: 40, borderRadius: 16, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
   scheduleTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
   scheduleSub: { fontSize: 13, color: '#AAB4C0', marginTop: 2 },
