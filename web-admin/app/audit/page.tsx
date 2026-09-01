@@ -99,29 +99,86 @@ function detailText(log: AuditLogWithActor): string {
 
 const PAGE_SIZE = 20;
 
+// 행위 필터 옵션 — audit_logs.action 원시값 기준(서버 eq 필터)
+const ACTION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'tournament_entries.INSERT', label: '참가 신청' },
+  { value: 'tournament_entries.UPDATE', label: '참가 승인/거절' },
+  { value: 'tournament_entries.DELETE', label: '참가 취소' },
+  { value: 'tournaments.INSERT', label: '대회 개설' },
+  { value: 'tournaments.UPDATE', label: '대회 수정' },
+  { value: 'tournaments.DELETE', label: '대회 삭제' },
+  { value: 'tournament_matches.INSERT', label: '대진 생성' },
+  { value: 'tournament_matches.UPDATE', label: '경기 결과 입력' },
+  { value: 'tournament_matches.DELETE', label: '대진 삭제' },
+  { value: 'profiles.UPDATE', label: '프로필/권한 변경' },
+];
+
 function AuditInner() {
   const [rows, setRows] = useState<AuditLogWithActor[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
 
-  const load = useCallback(async (p: number) => {
-    setLoading(true);
-    const from = p * PAGE_SIZE;
-    const { data, count } = await supabase
-      .from('audit_logs')
-      .select('*, actor:profiles!audit_logs_actor_id_fkey(id, nickname)', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-    setRows((data as unknown as AuditLogWithActor[]) ?? []);
-    setTotal(count ?? 0);
-    setLoading(false);
-  }, []);
+  // 필터 — 시간(기간)·행위자(닉네임)·역할·행위
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [actorInput, setActorInput] = useState('');
+  const [actorQ, setActorQ] = useState(''); // 디바운스 적용된 검색어
+  const [roleF, setRoleF] = useState('');
+  const [actionF, setActionF] = useState('');
+
+  // 행위자 입력 400ms 디바운스
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActorQ(actorInput.trim());
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [actorInput]);
+
+  const load = useCallback(
+    async (p: number) => {
+      setLoading(true);
+      const from = p * PAGE_SIZE;
+      // 행위자 검색 시에만 inner join(닉네임 필터) — 평소엔 left join 으로 시스템 행도 표시
+      const select = actorQ
+        ? '*, actor:profiles!audit_logs_actor_id_fkey!inner(id, nickname)'
+        : '*, actor:profiles!audit_logs_actor_id_fkey(id, nickname)';
+      let q = supabase
+        .from('audit_logs')
+        .select(select, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (fromDate) q = q.gte('created_at', `${fromDate}T00:00:00`);
+      if (toDate) q = q.lte('created_at', `${toDate}T23:59:59`);
+      if (roleF) q = q.eq('actor_role', roleF);
+      if (actionF) q = q.eq('action', actionF);
+      if (actorQ) q = q.ilike('actor.nickname', `%${actorQ}%`);
+      const { data, count } = await q;
+      setRows((data as unknown as AuditLogWithActor[]) ?? []);
+      setTotal(count ?? 0);
+      setLoading(false);
+    },
+    [fromDate, toDate, roleF, actionF, actorQ],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(page);
   }, [load, page]);
+
+  function resetFilters() {
+    setFromDate('');
+    setToDate('');
+    setActorInput('');
+    setActorQ('');
+    setRoleF('');
+    setActionF('');
+    setPage(0);
+  }
+
+  const hasFilter = !!(fromDate || toDate || actorQ || roleF || actionF);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -141,11 +198,89 @@ function AuditInner() {
         </button>
       </div>
 
+      {/* 필터 — 시간·행위자·역할·행위 */}
+      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-3">
+        <label className="text-xs text-slate-500">
+          시작일
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => {
+              setFromDate(e.target.value);
+              setPage(0);
+            }}
+            className="mt-1 block rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
+          />
+        </label>
+        <label className="text-xs text-slate-500">
+          종료일
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => {
+              setToDate(e.target.value);
+              setPage(0);
+            }}
+            className="mt-1 block rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
+          />
+        </label>
+        <label className="text-xs text-slate-500">
+          행위자
+          <input
+            value={actorInput}
+            onChange={(e) => setActorInput(e.target.value)}
+            placeholder="닉네임 검색"
+            className="mt-1 block w-36 rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
+          />
+        </label>
+        <label className="text-xs text-slate-500">
+          역할
+          <select
+            value={roleF}
+            onChange={(e) => {
+              setRoleF(e.target.value);
+              setPage(0);
+            }}
+            className="mt-1 block rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-700">
+            <option value="">전체</option>
+            {Object.entries(ROLE_LABEL).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-slate-500">
+          행위
+          <select
+            value={actionF}
+            onChange={(e) => {
+              setActionF(e.target.value);
+              setPage(0);
+            }}
+            className="mt-1 block rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-700">
+            <option value="">전체</option>
+            {ACTION_OPTIONS.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {hasFilter ? (
+          <button
+            onClick={resetFilters}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+            초기화
+          </button>
+        ) : null}
+      </div>
+
       {loading ? (
         <p className="mt-8 text-slate-500">불러오는 중…</p>
       ) : rows.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-          아직 기록이 없습니다.
+          {hasFilter ? '조건에 맞는 기록이 없습니다.' : '아직 기록이 없습니다.'}
         </div>
       ) : (
         <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white">
