@@ -58,12 +58,12 @@ export default function CommunityScreen() {
         <AppHeader title="커뮤니티" subtitle="자유롭게 이야기하고 정보를 나눠보세요" />
       </View>
 
-      {/* 카테고리 필터 */}
+      {/* 카테고리 탭 — 번개 목록의 일반/DUPR 탭과 동일한 디자인 */}
       <View style={styles.chipsWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <FilterChip label="전체" active={cat === 'all'} onPress={() => setCat('all')} />
+          <FilterChip label="전체" icon="grid-outline" color="#16C784" active={cat === 'all'} onPress={() => setCat('all')} />
           {COMMUNITY_CATEGORIES.map((c) => (
-            <FilterChip key={c.key} label={c.label} active={cat === c.key} onPress={() => setCat(c.key)} />
+            <FilterChip key={c.key} label={c.label} icon={c.icon} color={c.color} active={cat === c.key} onPress={() => setCat(c.key)} />
           ))}
         </ScrollView>
       </View>
@@ -105,10 +105,27 @@ export default function CommunityScreen() {
   );
 }
 
-function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function FilterChip({
+  label,
+  icon,
+  color,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  // 활성 시 카테고리 색으로 채움 — 초록(전체)만 어두운 글자, 나머지는 흰 글자
+  const activeText = color === '#16C784' ? '#07100D' : '#FFFFFF';
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, active && { backgroundColor: color, borderColor: color }]}>
+      <Ionicons name={icon} size={15} color={active ? activeText : '#AAB4C0'} />
+      <Text style={[styles.chipText, active && { color: activeText }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -116,21 +133,22 @@ function FilterChip({ label, active, onPress }: { label: string; active: boolean
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#070A0D' },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two },
-  chipsWrap: { paddingBottom: Spacing.two },
+  chipsWrap: { paddingBottom: Spacing.three },
   chips: { paddingHorizontal: Spacing.four, gap: 8 },
   chip: {
-    height: 36,
+    height: 44,
     paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
   },
-  chipActive: { backgroundColor: '#16C784', borderColor: '#16C784' },
-  chipText: { fontSize: 14, fontWeight: '700', color: '#AAB4C0' },
-  chipTextActive: { color: '#FFFFFF' },
+  chipText: { fontSize: 14, fontWeight: '800', color: '#AAB4C0' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
