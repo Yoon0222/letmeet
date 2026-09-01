@@ -29,7 +29,9 @@
 - [ ] ⚠️ **5.1.1(v) 재리젝 리스크 점검** — v1.0.4 는 "비계정 기능에 로그인 강제"로 리젝됨. `ee4bf61` 로 게스트 열람을 다시 없앴으므로, **이 커밋이 심사 제출 빌드에 포함됐는지** 확인 필요. 포함 시 동일 사유 재리젝 가능
 - [ ] 결제 스테일 홀드 자동정리 스케줄 — `pg_cron` 활성화 + `release_stale_court_holds` 5분 주기 등록
 - [x] 코트 예약 취소 시 환불 — toss-cancel 엣지함수(당일 외 100% 환불), dev·prod 배포. **prod에 TOSS_SECRET_KEY 필요**
-- [ ] 코트별 환불 정책 설정(courts.refund_policy + 부분환불) — 현재는 전역 "당일 외 100%"만
+- [x] 코트별 환불 정책 설정(courts.refund_policy + 부분환불) — 완료(0076, 2026-08-26)
+- [ ] **prod DB `PROD_APPLY_0084~0087.sql` 4개 순서대로 실행** — DUPR+ 게이팅·경기요청·종목·목록숨김 (사용자)
+- [ ] DUPR 통합 리뷰 **스크린 리코딩 촬영·제출** — 씬 5용 PREMIUM 자격 UAT 계정은 DUPR 응답 대기
 - [ ] Supabase에 `0063_club_premium_match_results.sql` 실행 — 클럽 프리미엄 상태 + 경기 결과 기록 테이블/RLS
 - [ ] Supabase에 `0064_club_officers_tournaments.sql`·`0065_club_match_dupr.sql` 실행 + `dupr-match` 엣지함수 재배포 — 클럽 임원/월례대회 + 클럽 경기결과 DUPR
 - [ ] 🔴 **알림 기능 prod 배포** — SQL(0053~0055) + Edge Function(notify-turn/tie) + 앱, **한 세트로**. 절차: `docs/PROD_NOTIFICATIONS_DEPLOY.md` (dev는 2026-07-25 적용·검증 완료)
@@ -76,6 +78,13 @@
 - [ ] 상점 화면 (피클볼 용품 판매) — 로드맵 가장 마지막
 
 ---
+
+## 2026-09-02
+
+### DUPR 통합 리뷰 대응 — 프리미엄 게이팅·요청 흐름·UX 정리 (0084~0087)
+- **결정**: 리뷰어 요구("Premium 이벤트는 PREMIUM_L1+VERIFIED_L1만 입장, 관리자가 매치 CRUD")에 맞춰 ① DUPR+ 전용 이벤트 게이팅 신설 ② DUPR 등록된 경기는 호스트 직접 수정/삭제 금지 → 운영자 요청(web-admin `/match-requests`) 처리로 전환(레이팅 조작 방지).
+- **만든 것**: 0084(dupr_verified_l1·이벤트 dupr_premium)·0085(match_change_requests+RLS 강화)·0086(모임 종목)·0087(match_count — 기록된 모임 목록 숨김). 앱: 프로필 자격 칩(BASIC/DUPR+/VERIFIED), 번개 생성 DUPR/종목 토글(코덱스 파일 — HANDOFF 기재), 기록 화면 최종 점검 모달·형식 자동 고정, 번개 일반/DUPR 매치 탭, 커뮤니티 탭 디자인 통일. web-admin: 새 대회 DUPR+ 체크, 경기요청 처리 페이지, 감사로그 4종 필터.
+- **메모/주의**: prod DB는 `PROD_APPLY_0084~0087.sql` 4개 실행 대기(순서대로). dupr-verify·dupr-match dev+prod 배포됨. 리뷰 대응은 스크린 리코딩 제출 예정 — 씬 5(DUPR+ 참가 성공)는 PREMIUM 자격 UAT 계정 필요(DUPR에 요청 메일 발송).
 
 ## 2026-08-26
 

@@ -23,6 +23,20 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-09-02, DUPR 리뷰 대응 + meetup/create.tsx 수정 공지)
+
+- **What changed**:
+  - ⚠️ **Codex 소유 파일 `src/app/meetup/create.tsx` 를 직접 수정**했다 (DUPR 통합 리뷰 요건이 급해서 경계를 넘음, 양해 바람):
+    - DUPR 섹션 추가 — "DUPR 인증 번개" / "DUPR+ 전용" 토글 2개 (호스트 자격 가드 + 상태별 안내).
+    - 종목(복식/단식/자유) 세그먼트 추가 (`meetups.discipline`, 0086).
+    - `Alert`(RN, 웹 no-op) → `AppAlert`(@/lib/feedback) 교체.
+  - 번개 목록(matches.tsx) 일반/DUPR 매치 탭 분리, 커뮤니티 카테고리 탭 동일 디자인 통일.
+  - 경기 기록: DUPR 전송 전 최종 점검 모달 + 등록된 경기는 운영자 수정/삭제 요청 흐름(0085, web-admin `/match-requests`).
+- **Why**: DUPR 통합 리뷰어 요구(프리미엄 게이팅·관리자 매치 CRUD 시연) 대응.
+- **Files touched**: `src/app/meetup/create.tsx`, `matches.tsx`, `community.tsx`, `meetup/[id].tsx`, `meetup/record/[id].tsx`, `(tabs)/profile.tsx`, `src/components/meetup-card.tsx`, `src/lib/{types,dupr}.ts`, `supabase/{schema.sql,migrations/0084~0087,functions/dupr-verify,dupr-match}`, `web-admin/{app/match-requests,app/audit,app/tournaments/new,components/app-header,lib/types}`.
+- **Validation**: 모바일 tsc/lint, web-admin tsc 전부 통과. dev DB 0084~0087 적용, 함수 dev+prod 배포, web-admin Vercel 배포. 웹 프리뷰·Android dev-client 라이브 확인.
+- **Follow-up**: prod DB는 `docs/PROD_APPLY_0084~0087.sql` 실행 대기(사용자). meetup/create.tsx 후속 디자인 조정은 Codex 재량.
+
 ### Codex -> Claude (2026-08-19, club premium match-result MVP)
 
 - **What changed**:
