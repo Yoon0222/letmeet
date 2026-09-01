@@ -137,6 +137,7 @@ export default function HomeScreen() {
       .from('meetups_with_counts')
       .select('*')
       .eq('status', 'open')
+      .eq('match_count', 0) // 경기 기록된(끝난) 모임은 추천 제외 (0087)
       .gte('start_time', nowIso)
       .order('start_time', { ascending: true })
       .limit(10);

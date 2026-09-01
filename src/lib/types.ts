@@ -160,6 +160,7 @@ export type MeetupWithCounts = Meetup & {
   host_nickname: string;
   host_avatar_url: string | null;
   participant_count: number;
+  match_count: number; // 경기 기록 수 (0087) — 기록되면 목록에서 숨김
 };
 
 export type Participant = {

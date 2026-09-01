@@ -3,9 +3,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   View,
@@ -40,6 +40,7 @@ export default function MatchesScreen() {
         .from('meetups_with_counts')
         .select('*')
         .neq('status', 'cancelled') // 취소된 모임은 목록에서 숨김
+        .eq('match_count', 0) // 경기 기록이 입력된(끝난) 모임도 숨김 (0087)
         .gte('start_time', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
         .order('start_time', { ascending: true })
         .limit(100),
@@ -65,6 +66,14 @@ export default function MatchesScreen() {
   const regions = Array.from(new Set(meetups.map((m) => m.region).filter(Boolean)));
   const visible = region ? meetups.filter((m) => m.region === region) : meetups;
 
+  // DUPR 인증 모임 / 일반 모임 섹션 분리 — 빈 섹션은 숨김
+  const duprList = visible.filter((m) => m.dupr_certified);
+  const normalList = visible.filter((m) => !m.dupr_certified);
+  const sections = [
+    ...(duprList.length > 0 ? [{ key: 'dupr', title: 'DUPR 인증 모임', data: duprList }] : []),
+    ...(normalList.length > 0 ? [{ key: 'normal', title: '일반 모임', data: normalList }] : []),
+  ];
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -89,12 +98,26 @@ export default function MatchesScreen() {
           <ActivityIndicator color={theme.primary} />
         </View>
       ) : (
-        <FlatList
-          data={visible}
+        <SectionList
+          sections={sections}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Ionicons
+                name={section.key === 'dupr' ? 'shield-checkmark' : 'flash-outline'}
+                size={15}
+                color={section.key === 'dupr' ? '#2D6BD6' : '#AAB4C0'}
+              />
+              <Text style={[styles.sectionTitle, section.key === 'dupr' && { color: '#2D6BD6' }]}>{section.title}</Text>
+              <Text style={styles.sectionCount}>{section.data.length}</Text>
+            </View>
+          )}
           renderItem={({ item }) => (
-            <MeetupCard meetup={item} onPress={() => router.push(`/meetup/${item.id}`)} />
+            <View style={styles.itemWrap}>
+              <MeetupCard meetup={item} onPress={() => router.push(`/meetup/${item.id}`)} />
+            </View>
           )}
           refreshControl={
             <RefreshControl
@@ -129,7 +152,11 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
   chipsScroll: { flexGrow: 0 },
   chips: { paddingHorizontal: Spacing.four, gap: 8, paddingBottom: Spacing.three, alignItems: 'center' },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
+  list: { padding: Spacing.four, paddingTop: 0, paddingBottom: 124 },
+  itemWrap: { marginBottom: Spacing.three },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: Spacing.two, paddingTop: Spacing.one },
+  sectionTitle: { fontSize: 14, fontWeight: '900', color: '#AAB4C0' },
+  sectionCount: { fontSize: 12.5, fontWeight: '800', color: '#707B87' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
   emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },

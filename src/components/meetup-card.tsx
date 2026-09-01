@@ -23,13 +23,20 @@ export function MeetupCard({
       {meetup.image_url ? <Image source={{ uri: meetup.image_url }} style={styles.cover} /> : null}
       <View style={styles.topRow}>
         <Text style={styles.time}>{formatMeetupTime(meetup.start_time)}</Text>
-        {closed ? (
-          <Badge label={meetup.status === 'cancelled' ? '취소됨' : '마감'} color="#F87171" bg="rgba(248,113,113,0.14)" />
-        ) : full ? (
-          <Badge label="정원마감" color="#FBBF24" bg="rgba(251,191,36,0.14)" />
-        ) : (
-          <Badge label="모집중" />
-        )}
+        <View style={styles.badges}>
+          {meetup.dupr_premium ? (
+            <Badge label="DUPR+" color="#8B5CF6" bg="rgba(139,92,246,0.14)" />
+          ) : meetup.dupr_certified ? (
+            <Badge label="DUPR" color="#2D6BD6" bg="rgba(45,107,214,0.14)" />
+          ) : null}
+          {closed ? (
+            <Badge label={meetup.status === 'cancelled' ? '취소됨' : '마감'} color="#F87171" bg="rgba(248,113,113,0.14)" />
+          ) : full ? (
+            <Badge label="정원마감" color="#FBBF24" bg="rgba(251,191,36,0.14)" />
+          ) : (
+            <Badge label="모집중" />
+          )}
+        </View>
       </View>
 
       <Text style={styles.title} numberOfLines={2}>
@@ -75,6 +82,7 @@ const styles = StyleSheet.create({
   },
   cover: { width: '100%', height: 128, borderRadius: Radius.card, borderCurve: 'continuous', backgroundColor: '#151D25', marginBottom: AppSpacing.xs },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm },
+  badges: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   time: { fontSize: 14, fontWeight: '800', color: '#16C784' }, // 날짜는 작게(제목보다), 그린 라벨
   title: { ...Typography.cardTitle, color: '#F8FAFC' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
