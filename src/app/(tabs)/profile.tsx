@@ -148,6 +148,23 @@ export default function ProfileScreen() {
             <Text style={styles.ratingUpdated}>
               {profile?.dupr_synced_at ? `Updated ${profile.dupr_synced_at.slice(0, 10)}` : skillLabel(profile?.skill_level ?? 3)}
             </Text>
+            {/* DUPR 자격(엔티틀먼트) — 연결과 별개로 SSO 에서 동기화되는 멤버십 자격 (0061·0084) */}
+            {profile?.dupr_status === 'verified' ? (
+              <>
+                <View style={styles.entRow}>
+                  <EntChip label="BASIC" active={!!profile.dupr_basic} />
+                  <EntChip label="DUPR+" active={!!profile.dupr_premium} tone="purple" />
+                  <EntChip label="VERIFIED" active={!!profile.dupr_verified_l1} tone="purple" />
+                </View>
+                {!profile.dupr_basic ? (
+                  <Pressable onPress={() => router.push('/dupr-connect' as never)} style={styles.entWarn}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#F59E0B" />
+                    <Text style={styles.entWarnText}>자격 확인이 안 됐어요 — DUPR 재연결로 갱신하기</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#F59E0B" />
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
           </View>
 
           <View style={styles.quickGrid}>
@@ -222,6 +239,18 @@ export default function ProfileScreen() {
         </Pressable>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// DUPR 자격 칩 — active=보유(체크), 아니면 회색 (0061·0084)
+function EntChip({ label, active, tone }: { label: string; active: boolean; tone?: 'purple' }) {
+  const color = active ? (tone === 'purple' ? '#8B5CF6' : '#16C784') : dark.textMuted;
+  const bg = active ? (tone === 'purple' ? 'rgba(139,92,246,0.14)' : 'rgba(22,199,132,0.12)') : 'rgba(255,255,255,0.06)';
+  return (
+    <View style={[styles.entChip, { backgroundColor: bg }]}>
+      <Ionicons name={active ? 'checkmark-circle' : 'remove-circle-outline'} size={13} color={color} />
+      <Text style={[styles.entChipText, { color }]}>{label}</Text>
+    </View>
   );
 }
 
@@ -348,6 +377,11 @@ const styles = StyleSheet.create({
   ratingDelta: { paddingBottom: 8, fontSize: 15, fontWeight: '900', color: '#9BE137' },
   ratingDeltaMuted: { color: dark.textMuted },
   ratingUpdated: { marginTop: 6, fontSize: 12, fontWeight: '600', color: dark.textMuted },
+  entRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  entChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, borderCurve: 'continuous' },
+  entChipText: { fontSize: 11.5, fontWeight: '800' },
+  entWarn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  entWarnText: { flex: 1, fontSize: 12, fontWeight: '700', color: '#F59E0B' },
   quickGrid: {
     flexDirection: 'row',
     borderTopWidth: 1,

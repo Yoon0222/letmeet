@@ -56,6 +56,8 @@ export default function CreateMeetup() {
   // DUPR 인증/프리미엄 옵션 (0059·0084) — 인증: 연결자만 참가·결과 DUPR 등록 / 프리미엄: DUPR+ 만 참가
   const [duprCertified, setDuprCertified] = useState(false);
   const [duprPremium, setDuprPremium] = useState(false);
+  const duprConnected = profile?.dupr_status === 'verified'; // 계정 연결 여부
+  const duprEligible = duprConnected && !!profile?.dupr_basic; // 연결 + BASIC 자격(활성 멤버십)
   const [saving, setSaving] = useState(false);
 
   // 코트 등록 요청 모달 (검색에 없는 코트)
@@ -268,23 +270,38 @@ export default function CreateMeetup() {
             <View style={styles.duprRow}>
               <View style={styles.duprRowText}>
                 <Text style={styles.duprRowTitle}>DUPR 인증 번개</Text>
-                <Text style={styles.duprRowSub}>DUPR 연결 회원만 참가 · 경기 결과가 DUPR 공식 레이팅에 반영돼요.</Text>
-                {!(profile?.dupr_status === 'verified' && profile?.dupr_basic) ? (
+                <Text style={styles.duprRowSub}>
+                  DUPR 연결 + BASIC 자격(활성 멤버십) 회원만 참가할 수 있고, 경기 결과가 DUPR 공식 레이팅에 반영돼요.
+                </Text>
+                {!duprConnected ? (
                   <Text style={styles.duprRowWarn}>호스트가 먼저 DUPR을 연결해야 켤 수 있어요 (프로필 → DUPR 연결)</Text>
+                ) : !duprEligible ? (
+                  <Text style={styles.duprRowWarn}>DUPR은 연결됐지만 BASIC 자격 확인이 안 됐어요 — 프로필에서 재연결하면 갱신돼요</Text>
                 ) : null}
               </View>
               <Switch
                 value={duprCertified}
                 onValueChange={(v) => {
-                  if (v && !(profile?.dupr_status === 'verified' && profile?.dupr_basic)) {
-                    Alert.alert(
-                      'DUPR 연결이 필요해요',
-                      'DUPR 인증 번개를 만들려면 호스트가 먼저 DUPR 계정을 연결해야 해요(활성 BASIC 자격).',
-                      [
-                        { text: '나중에', style: 'cancel' },
-                        { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
-                      ],
-                    );
+                  if (v && !duprEligible) {
+                    if (duprConnected) {
+                      Alert.alert(
+                        'DUPR 자격 확인이 필요해요',
+                        '계정은 연결됐지만 BASIC 자격(활성 멤버십)이 확인되지 않았어요. DUPR을 재연결하면 자격이 갱신돼요.',
+                        [
+                          { text: '나중에', style: 'cancel' },
+                          { text: '재연결하기', onPress: () => router.push('/dupr-connect' as never) },
+                        ],
+                      );
+                    } else {
+                      Alert.alert(
+                        'DUPR 연결이 필요해요',
+                        'DUPR 인증 번개를 만들려면 호스트가 먼저 DUPR 계정을 연결해야 해요(활성 BASIC 자격).',
+                        [
+                          { text: '나중에', style: 'cancel' },
+                          { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
+                        ],
+                      );
+                    }
                     return;
                   }
                   setDuprCertified(v);
