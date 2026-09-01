@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96mm" height="56mm" viewBox="0 0 960 560">
+  <!-- 재단 90×50mm, 사방 3mm 도련 포함 -->
+  <rect width="960" height="560" fill="#F6F8F6"/>
+  <rect x="0" y="0" width="22" height="560" fill="#3DBA6F"/>
+  <g transform="translate(92 88)">
+    <text x="0" y="57" fill="#071A14" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="54" font-weight="800">신윤식</text>
+    <text x="4" y="94" fill="#148A52" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" letter-spacing="1.5">TROY SHIN · FOUNDER &amp; CEO</text>
+    <line x1="0" y1="132" x2="776" y2="132" stroke="#D6DED9" stroke-width="2"/>
+    <g fill="#415149" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="22">
+      <text x="0" y="191" fill="#148A52" font-size="16" font-weight="800" letter-spacing="2">M</text><text x="54" y="191">010 5270 2034</text>
+      <text x="0" y="239" fill="#148A52" font-size="16" font-weight="800" letter-spacing="2">E</text><text x="54" y="239">pinut@pinut.org</text>
+      <text x="0" y="287" fill="#148A52" font-size="16" font-weight="800" letter-spacing="2">W</text><text x="54" y="287">pinut.org</text>
+      <text x="0" y="335" fill="#148A52" font-size="16" font-weight="800" letter-spacing="2">A</text>
+      <text x="54" y="335" font-size="19">인천광역시 검단구 묵지3로 3</text>
+      <text x="54" y="366" font-size="19">1동 4층 401호 (불로동)</text>
+    </g>
+  </g>
+  <g transform="translate(748 70) scale(.32)">
+    <text x="0" y="118" fill="#071A14" font-family="Arial, Helvetica, sans-serif" font-size="142" font-weight="900" letter-spacing="-5">P</text>
+    <rect x="116" y="10" width="24" height="78" rx="12" fill="#3DBA6F"/>
+    <circle cx="128" cy="111" r="13" fill="#3DBA6F"/>
+    <text x="151" y="118" fill="#071A14" font-family="Arial, Helvetica, sans-serif" font-size="142" font-weight="900" letter-spacing="-5">NUT</text>
+  </g>
+  <rect x="30" y="30" width="900" height="500" fill="none" stroke="#071A14" stroke-width="1" opacity="0.10"/>
+</svg>

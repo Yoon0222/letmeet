@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96mm" height="56mm" viewBox="0 0 960 560">
+ <defs><linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8BE9AC"/><stop offset=".48" stop-color="#32B368"/><stop offset="1" stop-color="#B1F2C7"/></linearGradient><pattern id="grain" width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r=".55" fill="#fff" opacity=".028"/><circle cx="7" cy="6" r=".4" fill="#fff" opacity=".02"/></pattern></defs>
+ <!-- 완성 90×50mm / 사방 3mm 도련 -->
+ <rect width="960" height="560" fill="#07100B"/><rect width="960" height="560" fill="url(#grain)"/>
+ <g transform="translate(104 106)">
+  <text x="0" y="66" font-family="Noto Sans KR,Arial,sans-serif" font-size="58" font-weight="700" letter-spacing="1" fill="#F3F6F4">신윤식</text>
+  <text x="4" y="111" font-family="Bahnschrift,Arial,sans-serif" font-size="22" font-weight="600" letter-spacing="3" fill="url(#foil)">TROY SHIN  /  FOUNDER &amp; CEO</text>
+  <line x1="0" y1="157" x2="752" y2="157" stroke="#92A098" stroke-width="1" opacity=".28"/>
+  <g font-family="Bahnschrift,Arial,sans-serif" font-size="21" font-weight="400" fill="#C8D0CB">
+   <text x="0" y="216" fill="#69D691" font-size="16" font-weight="600">M</text><text x="42" y="216">010 5270 2034</text>
+   <text x="0" y="265" fill="#69D691" font-size="16" font-weight="600">E</text><text x="42" y="265">pinut@pinut.org</text>
+   <text x="0" y="314" fill="#69D691" font-size="16" font-weight="600">W</text><text x="42" y="314">pinut.org</text>
+  </g>
+  <text x="405" y="216" font-family="Bahnschrift,Arial,sans-serif" font-size="16" font-weight="600" fill="#69D691">A</text>
+  <text x="445" y="216" font-family="Noto Sans KR,Arial,sans-serif" font-size="17" font-weight="400" fill="#C8D0CB">인천광역시 검단구 묵지3로 3</text>
+  <text x="445" y="250" font-family="Noto Sans KR,Arial,sans-serif" font-size="17" font-weight="400" fill="#C8D0CB">1동 4층 401호 (불로동)</text>
+ </g>
+ <text x="856" y="467" text-anchor="end" font-family="Bahnschrift,Arial,sans-serif" font-size="36" font-weight="700" letter-spacing="-1" fill="#F3F6F4">P<tspan fill="url(#foil)">!</tspan>NUT</text>
+</svg>

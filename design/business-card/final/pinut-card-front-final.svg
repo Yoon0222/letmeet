@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96mm" height="56mm" viewBox="0 0 960 560">
+ <defs><linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8BE9AC"/><stop offset=".48" stop-color="#32B368"/><stop offset="1" stop-color="#B1F2C7"/></linearGradient><pattern id="grain" width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r=".55" fill="#fff" opacity=".028"/><circle cx="7" cy="6" r=".4" fill="#fff" opacity=".02"/></pattern></defs>
+ <!-- 완성 90×50mm / 사방 3mm 도련 -->
+ <rect width="960" height="560" fill="#07100B"/><rect width="960" height="560" fill="url(#grain)"/>
+ <path d="M103 129V431" stroke="url(#foil)" stroke-width="3"/>
+ <g transform="translate(166 164)">
+  <text x="0" y="142" font-family="Noto Sans KR,Arial,sans-serif" font-size="150" font-weight="900" letter-spacing="-8" fill="#F3F6F4">P<tspan fill="url(#foil)">!</tspan>NUT</text>
+  <text x="7" y="204" font-family="Noto Sans KR,Arial,sans-serif" font-size="23" font-weight="600" letter-spacing="10" fill="#A3AEA7">PLAY INSTANT</text>
+ </g>
+ <text x="855" y="472" text-anchor="end" font-family="Noto Sans KR,Arial,sans-serif" font-size="15" font-weight="600" letter-spacing="5" fill="#78857D">FOR SPORTS NUTS</text>
+</svg>

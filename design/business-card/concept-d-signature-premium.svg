@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+ <defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111814"/><stop offset="1" stop-color="#050906"/></linearGradient>
+  <linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#77E1A0"/><stop offset=".45" stop-color="#2EAD63"/><stop offset="1" stop-color="#A2F0BE"/></linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="12" stdDeviation="16" flood-opacity=".22"/></filter>
+  <pattern id="grain" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="1" cy="2" r=".5" fill="#fff" opacity=".035"/><circle cx="6" cy="5" r=".4" fill="#fff" opacity=".025"/></pattern>
+ </defs>
+ <rect width="1200" height="760" fill="#E5E7E5"/><text x="90" y="65" font-family="Arial,sans-serif" font-size="20" font-weight="700" letter-spacing="2" fill="#4D5751">D. SIGNATURE PREMIUM</text>
+ <!-- 앞면 -->
+ <g transform="translate(90 105)" filter="url(#shadow)"><rect width="1020" height="283" rx="3" fill="url(#bg)"/><rect width="1020" height="283" fill="url(#grain)"/>
+  <path d="M79 57V226" stroke="url(#foil)" stroke-width="2"/>
+  <text x="126" y="157" font-family="Arial,Helvetica,sans-serif" font-size="104" font-weight="900" letter-spacing="-6" fill="#F3F6F4">P<tspan fill="url(#foil)">!</tspan>NUT</text>
+  <text x="130" y="202" font-family="Arial,sans-serif" font-size="14" font-weight="600" letter-spacing="6" fill="#A5AEA8">PLAY INSTANT</text>
+  <text x="890" y="235" text-anchor="end" font-family="Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="4" fill="#728078">FOR SPORTS NUTS</text>
+  <circle cx="920" cy="58" r="3" fill="#3DBA6F"/>
+ </g>
+ <!-- 뒷면 -->
+ <g transform="translate(90 418)" filter="url(#shadow)"><rect width="1020" height="283" rx="3" fill="url(#bg)"/><rect width="1020" height="283" fill="url(#grain)"/>
+  <text x="75" y="79" font-family="Arial,'Noto Sans KR',sans-serif" font-size="38" font-weight="700" letter-spacing="1" fill="#F3F6F4">신윤식</text>
+  <text x="78" y="111" font-family="Arial,sans-serif" font-size="13" font-weight="600" letter-spacing="2.2" fill="url(#foil)">TROY SHIN  /  FOUNDER &amp; CEO</text>
+  <line x1="78" y1="140" x2="942" y2="140" stroke="#94A098" stroke-width="1" opacity=".22"/>
+  <g font-family="Arial,'Noto Sans KR',sans-serif" font-size="15" fill="#C4CBC6"><text x="78" y="180">010 5270 2034</text><text x="310" y="180">pinut@pinut.org</text><text x="582" y="180">pinut.org</text><text x="78" y="226" fill="#89958D" font-size="14">인천광역시 검단구 묵지3로 3, 1동 4층 401호 (불로동)</text></g>
+  <text x="942" y="91" text-anchor="end" font-family="Arial,sans-serif" font-size="31" font-weight="900" letter-spacing="-2" fill="#F3F6F4">P<tspan fill="url(#foil)">!</tspan>NUT</text>
+  <path d="M917 111h25" stroke="#3DBA6F" stroke-width="2"/>
+ </g>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+ <rect width="1200" height="760" fill="#E5E8E6"/><text x="90" y="62" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="2" fill="#4A554E">P!NUT · FINAL BUSINESS CARD</text>
+ <image href="pinut-card-front-final.svg" x="90" y="100" width="1020" height="283"/>
+ <text x="90" y="414" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2" fill="#748078">FRONT · MODERN 01</text>
+ <image href="pinut-card-back-final.svg" x="90" y="445" width="1020" height="283"/>
+ <text x="90" y="752" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2" fill="#748078">BACK · PERFORMANCE 03</text>
+</svg>

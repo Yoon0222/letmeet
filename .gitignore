@@ -61,4 +61,8 @@ docs/playstore-screenshots/
 # supabase CLI 로컬 캐시
 supabase/.temp/
 
+# 로컬 생성물 (PDF 변환 등 — 커밋 안 함)
+tmp/
+output/
+
 .vercel
