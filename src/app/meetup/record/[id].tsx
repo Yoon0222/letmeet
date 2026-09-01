@@ -36,6 +36,7 @@ export default function RecordMeetupMatch() {
   const [past, setPast] = useState<MeetupMatch[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [discipline, setDiscipline] = useState<'any' | 'singles' | 'doubles'>('any'); // 모임 종목 (0086)
   const [format, setFormat] = useState<'doubles' | 'singles'>('doubles');
   const [side, setSide] = useState<Record<string, Side>>({});
   const [games, setGames] = useState<{ a: string; b: string }[]>([{ a: '', b: '' }]);
@@ -64,10 +65,12 @@ export default function RecordMeetupMatch() {
       supabase.from('match_change_requests').select('*').eq('meetup_id', id).eq('status', 'pending'),
     ]);
     setTitle(m?.title ?? '');
-    // 모임 종목이 단식/복식으로 정해져 있으면 형식 기본값으로 (최초 로드 시 1회만)
-    if (!formatInit.current && (m?.discipline === 'singles' || m?.discipline === 'doubles')) {
+    // 모임 종목이 단식/복식이면 형식은 종목을 따라간다(선택 없음). 자유일 때만 선택 노출.
+    const d = (m?.discipline ?? 'any') as 'any' | 'singles' | 'doubles';
+    setDiscipline(d);
+    if (!formatInit.current && (d === 'singles' || d === 'doubles')) {
       formatInit.current = true;
-      setFormat(m.discipline);
+      setFormat(d);
     }
     // deno/ts: 조인 결과 프로필
     const list: Part[] = ((p as unknown as { user_id: string; profiles: { nickname: string; avatar_url: string | null; dupr_status: string } | null }[]) ?? []).map((r) => ({
@@ -204,6 +207,7 @@ export default function RecordMeetupMatch() {
     setEditing(null);
     setSide({});
     setGames([{ a: '', b: '' }]);
+    if (discipline !== 'any') setFormat(discipline);
     load();
   }
 
@@ -224,6 +228,8 @@ export default function RecordMeetupMatch() {
     setEditing(null);
     setSide({});
     setGames([{ a: '', b: '' }]);
+    // 종목 고정 모임이면 형식을 모임 종목으로 복귀(옛 경기 수정으로 바뀌었을 수 있음)
+    if (discipline !== 'any') setFormat(discipline);
   }
 
   // DUPR 미제출 경기 직접 삭제 (등록된 경기는 요청으로)
@@ -286,23 +292,32 @@ export default function RecordMeetupMatch() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {/* 형식 */}
-          <View style={styles.card}>
-            <Text style={styles.label}>경기 형식</Text>
-            <View style={styles.segRow}>
-              {(['doubles', 'singles'] as const).map((f) => (
-                <Pressable
-                  key={f}
-                  onPress={() => {
-                    setFormat(f);
-                    setSide({});
-                  }}
-                  style={[styles.seg, format === f && styles.segActive]}>
-                  <Text style={[styles.segText, format === f && styles.segTextActive]}>{f === 'doubles' ? '복식' : '단식'}</Text>
-                </Pressable>
-              ))}
+          {/* 형식 — 모임 종목이 정해져 있으면 그대로 따라감(선택 없음), 자유 모임만 선택 */}
+          {discipline === 'any' ? (
+            <View style={styles.card}>
+              <Text style={styles.label}>경기 형식</Text>
+              <View style={styles.segRow}>
+                {(['doubles', 'singles'] as const).map((f) => (
+                  <Pressable
+                    key={f}
+                    onPress={() => {
+                      setFormat(f);
+                      setSide({});
+                    }}
+                    style={[styles.seg, format === f && styles.segActive]}>
+                    <Text style={[styles.segText, format === f && styles.segTextActive]}>{f === 'doubles' ? '복식' : '단식'}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={[styles.card, styles.formatFixedRow]}>
+              <Ionicons name={format === 'doubles' ? 'people-outline' : 'person-outline'} size={18} color="#16C784" />
+              <Text style={styles.formatFixedText}>
+                {format === 'doubles' ? '복식' : '단식'} 모임 — 경기가 {format === 'doubles' ? '복식' : '단식'}으로 기록돼요.
+              </Text>
+            </View>
+          )}
 
           {/* 선수 배정 */}
           <View style={styles.card}>
@@ -557,6 +572,8 @@ const styles = StyleSheet.create({
   colon: { fontSize: 18, fontWeight: '800', color: '#707B87' },
   addGame: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 10, paddingVertical: 8 },
   addGameText: { fontSize: 14, fontWeight: '800', color: '#16C784' },
+  formatFixedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  formatFixedText: { flex: 1, fontSize: 13.5, fontWeight: '700', color: '#AAB4C0' },
   pastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pastRowEditing: { backgroundColor: 'rgba(22,199,132,0.08)', borderRadius: 8, marginHorizontal: -6, paddingHorizontal: 6, paddingVertical: 4 },
   pastText: { fontSize: 13.5, color: '#AAB4C0', flex: 1 },
