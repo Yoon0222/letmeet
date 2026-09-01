@@ -20,8 +20,9 @@ const fmtYmd = (iso: string) => {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 };
 
-type ClubMenu = { key: string; label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; path: '/club/sessions' | '/club/tournaments' | '/club/results' | '/club/members' };
+type ClubMenu = { key: string; label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; path: '/club/board' | '/club/sessions' | '/club/tournaments' | '/club/results' | '/club/members' };
 const CLUB_MENUS: ClubMenu[] = [
+  { key: 'board', label: '게시판', desc: '공지 · 클럽원 소통', icon: 'chatbox-ellipses', path: '/club/board' },
   { key: 'sessions', label: '정기모임', desc: '참석 투표 · 아메리카노 대진', icon: 'calendar', path: '/club/sessions' },
   { key: 'tournaments', label: '월례대회', desc: '클럽 토너먼트 개설·진행', icon: 'trophy', path: '/club/tournaments' },
   { key: 'results', label: '경기 결과', desc: '기록 · DUPR 반영', icon: 'podium', path: '/club/results' },

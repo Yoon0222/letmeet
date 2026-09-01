@@ -150,6 +150,14 @@ function RootNavigator() {
         />
         <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
         <Stack.Screen
+          name="club/board"
+          options={{ headerShown: true, title: '게시판', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="club/post/[id]"
+          options={{ headerShown: true, title: '게시글', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
+        <Stack.Screen
           name="club/sessions"
           options={{ headerShown: true, title: '정기모임', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
         />

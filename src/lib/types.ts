@@ -245,6 +245,34 @@ export type ClubMemberWithProfile = ClubMember & {
   profiles: Pick<Profile, 'id' | 'nickname' | 'skill_level' | 'avatar_url' | 'region'>;
 };
 
+// ---- 클럽 게시판 (0088) — 클럽원 전용 글/댓글 + 공지 ----
+export type ClubPost = {
+  id: string;
+  club_id: string;
+  author_id: string;
+  title: string;
+  body: string;
+  is_notice: boolean; // 공지(클럽장/임원만 지정)
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClubPostComment = {
+  id: string;
+  post_id: string;
+  club_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+};
+
+/** club_posts_with_authors 뷰 결과 */
+export type ClubPostWithAuthor = ClubPost & {
+  author_nickname: string;
+  author_avatar_url: string | null;
+  comment_count: number;
+};
+
 export type ClubMatchResult = {
   id: string;
   club_id: string;
@@ -846,6 +874,18 @@ export interface Database {
         Update: WriteDefaults<ClubMember>;
         Relationships: [];
       };
+      club_posts: {
+        Row: ClubPost;
+        Insert: WriteDefaults<ClubPost> & { club_id: string; author_id: string; title: string };
+        Update: WriteDefaults<ClubPost>;
+        Relationships: [];
+      };
+      club_post_comments: {
+        Row: ClubPostComment;
+        Insert: WriteDefaults<ClubPostComment> & { post_id: string; club_id: string; author_id: string; body: string };
+        Update: WriteDefaults<ClubPostComment>;
+        Relationships: [];
+      };
       club_match_results: {
         Row: ClubMatchResult;
         Insert: {
@@ -1040,6 +1080,10 @@ export interface Database {
       };
       clubs_with_counts: {
         Row: ClubWithCounts;
+        Relationships: [];
+      };
+      club_posts_with_authors: {
+        Row: ClubPostWithAuthor;
         Relationships: [];
       };
       tournaments_with_counts: {
