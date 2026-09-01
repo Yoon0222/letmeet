@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,22 @@ type Side = 'A' | 'B' | null;
 export default function RecordMeetupMatch() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
+  const insets = useSafeAreaInsets();
+
+  // 모달이 안드로이드 내비바·키보드에 가리지 않게 — 키보드 높이 추적 (create.tsx 패턴)
+  const [keyboardBottom, setKeyboardBottom] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardBottom(Math.max(0, event.endCoordinates.height - insets.bottom));
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardBottom(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [insets.bottom]);
 
   const [title, setTitle] = useState('');
   const [parts, setParts] = useState<Part[]>([]);
@@ -447,7 +464,7 @@ export default function RecordMeetupMatch() {
         {/* DUPR 전송 전 최종 점검 모달 */}
         <Modal visible={confirmOpen} transparent animationType="slide" onRequestClose={() => setConfirmOpen(false)}>
           <View style={styles.reqModalWrap}>
-            <View style={styles.reqModalCard}>
+            <View style={[styles.reqModalCard, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
               <Text style={styles.reqModalTitle}>{editing ? '수정 내용 최종 점검' : '경기 결과 최종 점검'}</Text>
               <Text style={styles.reqModalSub}>
                 전송하면 DUPR 공식 레이팅에 반영돼요. 전송 후에는 직접 수정·삭제할 수 없고 운영자 요청이 필요해요.
@@ -503,8 +520,12 @@ export default function RecordMeetupMatch() {
         {/* DUPR 등록 경기 수정/삭제 요청 모달 (0085) */}
         <Modal visible={!!reqTarget} transparent animationType="slide" onRequestClose={() => setReqTarget(null)}>
           <View style={styles.reqModalWrap}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-              <View style={styles.reqModalCard}>
+            <KeyboardAvoidingView style={styles.reqModalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <View
+                style={[
+                  styles.reqModalCard,
+                  { marginBottom: keyboardBottom, paddingBottom: Math.max(insets.bottom, 16) + 16 },
+                ]}>
                 <Text style={styles.reqModalTitle}>{reqKind === 'edit' ? '경기 수정 요청' : '경기 삭제 요청'}</Text>
                 <Text style={styles.reqModalSub}>
                   DUPR에 등록된 경기는 레이팅에 영향을 줘서 직접 고칠 수 없어요. 운영자가 확인 후 처리하면 DUPR에도 반영됩니다.
@@ -585,6 +606,7 @@ const styles = StyleSheet.create({
   reqChip: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(245,158,11,0.14)' },
   reqChipText: { fontSize: 11.5, fontWeight: '800', color: '#F59E0B' },
   reqModalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', justifyContent: 'flex-end' },
+  reqModalKeyboard: { justifyContent: 'flex-end' },
   reqModalCard: {
     backgroundColor: '#10161D',
     borderTopLeftRadius: 24,
@@ -594,7 +616,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: 'rgba(255,255,255,0.09)',
     padding: Spacing.four,
-    paddingBottom: Spacing.four + 12,
     gap: Spacing.two,
   },
   reqModalTitle: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
