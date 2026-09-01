@@ -84,12 +84,17 @@ Deno.serve(async (req) => {
     return mem?.role === 'officer' && mem?.status === 'approved';
   }
 
-  // 2) 권한: meetup=호스트 / club=클럽장·임원 / tournament=organizer·admin 또는 클럽 대회의 클럽장·임원.
+  // 2) 권한: meetup=호스트·운영자(0085 요청 처리) / club=클럽장·임원 / tournament=organizer·admin 또는 클럽 대회의 클럽장·임원.
   if (source === 'meetup') {
     const { data: mm } = await admin.from('meetup_matches').select('meetup_id').eq('id', matchId).maybeSingle();
     if (!mm) return json({ error: 'not_found' }, 404);
     const { data: mt } = await admin.from('meetups').select('host_id, title').eq('id', mm.meetup_id).maybeSingle();
-    if (!mt || mt.host_id !== caller.id) return json({ error: 'forbidden' }, 403);
+    if (!mt) return json({ error: 'not_found' }, 404);
+    if (mt.host_id !== caller.id) {
+      // 운영자(super_admin)는 수정·삭제 요청 처리를 위해 허용 (0085)
+      const { data: prof } = await admin.from('profiles').select('role').eq('id', caller.id).maybeSingle();
+      if (prof?.role !== 'super_admin') return json({ error: 'forbidden' }, 403);
+    }
     body.__event = body?.event ?? mt.title;
   } else if (source === 'club') {
     const { data: cm } = await admin

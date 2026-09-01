@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,7 +22,7 @@ import { useAuth } from '@/contexts/auth';
 import { deleteMeetupMatch, submitMatchToDupr } from '@/lib/dupr';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { supabase } from '@/lib/supabase';
-import type { MeetupMatch } from '@/lib/types';
+import type { MatchChangeRequest, MeetupMatch } from '@/lib/types';
 
 type Part = { user_id: string; nickname: string; avatar_url: string | null; connected: boolean };
 type Side = 'A' | 'B' | null;
@@ -39,10 +40,18 @@ export default function RecordMeetupMatch() {
   const [side, setSide] = useState<Record<string, Side>>({});
   const [games, setGames] = useState<{ a: string; b: string }[]>([{ a: '', b: '' }]);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<MeetupMatch | null>(null); // 수정 중인 기존 경기(DUPR 미제출만 직접 수정 가능)
+
+  // DUPR 등록된 경기는 직접 수정/삭제 불가(0085) → 운영자에게 요청
+  const [pendingReqs, setPendingReqs] = useState<Record<string, MatchChangeRequest>>({});
+  const [reqTarget, setReqTarget] = useState<MeetupMatch | null>(null);
+  const [reqKind, setReqKind] = useState<'edit' | 'delete'>('edit');
+  const [reqMsg, setReqMsg] = useState('');
+  const [reqSending, setReqSending] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [{ data: m }, { data: p }, { data: mm }] = await Promise.all([
+    const [{ data: m }, { data: p }, { data: mm }, { data: rq }] = await Promise.all([
       supabase.from('meetups').select('title, host_id').eq('id', id).maybeSingle(),
       supabase
         .from('meetup_participants')
@@ -50,6 +59,7 @@ export default function RecordMeetupMatch() {
         .eq('meetup_id', id)
         .eq('status', 'approved'),
       supabase.from('meetup_matches').select('*').eq('meetup_id', id).order('created_at', { ascending: false }),
+      supabase.from('match_change_requests').select('*').eq('meetup_id', id).eq('status', 'pending'),
     ]);
     setTitle(m?.title ?? '');
     // deno/ts: 조인 결과 프로필
@@ -61,6 +71,11 @@ export default function RecordMeetupMatch() {
     }));
     setParts(list);
     setPast((mm as MeetupMatch[]) ?? []);
+    const reqMap: Record<string, MatchChangeRequest> = {};
+    ((rq as MatchChangeRequest[]) ?? []).forEach((r) => {
+      reqMap[r.match_id] = r;
+    });
+    setPendingReqs(reqMap);
     setLoading(false);
   }, [id]);
 
@@ -115,30 +130,41 @@ export default function RecordMeetupMatch() {
       return;
     }
     setSaving(true);
-    // 1) 경기기록 저장 (RLS: 호스트만)
-    const { data: row, error } = await supabase
-      .from('meetup_matches')
-      .insert({
-        meetup_id: id,
-        format,
-        a1: teamA[0].user_id,
-        a2: teamA[1]?.user_id ?? null,
-        b1: teamB[0].user_id,
-        b2: teamB[1]?.user_id ?? null,
-        games: gameRows,
-        recorded_by: session.user.id,
-      })
-      .select('id')
-      .single();
-    if (error || !row) {
-      setSaving(false);
-      Alert.alert('저장 실패', error?.message ?? '다시 시도해주세요.');
-      return;
+    // 1) 경기기록 저장 (RLS: 호스트만) — 수정 모드면 기존 행 update, 아니면 insert
+    const fields = {
+      format,
+      a1: teamA[0].user_id,
+      a2: teamA[1]?.user_id ?? null,
+      b1: teamB[0].user_id,
+      b2: teamB[1]?.user_id ?? null,
+      games: gameRows,
+    };
+    let matchId: string | null = null;
+    if (editing) {
+      const { error } = await supabase.from('meetup_matches').update(fields).eq('id', editing.id);
+      if (error) {
+        setSaving(false);
+        Alert.alert('저장 실패', error.message);
+        return;
+      }
+      matchId = editing.id;
+    } else {
+      const { data: row, error } = await supabase
+        .from('meetup_matches')
+        .insert({ ...fields, meetup_id: id, recorded_by: session.user.id })
+        .select('id')
+        .single();
+      if (error || !row) {
+        setSaving(false);
+        Alert.alert('저장 실패', error?.message ?? '다시 시도해주세요.');
+        return;
+      }
+      matchId = row.id;
     }
-    // 2) DUPR 등록
+    // 2) DUPR 등록/반영 — 이미 등록된 경기(match code 보유)면 서버가 match/update 로 처리
     const res = await submitMatchToDupr({
       source: 'meetup',
-      match_id: row.id,
+      match_id: matchId,
       format,
       teamA: { p1: teamA[0].user_id, p2: teamA[1]?.user_id },
       teamB: { p1: teamB[0].user_id, p2: teamB[1]?.user_id },
@@ -148,17 +174,40 @@ export default function RecordMeetupMatch() {
     setSaving(false);
     if (!res.ok) {
       Alert.alert('DUPR 등록 실패', res.error === 'players_not_connected' ? '연결 안 된 선수가 있어요.' : (res.error ?? '잠시 후 다시 시도해주세요.') + '\n(경기 기록은 저장됐어요)');
+    } else if (editing) {
+      Alert.alert('수정 완료', '경기 기록이 수정되고 DUPR에도 반영됐어요.');
     } else {
       Alert.alert('등록 완료', 'DUPR에 경기가 등록됐어요. 레이팅 반영 후 그래프에 표시됩니다.');
     }
     // 초기화 + 새로고침
+    setEditing(null);
     setSide({});
     setGames([{ a: '', b: '' }]);
     load();
   }
 
+  // 기존 경기를 폼에 불러와 수정 모드로 전환 — DUPR 미제출 경기만 (등록된 경기는 요청으로)
+  function startEdit(m: MeetupMatch) {
+    const map: Record<string, Side> = {};
+    map[m.a1] = 'A';
+    if (m.a2) map[m.a2] = 'A';
+    map[m.b1] = 'B';
+    if (m.b2) map[m.b2] = 'B';
+    setEditing(m);
+    setFormat(m.format);
+    setSide(map);
+    setGames(m.games.map((g) => ({ a: String(g.a), b: String(g.b) })));
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setSide({});
+    setGames([{ a: '', b: '' }]);
+  }
+
+  // DUPR 미제출 경기 직접 삭제 (등록된 경기는 요청으로)
   function confirmDelete(mId: string) {
-    Alert.alert('경기 삭제', '이 경기 기록을 삭제할까요? DUPR에 등록됐다면 거기서도 제거돼요.', [
+    Alert.alert('경기 삭제', '이 경기 기록을 삭제할까요?', [
       { text: '닫기', style: 'cancel' },
       {
         text: '삭제',
@@ -170,6 +219,38 @@ export default function RecordMeetupMatch() {
         },
       },
     ]);
+  }
+
+  // DUPR 등록된 경기: 운영자에게 수정/삭제 요청 (0085)
+  function openRequest(m: MeetupMatch, kind: 'edit' | 'delete') {
+    setReqTarget(m);
+    setReqKind(kind);
+    setReqMsg('');
+  }
+
+  async function sendRequest() {
+    if (!reqTarget || !id || !session?.user.id) return;
+    if (reqKind === 'edit' && !reqMsg.trim()) {
+      Alert.alert('내용 입력', '어떻게 수정할지 적어주세요. (예: 2게임 11-9 → 11-7)');
+      return;
+    }
+    setReqSending(true);
+    const { error } = await supabase.from('match_change_requests').insert({
+      source: 'meetup',
+      match_id: reqTarget.id,
+      meetup_id: id,
+      requester_id: session.user.id,
+      kind: reqKind,
+      message: reqMsg.trim(),
+    });
+    setReqSending(false);
+    if (error) {
+      Alert.alert('요청 실패', error.message);
+      return;
+    }
+    setReqTarget(null);
+    Alert.alert('요청 완료', 'DUPR에 등록된 경기라 운영자 확인 후 처리돼요. 처리되면 DUPR에도 반영됩니다.');
+    load();
   }
 
   if (loading) {
@@ -270,25 +351,95 @@ export default function RecordMeetupMatch() {
             <View style={styles.card}>
               <Text style={styles.label}>기록된 경기 {past.length}</Text>
               <View style={{ gap: 8, marginTop: 8 }}>
-                {past.map((m) => (
-                  <View key={m.id} style={styles.pastRow}>
-                    <Text style={styles.pastText}>
-                      {m.format === 'doubles' ? '복식' : '단식'} · {m.games.map((g) => `${g.a}-${g.b}`).join(', ')}
-                    </Text>
-                    <Text style={[styles.pastStatus, statusStyle(m.dupr_status)]}>{statusLabel(m.dupr_status)}</Text>
-                    <Pressable onPress={() => confirmDelete(m.id)} hitSlop={8} style={{ marginLeft: 8 }}>
-                      <Ionicons name="trash-outline" size={18} color="#E5484D" />
-                    </Pressable>
-                  </View>
-                ))}
+                {past.map((m) => {
+                  const submitted = m.dupr_status === 'submitted';
+                  const pendingReq = pendingReqs[m.id];
+                  return (
+                    <View key={m.id} style={[styles.pastRow, editing?.id === m.id && styles.pastRowEditing]}>
+                      <Text style={styles.pastText}>
+                        {m.format === 'doubles' ? '복식' : '단식'} · {m.games.map((g) => `${g.a}-${g.b}`).join(', ')}
+                      </Text>
+                      <Text style={[styles.pastStatus, statusStyle(m.dupr_status)]}>{statusLabel(m.dupr_status)}</Text>
+                      {submitted ? (
+                        pendingReq ? (
+                          // 요청 접수됨 — 운영자 처리 대기
+                          <View style={styles.reqChip}>
+                            <Text style={styles.reqChipText}>{pendingReq.kind === 'edit' ? '수정' : '삭제'} 요청중</Text>
+                          </View>
+                        ) : (
+                          // DUPR 등록된 경기 → 직접 수정/삭제 대신 운영자 요청 (0085)
+                          <>
+                            <Pressable onPress={() => openRequest(m, 'edit')} hitSlop={8} style={{ marginLeft: 8 }}>
+                              <Ionicons name="create-outline" size={18} color="#AAB4C0" />
+                            </Pressable>
+                            <Pressable onPress={() => openRequest(m, 'delete')} hitSlop={8} style={{ marginLeft: 8 }}>
+                              <Ionicons name="trash-outline" size={18} color="#AAB4C0" />
+                            </Pressable>
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <Pressable onPress={() => startEdit(m)} hitSlop={8} style={{ marginLeft: 8 }}>
+                            <Ionicons name="create-outline" size={18} color="#16C784" />
+                          </Pressable>
+                          <Pressable onPress={() => confirmDelete(m.id)} hitSlop={8} style={{ marginLeft: 8 }}>
+                            <Ionicons name="trash-outline" size={18} color="#E5484D" />
+                          </Pressable>
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             </View>
           ) : null}
         </ScrollView>
 
         <View style={styles.actionBar}>
-          <Button title="경기 기록 + DUPR 등록" onPress={onSubmit} loading={saving} />
+          {editing ? (
+            <View style={styles.editNotice}>
+              <Ionicons name="create-outline" size={15} color="#16C784" />
+              <Text style={styles.editNoticeText}>기록된 경기를 수정 중이에요 — 저장하면 DUPR에도 반영돼요.</Text>
+              <Pressable onPress={cancelEdit} hitSlop={8}>
+                <Text style={styles.editCancel}>취소</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <Button title={editing ? '경기 수정 + DUPR 반영' : '경기 기록 + DUPR 등록'} onPress={onSubmit} loading={saving} />
         </View>
+
+        {/* DUPR 등록 경기 수정/삭제 요청 모달 (0085) */}
+        <Modal visible={!!reqTarget} transparent animationType="slide" onRequestClose={() => setReqTarget(null)}>
+          <View style={styles.reqModalWrap}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <View style={styles.reqModalCard}>
+                <Text style={styles.reqModalTitle}>{reqKind === 'edit' ? '경기 수정 요청' : '경기 삭제 요청'}</Text>
+                <Text style={styles.reqModalSub}>
+                  DUPR에 등록된 경기는 레이팅에 영향을 줘서 직접 고칠 수 없어요. 운영자가 확인 후 처리하면 DUPR에도 반영됩니다.
+                </Text>
+                {reqTarget ? (
+                  <Text style={styles.reqModalMatch}>
+                    {reqTarget.format === 'doubles' ? '복식' : '단식'} · {reqTarget.games.map((g) => `${g.a}-${g.b}`).join(', ')}
+                  </Text>
+                ) : null}
+                <TextInput
+                  style={styles.reqModalInput}
+                  placeholder={reqKind === 'edit' ? '어떻게 수정할지 적어주세요 (예: 2게임 11-9 → 11-7)' : '삭제 사유 (선택)'}
+                  placeholderTextColor="#707B87"
+                  value={reqMsg}
+                  onChangeText={setReqMsg}
+                  multiline
+                  maxLength={300}
+                  textAlignVertical="top"
+                />
+                <View style={styles.reqModalBtns}>
+                  <Button title="닫기" variant="secondary" onPress={() => setReqTarget(null)} style={{ flex: 1 }} />
+                  <Button title="요청 보내기" onPress={sendRequest} loading={reqSending} style={{ flex: 1 }} />
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -330,7 +481,31 @@ const styles = StyleSheet.create({
   addGame: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 10, paddingVertical: 8 },
   addGameText: { fontSize: 14, fontWeight: '800', color: '#16C784' },
   pastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pastRowEditing: { backgroundColor: 'rgba(22,199,132,0.08)', borderRadius: 8, marginHorizontal: -6, paddingHorizontal: 6, paddingVertical: 4 },
   pastText: { fontSize: 13.5, color: '#AAB4C0', flex: 1 },
   pastStatus: { fontSize: 12.5, fontWeight: '800' },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
+  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D', gap: 10 },
+  editNotice: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  editNoticeText: { flex: 1, fontSize: 12.5, fontWeight: '600', color: '#AAB4C0' },
+  editCancel: { fontSize: 13, fontWeight: '800', color: '#E5484D', paddingHorizontal: 4 },
+  reqChip: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(245,158,11,0.14)' },
+  reqChipText: { fontSize: 11.5, fontWeight: '800', color: '#F59E0B' },
+  reqModalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', justifyContent: 'flex-end' },
+  reqModalCard: {
+    backgroundColor: '#10161D',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: 'rgba(255,255,255,0.09)',
+    padding: Spacing.four,
+    paddingBottom: Spacing.four + 12,
+    gap: Spacing.two,
+  },
+  reqModalTitle: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
+  reqModalSub: { fontSize: 13, lineHeight: 19, color: '#AAB4C0' },
+  reqModalMatch: { fontSize: 13.5, fontWeight: '700', color: '#F8FAFC', backgroundColor: '#151D25', borderRadius: 10, borderCurve: 'continuous', paddingHorizontal: 12, paddingVertical: 8 },
+  reqModalInput: { minHeight: 84, borderRadius: 12, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: '#151D25', padding: 12, fontSize: 14.5, color: '#F8FAFC' },
+  reqModalBtns: { flexDirection: 'row', gap: 12, marginTop: 4 },
 });

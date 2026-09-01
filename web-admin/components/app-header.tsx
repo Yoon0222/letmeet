@@ -43,6 +43,11 @@ export function AppHeader() {
               </Link>
             )}
             {role === 'super_admin' && (
+              <Link href="/match-requests" className="text-slate-600 hover:text-slate-900">
+                경기요청
+              </Link>
+            )}
+            {role === 'super_admin' && (
               <Link href="/users" className="text-slate-600 hover:text-slate-900">
                 사용자
               </Link>

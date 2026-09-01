@@ -203,10 +203,7 @@ create policy "profiles_insert_own" on public.profiles
 alter table public.meetup_matches enable row level security;
 drop policy if exists meetup_matches_select on public.meetup_matches;
 create policy meetup_matches_select on public.meetup_matches for select using (true);
-drop policy if exists meetup_matches_write_host on public.meetup_matches;
-create policy meetup_matches_write_host on public.meetup_matches for all
-  using (exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid()))
-  with check (exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid()));
+-- 쓰기 정책은 0085 에서 분리(insert/update/delete) — my_role() 정의 이후, 파일 하단 참조.
 
 -- dupr_rating_history: 본인 것은 항상, 남의 것은 공개(dupr_public)일 때만. 쓰기는 service_role 전용.
 alter table public.dupr_rating_history enable row level security;
@@ -2300,6 +2297,61 @@ alter table public.tournaments
 
 comment on column public.tournaments.court_assign_mode is
   'auto=자동배정(수동수정 가능) / manual=완전 수동';
+
+-- ── 0085: DUPR 경기 수정·삭제 요청 + meetup_matches 쓰기 정책 강화 ──────────
+--   DUPR 등록된(submitted) 경기는 호스트가 직접 수정/삭제 불가 → 운영자에게 요청.
+--   (레이팅 조작 방지 · 관리자 매개 변경 — DUPR 통합 리뷰 요건 정합)
+drop policy if exists meetup_matches_write_host on public.meetup_matches;
+drop policy if exists meetup_matches_insert_host on public.meetup_matches;
+create policy meetup_matches_insert_host on public.meetup_matches
+  for insert with check (
+    exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid())
+  );
+drop policy if exists meetup_matches_update_host on public.meetup_matches;
+create policy meetup_matches_update_host on public.meetup_matches
+  for update using (
+    public.my_role() = 'super_admin'
+    or (
+      dupr_status <> 'submitted'
+      and exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid())
+    )
+  );
+drop policy if exists meetup_matches_delete_host on public.meetup_matches;
+create policy meetup_matches_delete_host on public.meetup_matches
+  for delete using (
+    public.my_role() = 'super_admin'
+    or (
+      dupr_status <> 'submitted'
+      and exists (select 1 from public.meetups m where m.id = meetup_matches.meetup_id and m.host_id = auth.uid())
+    )
+  );
+
+create table if not exists public.match_change_requests (
+  id           uuid primary key default gen_random_uuid(),
+  source       text not null default 'meetup' check (source in ('meetup')),
+  match_id     uuid not null references public.meetup_matches(id) on delete cascade,
+  meetup_id    uuid not null references public.meetups(id) on delete cascade,
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  kind         text not null check (kind in ('edit', 'delete')),
+  message      text not null default '',              -- 요청 사유(수정이면 바뀔 내용)
+  status       text not null default 'pending' check (status in ('pending', 'done', 'rejected')),
+  resolved_by  uuid references public.profiles(id) on delete set null,
+  resolved_at  timestamptz,
+  created_at   timestamptz not null default now()
+);
+alter table public.match_change_requests enable row level security;
+drop policy if exists match_change_requests_select on public.match_change_requests;
+create policy match_change_requests_select on public.match_change_requests
+  for select using (requester_id = auth.uid() or public.my_role() = 'super_admin');
+drop policy if exists match_change_requests_insert on public.match_change_requests;
+create policy match_change_requests_insert on public.match_change_requests
+  for insert with check (
+    requester_id = auth.uid()
+    and exists (select 1 from public.meetups m where m.id = meetup_id and m.host_id = auth.uid())
+  );
+drop policy if exists match_change_requests_update on public.match_change_requests;
+create policy match_change_requests_update on public.match_change_requests
+  for update using (public.my_role() = 'super_admin') with check (public.my_role() = 'super_admin');
 
 -- tournaments_with_counts 뷰 재생성 (court_assign_mode 포함 — t.* 고정 이슈).
 -- 컬럼 순서 변경으로 create or replace 가 거부(42P16)되므로 drop 후 재생성.

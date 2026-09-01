@@ -91,6 +91,21 @@ export type Meetup = {
   created_at: string;
 };
 
+// DUPR 경기 수정·삭제 요청(0085) — 등록된(submitted) 경기는 호스트가 직접 못 고치고 운영자에게 요청.
+export type MatchChangeRequest = {
+  id: string;
+  source: 'meetup';
+  match_id: string;
+  meetup_id: string;
+  requester_id: string;
+  kind: 'edit' | 'delete';
+  message: string;
+  status: 'pending' | 'done' | 'rejected';
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+};
+
 // 번개 경기기록(0059) — 호스트가 기록, DUPR 등록 추적.
 export type MeetupMatch = {
   id: string;
@@ -774,6 +789,12 @@ export interface Database {
         Row: MeetupMatch;
         Insert: WriteDefaults<MeetupMatch> & { meetup_id: string; format: string; a1: string; b1: string };
         Update: WriteDefaults<MeetupMatch>;
+        Relationships: [];
+      };
+      match_change_requests: {
+        Row: MatchChangeRequest;
+        Insert: WriteDefaults<MatchChangeRequest> & { match_id: string; meetup_id: string; requester_id: string; kind: 'edit' | 'delete' };
+        Update: WriteDefaults<MatchChangeRequest>;
         Relationships: [];
       };
       meetups: {

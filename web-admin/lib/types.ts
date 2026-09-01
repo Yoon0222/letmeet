@@ -60,6 +60,36 @@ export type Tournament = {
   created_at: string;
 };
 
+// 번개 경기기록 (0059) — 경기 수정/삭제 요청 처리 화면에서 사용
+export type MeetupMatchRow = {
+  id: string;
+  meetup_id: string;
+  format: 'singles' | 'doubles';
+  a1: string;
+  a2: string | null;
+  b1: string;
+  b2: string | null;
+  games: { a: number; b: number }[];
+  dupr_status: 'pending' | 'submitted' | 'failed' | 'skipped';
+  dupr_match_code: string | null;
+  created_at: string;
+};
+
+// DUPR 경기 수정·삭제 요청 (0085) — 호스트가 요청, 운영자가 처리
+export type MatchChangeRequest = {
+  id: string;
+  source: 'meetup';
+  match_id: string;
+  meetup_id: string;
+  requester_id: string;
+  kind: 'edit' | 'delete';
+  message: string;
+  status: 'pending' | 'done' | 'rejected';
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+};
+
 export type MatchPhase = 'group' | 'knockout';
 
 export type TournamentMatch = {
@@ -299,6 +329,24 @@ export interface Database {
         Row: Tournament;
         Insert: Write<Tournament> & { organizer_id: string; title: string; start_at: string };
         Update: Write<Tournament>;
+        Relationships: [];
+      };
+      meetups: {
+        Row: { id: string; title: string; host_id: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      meetup_matches: {
+        Row: MeetupMatchRow;
+        Insert: Write<MeetupMatchRow> & { meetup_id: string; format: string; a1: string; b1: string };
+        Update: Write<MeetupMatchRow>;
+        Relationships: [];
+      };
+      match_change_requests: {
+        Row: MatchChangeRequest;
+        Insert: Write<MatchChangeRequest> & { match_id: string; meetup_id: string; requester_id: string; kind: 'edit' | 'delete' };
+        Update: Write<MatchChangeRequest>;
         Relationships: [];
       };
       tournament_entries: {
