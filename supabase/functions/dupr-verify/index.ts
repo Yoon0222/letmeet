@@ -173,6 +173,7 @@ async function disconnectDupr(admin: any, userId: string, duprId: string | null,
   await admin
     .from('profiles')
     .update({
+      dupr_id: null, // 1:1 유니크 인덱스 해제 — 다른 계정이 이 DUPR 을 연결할 수 있게
       dupr_status: 'none',
       dupr_verified: false,
       dupr_basic: false,
