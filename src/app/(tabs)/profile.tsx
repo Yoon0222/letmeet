@@ -188,7 +188,7 @@ export default function ProfileScreen() {
                   onPress={() =>
                     confirmDestructive(
                       'DUPR 연결 해제',
-                      '레이팅 표시·자격·기록 그래프가 제거되고, DUPR 데이터 접근 동의가 철회돼요. 언제든 다시 연결할 수 있어요.',
+                      '레이팅 표시·자격·기록 그래프가 제거되고, 피넛의 DUPR 데이터 접근(토큰·알림 구독)이 모두 폐기돼요. 언제든 다시 연결할 수 있어요.',
                       '해제',
                       async () => {
                         const res = await requestDuprDisconnect();
