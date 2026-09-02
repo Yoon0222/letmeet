@@ -114,14 +114,22 @@ export async function verifyDupr(
   const decode = (code?: string, msg?: string) => {
     if (code === 'dupr_not_configured') return 'DUPR 연동이 아직 준비 중이에요. 조금만 기다려 주세요.';
     if (code === 'not_found') return msg ?? 'DUPR 에서 레이팅을 찾지 못했어요. ID 를 확인해 주세요.';
-    return msg ?? 'DUPR 연동에 실패했어요. 잠시 후 다시 시도해 주세요.';
+    // 원인 추적을 위해 서버 에러 코드를 함께 표시
+    return `${msg ?? 'DUPR 연동에 실패했어요. 잠시 후 다시 시도해 주세요.'}${code ? ` [${code}]` : ' [no-code]'}`;
   };
 
   if (error) {
-    // FunctionsHttpError 면 응답 본문에 error/message 가 있을 수 있음
+    // FunctionsHttpError.context 는 fetch Response 객체 — json() 으로 풀어야 서버 코드가 보인다
     // deno-lint-ignore no-explicit-any
-    const ctx = (error as any).context;
-    const body = ctx?.body ?? ctx;
+    let body: any = null;
+    try {
+      // deno-lint-ignore no-explicit-any
+      const ctx: any = (error as any).context;
+      if (ctx && typeof ctx.json === 'function') body = await ctx.json();
+      else body = ctx?.body ?? ctx;
+    } catch {
+      body = null;
+    }
     return { ok: false, error: decode(body?.error, body?.message) || error.message };
   }
   if (data?.error) return { ok: false, error: decode(data.error, data.message) };

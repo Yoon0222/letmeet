@@ -379,7 +379,7 @@ Deno.serve(async (req) => {
     .neq('id', caller.id)
     .maybeSingle();
   if (taken) {
-    return json({ error: 'dupr_already_linked', message: '이 DUPR 계정은 이미 다른 피넛 계정에 연결돼 있어요.' }, 409);
+    return json({ error: 'dupr_already_linked', message: `이 DUPR 계정(${duprId})은 이미 다른 피넛 계정에 연결돼 있어요.` }, 409);
   }
 
   // 6) 본인 프로필에 저장 (service_role → protect_dupr 트리거 통과). SSO 경유이므로 항상 verified.

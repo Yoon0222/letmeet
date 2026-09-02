@@ -68,9 +68,9 @@ export default function ProfileScreen() {
     }, [load]),
   );
 
+  const duprConnected = profile?.dupr_status === 'verified';
   const rating = profile?.dupr_rating ?? profile?.skill_level ?? 3;
-  const ratingLabel = profile?.dupr_rating ? 'DUPR Rating' : 'P!NUT Level';
-  const ratingDelta = profile?.dupr_verified ? '+0.15' : 'Self rated';
+  const ratingLabel = duprConnected ? 'DUPR Rating' : 'P!NUT Level';
   const recentMeetup = useMemo(() => myMeetups[0] ?? null, [myMeetups]);
   const needsSetup = profile && !profile.region;
 
@@ -142,12 +142,31 @@ export default function ProfileScreen() {
 
           <View style={styles.ratingCard}>
             <Text style={styles.ratingLabel}>{ratingLabel}</Text>
-            <View style={styles.ratingRow}>
-              <Text style={styles.ratingValue}>{rating.toFixed(2)}</Text>
-              <Text style={[styles.ratingDelta, !profile?.dupr_verified && styles.ratingDeltaMuted]}>{ratingDelta}</Text>
-            </View>
+            {duprConnected ? (
+              // 복식/단식 레이팅 구분 표시 — 미채점(NR)도 명시
+              <View style={styles.ratingCols}>
+                <View style={styles.ratingCol}>
+                  <Text style={styles.ratingColLabel}>복식</Text>
+                  <Text style={styles.ratingValue}>
+                    {profile?.dupr_doubles != null ? profile.dupr_doubles.toFixed(2) : 'NR'}
+                  </Text>
+                </View>
+                <View style={styles.ratingColDivider} />
+                <View style={styles.ratingCol}>
+                  <Text style={styles.ratingColLabel}>단식</Text>
+                  <Text style={styles.ratingValue}>
+                    {profile?.dupr_singles != null ? profile.dupr_singles.toFixed(2) : 'NR'}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.ratingRow}>
+                <Text style={styles.ratingValue}>{rating.toFixed(2)}</Text>
+                <Text style={[styles.ratingDelta, styles.ratingDeltaMuted]}>Self rated</Text>
+              </View>
+            )}
             <Text style={styles.ratingUpdated}>
-              {profile?.dupr_synced_at ? `Updated ${profile.dupr_synced_at.slice(0, 10)}` : skillLabel(profile?.skill_level ?? 3)}
+              {duprConnected && profile?.dupr_synced_at ? `Updated ${profile.dupr_synced_at.slice(0, 10)}` : skillLabel(profile?.skill_level ?? 3)}
             </Text>
             {/* DUPR 자격(엔티틀먼트) — 연결과 별개로 SSO 에서 동기화되는 멤버십 자격 (0061·0084) */}
             {profile?.dupr_status === 'verified' ? (
@@ -399,12 +418,16 @@ const styles = StyleSheet.create({
   ratingDelta: { paddingBottom: 8, fontSize: 15, fontWeight: '900', color: '#9BE137' },
   ratingDeltaMuted: { color: dark.textMuted },
   ratingUpdated: { marginTop: 6, fontSize: 12, fontWeight: '600', color: dark.textMuted },
-  entRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  ratingCols: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: Spacing.four },
+  ratingCol: { alignItems: 'center', minWidth: 108 },
+  ratingColLabel: { fontSize: 12.5, fontWeight: '800', color: dark.textSecondary, marginBottom: 2 },
+  ratingColDivider: { width: 1, height: 44, backgroundColor: dark.line },
+  entRow: { flexDirection: 'row', gap: 6, marginTop: 12, justifyContent: 'center' },
   entChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, borderCurve: 'continuous' },
   entChipText: { fontSize: 11.5, fontWeight: '800' },
   entWarn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
   entWarnText: { flex: 1, fontSize: 12, fontWeight: '700', color: '#F59E0B' },
-  duprUnlink: { marginTop: 8, alignSelf: 'flex-start' },
+  duprUnlink: { marginTop: 10, alignSelf: 'center' },
   duprUnlinkText: { fontSize: 12, fontWeight: '700', color: '#707B87', textDecorationLine: 'underline' },
   quickGrid: {
     flexDirection: 'row',
