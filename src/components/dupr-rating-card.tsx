@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
@@ -17,18 +18,21 @@ export function DuprRatingCard({
 }) {
   const [data, setData] = useState<DuprPoint[] | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const hist = await getDuprHistory(userId);
-      if (!alive) return;
-      if (hist.length === 0 && allowSample && __DEV__) setData(SAMPLE_DUPR_HISTORY);
-      else setData(hist);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [userId, allowSample]);
+  // 화면에 돌아올 때마다 재조회 — 연결/경기 직후 히스토리가 바로 반영되게
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        const hist = await getDuprHistory(userId);
+        if (!alive) return;
+        if (hist.length === 0 && allowSample && __DEV__) setData(SAMPLE_DUPR_HISTORY);
+        else setData(hist);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [userId, allowSample]),
+  );
 
   // 데이터 없으면 카드 자체를 숨긴다(레이팅 없는 계정에 빈 그래프 안 보이게).
   if (!data || data.length < 2) return null;
