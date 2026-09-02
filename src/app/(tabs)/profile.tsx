@@ -11,6 +11,7 @@ import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useI18n } from '@/contexts/i18n';
 import { confirmDestructive } from '@/lib/confirm';
+import { requestDuprDisconnect } from '@/lib/dupr';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { formatMeetupTime, playStyleLabel, skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +30,7 @@ const dark = {
 export default function ProfileScreen() {
   const router = useRouter();
   const { t, language, languages, languageLabels, setLanguage } = useI18n();
-  const { session, profile, signOut, deleteAccount } = useAuth();
+  const { session, profile, signOut, deleteAccount, refreshProfile } = useAuth();
   const [myMeetups, setMyMeetups] = useState<MeetupWithCounts[]>([]);
   const [reviewStat, setReviewStat] = useState<{ avg: number; count: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -163,6 +164,27 @@ export default function ProfileScreen() {
                     <Ionicons name="chevron-forward" size={14} color="#F59E0B" />
                   </Pressable>
                 ) : null}
+                {/* DUPR 연결 해제 — 구독·토큰·히스토리까지 정리(동의 철회) */}
+                <Pressable
+                  onPress={() =>
+                    confirmDestructive(
+                      'DUPR 연결 해제',
+                      '레이팅 표시·자격·기록 그래프가 제거되고, DUPR 데이터 접근 동의가 철회돼요. 언제든 다시 연결할 수 있어요.',
+                      '해제',
+                      async () => {
+                        const res = await requestDuprDisconnect();
+                        if (!res.ok) {
+                          Alert.alert('해제 실패', res.error ?? '잠시 후 다시 시도해 주세요.');
+                          return;
+                        }
+                        await refreshProfile();
+                      },
+                    )
+                  }
+                  style={styles.duprUnlink}
+                  hitSlop={6}>
+                  <Text style={styles.duprUnlinkText}>DUPR 연결 해제</Text>
+                </Pressable>
               </>
             ) : null}
           </View>
@@ -382,6 +404,8 @@ const styles = StyleSheet.create({
   entChipText: { fontSize: 11.5, fontWeight: '800' },
   entWarn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
   entWarnText: { flex: 1, fontSize: 12, fontWeight: '700', color: '#F59E0B' },
+  duprUnlink: { marginTop: 8, alignSelf: 'flex-start' },
+  duprUnlinkText: { fontSize: 12, fontWeight: '700', color: '#707B87', textDecorationLine: 'underline' },
   quickGrid: {
     flexDirection: 'row',
     borderTopWidth: 1,

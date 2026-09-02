@@ -269,6 +269,14 @@ Deno.serve(async (req) => {
   const caller = userData?.user;
   if (!caller) return json({ error: 'unauthorized' }, 401);
 
+  // 1.6) 연결 해제 — 사용자가 프로필에서 직접 요청. 구독 해제 + 토큰/히스토리 삭제 + 프로필 리셋.
+  if (body?.disconnect === true) {
+    const { data: prof } = await admin.from('profiles').select('dupr_id').eq('id', caller.id).maybeSingle();
+    const ptoken = await getDuprToken();
+    await disconnectDupr(admin, caller.id, prof?.dupr_id ?? null, ptoken);
+    return json({ ok: true, disconnected: true });
+  }
+
   // 1.7) 자격(엔티틀먼트) 재조회 — 앱이 24h 초과 시 호출. 사용자 access token 으로
   //      subscription/active 조회, 만료면 refresh(토큰 회전)로 갱신 후 재시도.
   if (body?.entitlements === true) {

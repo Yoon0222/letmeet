@@ -65,6 +65,13 @@ export async function maybeSyncEntitlements(syncedAt: string | null): Promise<bo
   return res.ok;
 }
 
+// DUPR 연결 해제 — 서버가 웹훅 구독 해제 + 토큰/히스토리 삭제 + 프로필 리셋까지 처리.
+export async function requestDuprDisconnect(): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { disconnect: true } });
+  if (error || !data?.ok) return { ok: false, error: error?.message ?? data?.error };
+  return { ok: true };
+}
+
 // 서버에 히스토리 새로고침 요청(DUPR /history → 캐시 upsert). 갱신된 개수 반환.
 export async function refreshDuprHistory(): Promise<number> {
   const { data, error } = await supabase.functions.invoke('dupr-verify', { body: { history: true } });
