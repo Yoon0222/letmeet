@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DuprRatingCard } from '@/components/dupr-rating-card';
 import { MeetupCard } from '@/components/meetup-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Brand, Spacing } from '@/constants/theme';
@@ -208,12 +209,8 @@ export default function ProfileScreen() {
             ) : null}
           </View>
 
-          <View style={styles.quickGrid}>
-            <QuickAction icon="analytics-outline" label="경기 기록" onPress={() => router.push(`/player/${session?.user.id}` as never)} />
-            <QuickAction icon="bar-chart-outline" label="통계" onPress={() => router.push(`/player/${session?.user.id}` as never)} />
-            <QuickAction icon="trophy-outline" label="랭킹" onPress={() => router.push('/tournaments' as never)} />
-            <QuickAction icon="shield-checkmark-outline" label="뱃지" onPress={() => router.push('/profile/edit')} />
-          </View>
+          {/* DUPR 레이팅 추이 선그래프 — 히스토리 2개 이상일 때만 표시 (퀵버튼 줄 대체) */}
+          {session?.user.id ? <DuprRatingCard userId={session.user.id} /> : null}
         </View>
 
         {needsSetup ? (
@@ -292,23 +289,6 @@ function EntChip({ label, active, tone }: { label: string; active: boolean; tone
       <Ionicons name={active ? 'checkmark-circle' : 'remove-circle-outline'} size={13} color={color} />
       <Text style={[styles.entChipText, { color }]}>{label}</Text>
     </View>
-  );
-}
-
-function QuickAction({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={styles.quickAction} onPress={onPress}>
-      <Ionicons name={icon} size={20} color={dark.textSecondary} />
-      <Text style={styles.quickLabel}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -429,14 +409,6 @@ const styles = StyleSheet.create({
   entWarnText: { flex: 1, fontSize: 12, fontWeight: '700', color: '#F59E0B' },
   duprUnlink: { marginTop: 10, alignSelf: 'center' },
   duprUnlinkText: { fontSize: 12, fontWeight: '700', color: '#707B87', textDecorationLine: 'underline' },
-  quickGrid: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: dark.line,
-    paddingTop: Spacing.three,
-  },
-  quickAction: { flex: 1, alignItems: 'center', gap: 7 },
-  quickLabel: { fontSize: 12, fontWeight: '700', color: dark.textSecondary },
   setupBanner: {
     flexDirection: 'row',
     alignItems: 'center',
