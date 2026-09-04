@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BusinessFooter } from '@/components/business-footer';
 import { Spacing } from '@/constants/theme';
 import { AppAlert as Alert } from '@/lib/feedback';
 
@@ -49,6 +50,9 @@ export default function SupportScreen() {
         <Text style={styles.note}>
           DUPR 공식 레이팅 관련 정정은 접수 후 확인하여 필요한 경우 DUPR에 정정 요청까지 처리해 드립니다.
         </Text>
+
+        {/* 사업자 정보 — 전자상거래 표시 의무 + PG 심사 요건 */}
+        <BusinessFooter />
       </ScrollView>
     </SafeAreaView>
   );

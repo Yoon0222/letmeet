@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BusinessFooter } from '@/components/business-footer';
 import { Avatar } from '@/components/ui/avatar';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
@@ -87,6 +88,9 @@ export default function MoreScreen() {
             ))}
           </View>
         </View>
+
+        {/* 사업자 정보 — 전자상거래 표시 의무 + PG 심사 요건 */}
+        <BusinessFooter />
       </ScrollView>
     </SafeAreaView>
   );
