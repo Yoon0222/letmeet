@@ -154,6 +154,7 @@ export default function HomeScreen() {
     const { data: tours } = await supabase
       .from('tournaments_with_counts')
       .select('*')
+      .is('club_id', null) // 클럽 월례대회는 홈 추천에서 제외 — 해당 클럽 화면에서만
       .eq('status', 'registration')
       .gte('start_at', nowIso)
       .order('start_at', { ascending: true })
