@@ -166,10 +166,6 @@ function RootNavigator() {
           options={{ headerShown: true, title: '월례대회', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
         />
         <Stack.Screen
-          name="club/results"
-          options={{ headerShown: true, title: '경기 결과', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
-        />
-        <Stack.Screen
           name="club/members"
           options={{ headerShown: true, title: '회원 관리', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
         />

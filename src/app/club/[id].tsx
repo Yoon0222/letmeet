@@ -20,12 +20,12 @@ const fmtYmd = (iso: string) => {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 };
 
-type ClubMenu = { key: string; label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; path: '/club/board' | '/club/sessions' | '/club/tournaments' | '/club/results' | '/club/members' };
+type ClubMenu = { key: string; label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; path: '/club/board' | '/club/sessions' | '/club/tournaments' | '/club/members'; comingSoon?: boolean };
+// 경기 결과는 정기모임 상세의 대진/순위 탭으로 통합돼 별도 메뉴 제거 (2026-09-08)
 const CLUB_MENUS: ClubMenu[] = [
   { key: 'board', label: '게시판', desc: '공지 · 클럽원 소통', icon: 'chatbox-ellipses', path: '/club/board' },
-  { key: 'sessions', label: '정기모임', desc: '참석 투표 · 아메리카노 대진', icon: 'calendar', path: '/club/sessions' },
-  { key: 'tournaments', label: '월례대회', desc: '클럽 토너먼트 개설·진행', icon: 'trophy', path: '/club/tournaments' },
-  { key: 'results', label: '경기 결과', desc: '기록 · DUPR 반영', icon: 'podium', path: '/club/results' },
+  { key: 'sessions', label: '정기모임', desc: '참석 투표 · 대진 · 순위 · DUPR 반영', icon: 'calendar', path: '/club/sessions' },
+  { key: 'tournaments', label: '월례대회', desc: '클럽 토너먼트 개설·진행', icon: 'trophy', path: '/club/tournaments', comingSoon: true },
   { key: 'members', label: '회원 관리', desc: '멤버 · 임원 임명 · 가입 승인', icon: 'people', path: '/club/members' },
 ];
 
@@ -351,16 +351,26 @@ export default function ClubDetail() {
             {(isApprovedMember || isOwner ? CLUB_MENUS : CLUB_MENUS.filter((menu) => menu.key === 'members')).map((menu) => (
               <Pressable
                 key={menu.key}
-                onPress={() => router.push({ pathname: menu.path, params: { clubId: club.id } })}
-                style={styles.menuCard}>
+                onPress={() =>
+                  menu.comingSoon
+                    ? Alert.alert('추후 오픈', `${menu.label} 기능은 곧 열려요. 조금만 기다려주세요!`)
+                    : router.push({ pathname: menu.path, params: { clubId: club.id } })
+                }
+                style={[styles.menuCard, menu.comingSoon && styles.menuCardSoon]}>
                 <View style={styles.menuIcon}>
-                  <Ionicons name={menu.icon} size={20} color="#16C784" />
+                  <Ionicons name={menu.icon} size={20} color={menu.comingSoon ? '#707B87' : '#16C784'} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.menuLabel}>{menu.label}</Text>
                   <Text style={styles.menuDesc}>{menu.desc}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#707B87" />
+                {menu.comingSoon ? (
+                  <View style={styles.soonChip}>
+                    <Text style={styles.soonChipTxt}>추후 오픈</Text>
+                  </View>
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color="#707B87" />
+                )}
               </Pressable>
             ))}
           </View>
@@ -434,6 +444,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.09)',
     padding: Spacing.three,
   },
+  menuCardSoon: { opacity: 0.55 },
+  soonChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' },
+  soonChipTxt: { color: '#AAB4C0', fontSize: 11, fontWeight: '900' },
   menuIcon: {
     width: 44,
     height: 44,
