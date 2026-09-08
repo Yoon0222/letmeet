@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView from 'react-native-webview';
 
@@ -120,7 +121,9 @@ export default function SubscribeRoute() {
   const customerKey = session?.user.id ?? '';
   const busyRef = useRef(false);
   const doneRef = useRef(false);
-  const [status, setStatus] = useState('카드 등록 창을 준비하고 있어요.');
+  // status 는 보여줄 게 있을 때만 값이 있다(null 이면 하단 상태바 숨김) — 카드창 위에 계속 떠 있지 않도록.
+  const [status, setStatus] = useState<string | null>('카드 등록 창을 준비하고 있어요.');
+  const [confirming, setConfirming] = useState(false);
   const [finished, setFinished] = useState(false);
 
   const valid = isTossConfigured && !!clubId && !!customerKey;
@@ -136,6 +139,7 @@ export default function SubscribeRoute() {
       const q = getQuery(unwrap(url));
       const authKey = q.get('authKey') ?? '';
       const custKey = q.get('customerKey') ?? customerKey;
+      setConfirming(true);
       setStatus('구독을 확정하고 있어요.');
       try {
         const res = await startClubSubscription({ clubId, authKey, customerKey: custKey });
@@ -147,7 +151,7 @@ export default function SubscribeRoute() {
         }
         doneRef.current = true;
         setFinished(true);
-        setStatus('구독이 시작됐어요.');
+        setStatus(null); // 완료 화면이 대신 안내
         Alert.alert(
           '구독 완료',
           res.chargedNow ? `월 ${AMOUNT.toLocaleString('ko-KR')}원 구독이 시작됐어요.` : '카드가 등록됐어요. 무료체험이 끝나면 자동으로 결제돼요.',
@@ -158,6 +162,8 @@ export default function SubscribeRoute() {
         const m = e instanceof Error ? e.message : '구독 확정에 실패했어요.';
         setStatus(m);
         Alert.alert('구독 실패', m);
+      } finally {
+        setConfirming(false);
       }
     },
     [clubId, customerKey, router],
@@ -205,18 +211,27 @@ export default function SubscribeRoute() {
     [handleUrl],
   );
 
-  const leave = useCallback(() => {
+  // 닫기(✕)·안드로이드 뒤로가기 공용 — 등록 도중엔 실수 방지용 확인을 거친다.
+  //   빌링 인증은 authKey 를 받기 전까지 서버에 아무것도 만들지 않으므로 그냥 나가도 안전하다.
+  const confirmLeave = useCallback(() => {
     if (doneRef.current) return router.back();
-    router.back();
+    if (busyRef.current) {
+      Alert.alert('잠시만요', '구독을 확정하는 중이에요. 잠시 후 완료돼요.');
+      return;
+    }
+    Alert.alert('카드 등록 취소', '카드 등록을 그만두고 나갈까요?', [
+      { text: '계속 등록', style: 'cancel' },
+      { text: '나가기', style: 'destructive', onPress: () => router.back() },
+    ]);
   }, [router]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      leave();
+      confirmLeave();
       return true;
     });
     return () => sub.remove();
-  }, [leave]);
+  }, [confirmLeave]);
 
   if (!valid) {
     return (
@@ -258,13 +273,23 @@ export default function SubscribeRoute() {
               void openExternal(t);
             }}
             onLoadEnd={() => {
-              if (!doneRef.current) setStatus('카드 등록 창이 준비되었습니다.');
+              // 카드창이 뜨면 안내는 치운다 — 확정 중(busy) 메시지는 유지.
+              if (!doneRef.current && !busyRef.current) setStatus(null);
             }}
           />
         )}
-        <View pointerEvents="none" style={styles.statusBar}>
-          <Text style={styles.statusText}>{status}</Text>
-        </View>
+        {/* 헤더가 없는 전체화면이라 나가는 길을 따로 만든다 */}
+        {finished ? null : (
+          <Pressable onPress={confirmLeave} hitSlop={8} style={styles.closeBtn} accessibilityLabel="카드 등록 닫기">
+            <Ionicons name="close" size={20} color="#F8FAFC" />
+          </Pressable>
+        )}
+        {status ? (
+          <View pointerEvents="none" style={styles.statusBar}>
+            {confirming ? <ActivityIndicator size="small" color={AppColors.primary} /> : null}
+            <Text style={styles.statusText}>{status}</Text>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -276,6 +301,11 @@ const styles = StyleSheet.create({
   errTitle: { color: AppColors.textPrimary, fontSize: 20, fontWeight: '800' },
   errText: { color: AppColors.textSecondary, fontSize: 14, marginTop: Spacing.two, textAlign: 'center' },
   wrap: { flex: 1, backgroundColor: AppColors.background },
+  closeBtn: {
+    position: 'absolute', top: Spacing.two, right: Spacing.three, width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(7,10,13,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   finished: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
   finishedTitle: { color: AppColors.textPrimary, fontSize: 20, fontWeight: '800' },
   statusBar: {

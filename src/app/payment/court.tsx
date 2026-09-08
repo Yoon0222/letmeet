@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView from 'react-native-webview';
 
@@ -462,7 +463,8 @@ export default function CourtPaymentRoute() {
   const successRouteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [paymentFinished, setPaymentFinished] = useState(false);
-  const [statusText, setStatusText] = useState('결제창을 준비하고 있어요.');
+  // null 이면 하단 상태바 숨김 — 결제창 위에 안내가 계속 떠 있지 않도록.
+  const [statusText, setStatusText] = useState<string | null>('결제창을 준비하고 있어요.');
 
   const valid = isTossConfigured && paymentId && orderId && amount > 0;
   const paymentHtml = useMemo(
@@ -513,7 +515,7 @@ export default function CourtPaymentRoute() {
         completedRef.current = true;
         setPaymentFinished(true);
         setActiveCourtPaymentReturn(null);
-        setStatusText('예약이 완료되었습니다. 내 예약으로 이동합니다.');
+        setStatusText(null); // 완료 화면이 대신 안내
         successRouteTimerRef.current = setTimeout(() => {
           router.replace('/court/reservations');
         }, 900);
@@ -629,6 +631,19 @@ export default function CourtPaymentRoute() {
     router.replace('/court');
   }, [paymentId, router]);
 
+  // 닫기(✕)·안드로이드 뒤로가기 공용 — 결제 도중 실수로 나가 주문이 취소되는 걸 확인으로 막는다.
+  const confirmLeave = useCallback(() => {
+    if (completedRef.current || exitingRef.current) return;
+    if (confirmingRef.current) {
+      Alert.alert('잠시만요', '결제 승인을 확인하는 중이에요. 잠시 후 완료돼요.');
+      return;
+    }
+    Alert.alert('결제 취소', '결제를 그만두고 나갈까요?\n진행 중이던 주문은 취소돼요.', [
+      { text: '계속 결제', style: 'cancel' },
+      { text: '나가기', style: 'destructive', onPress: leavePayment },
+    ]);
+  }, [leavePayment]);
+
   useEffect(() => {
     if (valid) {
       setActiveCourtPaymentReturn({
@@ -655,14 +670,14 @@ export default function CourtPaymentRoute() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      leavePayment();
+      confirmLeave();
       return true;
     });
 
     return () => {
       subscription.remove();
     };
-  }, [leavePayment]);
+  }, [confirmLeave]);
 
   if (!valid) {
     return (
@@ -720,7 +735,8 @@ export default function CourtPaymentRoute() {
             }}
             onMessage={() => {}}
             onLoadEnd={() => {
-              if (!completedRef.current && !exitingRef.current) setStatusText('결제창이 준비되었습니다.');
+              // 결제창이 뜨면 안내는 치운다 — 승인 확인 중 메시지는 유지.
+              if (!completedRef.current && !exitingRef.current && !confirmingRef.current) setStatusText(null);
             }}
             onError={(event) => {
               if (completedRef.current || exitingRef.current) return;
@@ -730,10 +746,18 @@ export default function CourtPaymentRoute() {
             }}
           />
         )}
-        <View pointerEvents="none" style={styles.statusBar}>
-          {confirming ? <ActivityIndicator color={AppColors.primary} /> : null}
-          <Text style={styles.statusText}>{statusText}</Text>
-        </View>
+        {/* 헤더가 없는 전체화면이라 나가는 길을 따로 만든다 */}
+        {paymentFinished ? null : (
+          <Pressable onPress={confirmLeave} hitSlop={8} style={styles.closeBtn} accessibilityLabel="결제 닫기">
+            <Ionicons name="close" size={20} color="#F8FAFC" />
+          </Pressable>
+        )}
+        {statusText ? (
+          <View pointerEvents="none" style={styles.statusBar}>
+            {confirming ? <ActivityIndicator color={AppColors.primary} /> : null}
+            <Text style={styles.statusText}>{statusText}</Text>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -745,6 +769,11 @@ const styles = StyleSheet.create({
   errorTitle: { color: AppColors.textPrimary, fontSize: 20, fontWeight: '800' },
   errorText: { color: AppColors.textSecondary, fontSize: 14, marginTop: Spacing.two, textAlign: 'center' },
   webviewWrap: { flex: 1, backgroundColor: AppColors.background },
+  closeBtn: {
+    position: 'absolute', top: Spacing.two, right: Spacing.three, width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(7,10,13,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   finishedState: {
     flex: 1,
     alignItems: 'center',
