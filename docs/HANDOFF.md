@@ -3212,6 +3212,87 @@ Production Supabase migration status check:
   - `npx.cmd expo lint` passed.
 - Deployment:
   - No production deployment was performed.
+
+2026-09-08 Codex - Toss Payments APP payment route PPT draft:
+
+- User provided 14 iPhone screenshots for the Toss Payments card company review payment-route document.
+- Created editable PPTX draft:
+  - `output/presentations/pinut_tosspayments_app_payment_route_v1.pptx`
+- Deck contents:
+  - Cover with merchant information.
+  - Toss guide checklist slide.
+  - App Store install path.
+  - Login path.
+  - Home/court booking entry.
+  - Court/date/time selection.
+  - Payment amount and payment method selection.
+  - TossPay and Hyundai Card payment route screenshots.
+  - App return, reservation completion, and My Reservations confirmation.
+  - Final checklist for missing supplemental screenshots.
+- Known gaps before final Toss submission:
+  - Need in-app business information screenshot.
+  - Need refund policy screenshot or web page capture from `https://pinut.org/refund-policy`.
+  - Need signup route screenshot if Toss/card reviewer asks for full account flow.
+  - Ideally add one more card issuer authentication screenshot because the Toss guide requests two card companies.
+- Note:
+  - `src/components/business-footer.tsx` currently shows `목지3로`, while the refund policy/business address elsewhere uses `묵지3로`. Confirm and align before taking the final business-info screenshot.
+
+2026-09-08 Codex - Toss Payments APP payment route PPT v2:
+
+- User provided an additional iPhone screenshot for the in-app business information screen:
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/KakaoTalk_20260908_154805336.png`
+- Created updated PPTX:
+  - `output/presentations/pinut_tosspayments_app_payment_route_v2.pptx`
+- Update:
+  - Added a dedicated `사업자 정보` slide.
+  - Removed in-app business information from the missing-screenshot list.
+  - Remaining requested supplemental captures:
+    - refund/cancellation policy screen,
+    - signup route screen,
+    - one more card issuer authentication screen if possible.
+
+2026-09-08 Codex - Toss Payments APP payment route PPT v4:
+
+- User provided refund-policy screenshots:
+  - Customer-facing refund/cancellation policy page.
+  - Admin court-specific refund-policy configuration.
+- Created updated PPTX:
+  - `output/presentations/pinut_tosspayments_app_payment_route_v4.pptx`
+- Update:
+  - Added `환불 및 취소 정책` slide with the customer-facing refund policy.
+  - Added `코트별 환불 설정` slide with the admin configuration as supplemental evidence.
+  - Enlarged the wide admin screenshot for readability.
+  - Remaining useful captures before final submission:
+    - signup route screen,
+    - one more card issuer authentication screen if possible.
+
+2026-09-08 Codex - Toss Payments APP payment route PPT v5:
+
+- User provided BC Card / Paybooc card issuer screenshots:
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/ㅋ/KakaoTalk_20260908_155901213.png`
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/ㅋ/KakaoTalk_20260908_155901213_01.png`
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/ㅋ/KakaoTalk_20260908_155901213_02.png`
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/ㅋ/KakaoTalk_20260908_155901213_03.png`
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/ㅋ/KakaoTalk_20260908_155901213_04.png`
+- Created updated PPTX:
+  - `output/presentations/pinut_tosspayments_app_payment_route_v5.pptx`
+- Update:
+  - Added BC Card selection slide.
+  - Added Paybooc payment window slide.
+  - Added Paybooc card payment confirmation slides.
+  - Added BC Card reservation reflection slide.
+  - Final checklist now only leaves signup route screenshot as an optional useful supplement.
+
+2026-09-08 Codex - Toss Payments APP payment route PPT v6:
+
+- User provided signup route screenshot:
+  - `C:/Users/SEPC/Documents/카카오톡 받은 파일/KakaoTalk_20260908_160708240.png`
+- Created updated PPTX:
+  - `output/presentations/pinut_tosspayments_app_payment_route_v6.pptx`
+- Update:
+  - Added `회원가입 경로` slide after login.
+  - Replaced the final supplemental-capture slide with a `제출 전 확인` slide.
+  - Reflected that app download, login/signup, business information, refund policy, product selection, two card issuer payment routes, and reservation reflection are included.
   - Metro reload should be enough for development testing.
 
 2026-08-19 Codex - Toss payment success conclusion:
