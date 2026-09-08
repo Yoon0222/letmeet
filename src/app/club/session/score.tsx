@@ -38,6 +38,8 @@ export default function SessionScore() {
   }, [matchId]);
 
   const name = (pid: string | null) => (pid ? profiles.get(pid)?.nickname ?? '?' : '');
+  // 단식(파트너 없음)이면 이름 하나만 표시
+  const teamLabel = (p1: string, p2: string | null) => [name(p1), p2 ? name(p2) : null].filter(Boolean).join(' · ');
 
   async function save() {
     if (!match) return;
@@ -59,9 +61,9 @@ export default function SessionScore() {
     <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
       <Text style={styles.hint}>목표 {pointTarget}점 · 이긴 팀 점수가 더 높게 입력하세요.</Text>
 
-      <TeamScore label={`${name(match.team1_player1)} · ${name(match.team1_player2)}`} value={score1} onChange={setScore1} max={pointTarget} />
+      <TeamScore label={teamLabel(match.team1_player1, match.team1_player2)} value={score1} onChange={setScore1} max={pointTarget} />
       <View style={styles.vs}><Text style={styles.vsTxt}>VS</Text></View>
-      <TeamScore label={`${name(match.team2_player1)} · ${name(match.team2_player2)}`} value={score2} onChange={setScore2} max={pointTarget} />
+      <TeamScore label={teamLabel(match.team2_player1, match.team2_player2)} value={score2} onChange={setScore2} max={pointTarget} />
 
       <Button title="결과 저장" onPress={save} loading={saving} style={{ marginTop: Spacing.four }} />
     </ScrollView>

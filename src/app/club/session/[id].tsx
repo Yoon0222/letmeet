@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppAlert as Alert } from '@/lib/feedback';
 
@@ -13,9 +13,11 @@ import { americanoStandings, generateAmericano, sitOutCount } from '@/lib/americ
 import { submitMatchToDupr } from '@/lib/dupr';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { ClubSession, ClubSessionMatch, PartnerProfile } from '@/lib/types';
+import type { ClubSession, ClubSessionMatch, PartnerProfile, Profile } from '@/lib/types';
 
-type Attendee = { user_id: string; status: 'in' | 'out'; profile: PartnerProfile | null };
+// DUPR 인증 뱃지 표시용 — 프로필에 dupr_status 를 함께 가져온다
+type SessionProfile = PartnerProfile & { dupr_status?: Profile['dupr_status'] };
+type Attendee = { user_id: string; status: 'in' | 'out'; profile: SessionProfile | null };
 
 const STATUS_LABEL: Record<string, string> = {
   voting: '투표 중',
@@ -37,12 +39,17 @@ export default function ClubSessionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session: auth } = useAuth();
   const uid = auth?.user.id;
+  // 참석 현황 명단 모달: 'in'=참석, 'out'=불참, 'none'=미투표
+  const [listModal, setListModal] = useState<null | 'in' | 'out' | 'none'>(null);
+  // 화면 탭: 모임(참석) / 대진 / 순위 — 한 화면에 몰리지 않게 분리
+  const [tab, setTab] = useState<'info' | 'draw' | 'rank'>('info');
+  const tabInitRef = useRef(false); // 첫 로드 때 한 번만 상태 기반 기본 탭 설정
 
   const [sess, setSess] = useState<ClubSession | null>(null);
   const [players, setPlayers] = useState<Attendee[]>([]);
   const [matches, setMatches] = useState<ClubSessionMatch[]>([]);
-  const [profileMap, setProfileMap] = useState<Map<string, PartnerProfile>>(new Map());
-  const [candidates, setCandidates] = useState<PartnerProfile[]>([]); // 아직 명단에 없는 승인 클럽원
+  const [profileMap, setProfileMap] = useState<Map<string, SessionProfile>>(new Map());
+  const [candidates, setCandidates] = useState<SessionProfile[]>([]); // 아직 명단에 없는 승인 클럽원
   const [isManager, setIsManager] = useState(false);
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -59,21 +66,21 @@ export default function ClubSessionDetail() {
     }
     const session = s as ClubSession;
     const [{ data: pl }, { data: ms }, { data: club }, { data: mem }, { data: approved }] = await Promise.all([
-      supabase.from('club_session_players').select('user_id, status, profiles(id, nickname, skill_level, avatar_url, region)').eq('session_id', id).order('joined_at', { ascending: true }),
+      supabase.from('club_session_players').select('user_id, status, profiles(id, nickname, skill_level, avatar_url, region, dupr_status)').eq('session_id', id).order('joined_at', { ascending: true }),
       supabase.from('club_session_matches').select('*').eq('session_id', id).order('round_no', { ascending: true }).order('court_no', { ascending: true }),
       supabase.from('clubs').select('owner_id').eq('id', session.club_id).maybeSingle(),
       uid ? supabase.from('club_members').select('role, status').eq('club_id', session.club_id).eq('user_id', uid).maybeSingle() : Promise.resolve({ data: null }),
-      supabase.from('club_members').select('user_id, profiles(id, nickname, skill_level, avatar_url, region)').eq('club_id', session.club_id).eq('status', 'approved'),
+      supabase.from('club_members').select('user_id, profiles(id, nickname, skill_level, avatar_url, region, dupr_status)').eq('club_id', session.club_id).eq('status', 'approved'),
     ]);
 
-    const attendees: Attendee[] = ((pl as unknown as { user_id: string; status: 'in' | 'out'; profiles: PartnerProfile | null }[]) ?? []).map((r) => ({
+    const attendees: Attendee[] = ((pl as unknown as { user_id: string; status: 'in' | 'out'; profiles: SessionProfile | null }[]) ?? []).map((r) => ({
       user_id: r.user_id,
       status: r.status,
       profile: r.profiles,
     }));
-    const map = new Map<string, PartnerProfile>();
+    const map = new Map<string, SessionProfile>();
     attendees.forEach((a) => a.profile && map.set(a.user_id, a.profile));
-    const approvedRows = (approved as unknown as { user_id: string; profiles: PartnerProfile | null }[]) ?? [];
+    const approvedRows = (approved as unknown as { user_id: string; profiles: SessionProfile | null }[]) ?? [];
     approvedRows.forEach((r) => r.profiles && map.set(r.user_id, r.profiles));
 
     const owner = (club as { owner_id: string } | null)?.owner_id;
@@ -81,11 +88,16 @@ export default function ClubSessionDetail() {
     const member = !!mem && (mem as { status?: string }).status === 'approved';
 
     const attendeeIds = new Set(attendees.map((a) => a.user_id));
+    // 대진이 이미 진행 중인 모임은 대진 탭으로 시작 (사용자가 고른 탭은 이후 유지)
+    if (!tabInitRef.current) {
+      tabInitRef.current = true;
+      if (session.status === 'matched' || session.status === 'ongoing' || session.status === 'finished') setTab('draw');
+    }
     setSess(session);
     setPlayers(attendees);
     setMatches((ms as ClubSessionMatch[] | null) ?? []);
     setProfileMap(map);
-    setCandidates(approvedRows.filter((r) => !attendeeIds.has(r.user_id)).map((r) => r.profiles).filter(Boolean) as PartnerProfile[]);
+    setCandidates(approvedRows.filter((r) => !attendeeIds.has(r.user_id)).map((r) => r.profiles).filter(Boolean) as SessionProfile[]);
     setIsManager(!!manager);
     setIsMember(!!member);
     setLoading(false);
@@ -130,14 +142,6 @@ export default function ClubSessionDetail() {
     const { error } = await supabase.from('club_session_players').upsert({ session_id: id, user_id: userId, status: 'in' }, { onConflict: 'session_id,user_id' });
     setBusy(false);
     if (error) { Alert.alert('추가 실패', error.message); return; }
-    load();
-  }
-  async function removeMember(userId: string) {
-    if (!id) return;
-    setBusy(true);
-    const { error } = await supabase.from('club_session_players').delete().eq('session_id', id).eq('user_id', userId);
-    setBusy(false);
-    if (error) { Alert.alert('제외 실패', error.message); return; }
     load();
   }
 
@@ -194,12 +198,17 @@ export default function ClubSessionDetail() {
     [isManager, uid],
   );
 
-  // 경기 시작 전 모드 선택(DUPR/일반)
+  // 경기 시작 전 모드 선택(DUPR/일반) — 선수들의 DUPR 연결 상태를 함께 보여준다
   function confirmStart(m: ClubSessionMatch) {
     if (!canPlay(m)) { Alert.alert('권한 없음', '경기에 참여한 선수 또는 임원만 시작할 수 있어요.'); return; }
+    const ids = [m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2].filter(Boolean) as string[];
+    const missing = ids.filter((p) => !duprOk(p)).map((p) => nameOf(p));
+    const duprLine = missing.length
+      ? `\n\n⚠️ DUPR 미인증: ${missing.join(', ')}\n전원 인증돼야 DUPR에 등록할 수 있어요.`
+      : '\n\n✅ 모든 선수가 DUPR 인증돼 있어요.';
     Alert.alert(
       '경기 시작',
-      '이 경기를 어떤 모드로 진행할까요?\n· DUPR 모드: 결과가 공식 레이팅에 반영\n· 일반 모드: 친선(레이팅 미반영)',
+      `이 경기를 어떤 모드로 진행할까요?\n· DUPR 모드: 결과가 공식 레이팅에 반영\n· 일반 모드: 친선(레이팅 미반영)${duprLine}`,
       [
         { text: 'DUPR 모드', onPress: () => startMatch(m, true) },
         { text: '일반 모드', onPress: () => startMatch(m, false) },
@@ -259,6 +268,16 @@ export default function ClubSessionDetail() {
   }
 
   const nameOf = (pid: string | null) => (pid ? profileMap.get(pid)?.nickname ?? '?' : '');
+  // DUPR 소유인증(verified) 여부 — 미인증 선수가 낀 경기는 DUPR 등록이 안 된다
+  const duprOk = (pid: string | null) => !!pid && profileMap.get(pid)?.dupr_status === 'verified';
+  // 이름 + DUPR 인증 뱃지 (Text 안에 인라인으로 렌더)
+  const nameBadge = (pid: string | null) =>
+    pid ? (
+      <>
+        {nameOf(pid)}
+        {duprOk(pid) ? <Ionicons name="shield-checkmark" size={11} color="#60A5FA" /> : null}
+      </>
+    ) : null;
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color="#16C784" /></View>;
@@ -287,8 +306,21 @@ export default function ClubSessionDetail() {
           ) : null}
         </View>
 
+        {/* 탭 바 — 모임(참석) / 대진 / 순위 */}
+        <View style={styles.tabRow}>
+          <Pressable onPress={() => setTab('info')} style={[styles.tabBtn, tab === 'info' && styles.tabOn]}>
+            <Text style={[styles.tabTxt, tab === 'info' && styles.tabTxtOn]}>모임</Text>
+          </Pressable>
+          <Pressable onPress={() => setTab('draw')} style={[styles.tabBtn, tab === 'draw' && styles.tabOn]}>
+            <Text style={[styles.tabTxt, tab === 'draw' && styles.tabTxtOn]}>대진{matches.length ? ` ${matches.length}` : ''}</Text>
+          </Pressable>
+          <Pressable onPress={() => setTab('rank')} style={[styles.tabBtn, tab === 'rank' && styles.tabOn]}>
+            <Text style={[styles.tabTxt, tab === 'rank' && styles.tabTxtOn]}>순위</Text>
+          </Pressable>
+        </View>
+
         {/* 내 참석 투표 */}
-        {isMember ? (
+        {tab === 'info' && isMember ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>내 참석</Text>
             <View style={styles.voteRow}>
@@ -305,64 +337,33 @@ export default function ClubSessionDetail() {
           </View>
         ) : null}
 
-        {/* 참석 현황 */}
+        {/* 참석 현황 — 숫자만 보여주고, 탭하면 명단 모달 */}
+        {tab === 'info' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>참석 현황</Text>
           <View style={styles.statusRow}>
-            <View style={[styles.statusPillBig, styles.statInBg]}>
+            <Pressable onPress={() => setListModal('in')} style={[styles.statusPillBig, styles.statInBg]}>
               <Ionicons name="checkmark-circle" size={15} color="#16C784" />
               <Text style={styles.statInTxt}>참석 {attending.length}</Text>
-            </View>
-            <View style={[styles.statusPillBig, styles.statOutBg]}>
+              <Ionicons name="chevron-forward" size={12} color="#16C784" />
+            </Pressable>
+            <Pressable onPress={() => setListModal('out')} style={[styles.statusPillBig, styles.statOutBg]}>
               <Ionicons name="close-circle" size={15} color="#F26D6D" />
               <Text style={styles.statOutTxt}>불참 {notAttending.length}</Text>
-            </View>
-            <View style={[styles.statusPillBig, styles.statNoneBg]}>
+              <Ionicons name="chevron-forward" size={12} color="#F26D6D" />
+            </Pressable>
+            <Pressable onPress={() => setListModal('none')} style={[styles.statusPillBig, styles.statNoneBg]}>
               <Ionicons name="ellipse-outline" size={15} color="#AAB4C0" />
               <Text style={styles.statNoneTxt}>미투표 {candidates.length}</Text>
-            </View>
+              <Ionicons name="chevron-forward" size={12} color="#AAB4C0" />
+            </Pressable>
           </View>
-
-          <View style={{ gap: 8, marginTop: 12 }}>
-            {attending.map((a) => (
-              <View key={a.user_id} style={styles.mRow}>
-                <Avatar nickname={a.profile?.nickname ?? '?'} uri={a.profile?.avatar_url} size={36} />
-                <Text style={styles.mName}>{a.profile?.nickname ?? '알 수 없음'}</Text>
-                <View style={styles.attendTag}><Text style={styles.attendTagTxt}>참석</Text></View>
-                {isManager ? (
-                  <Pressable onPress={() => removeMember(a.user_id)} style={styles.removeBtn}>
-                    <Ionicons name="close" size={16} color="#AAB4C0" />
-                  </Pressable>
-                ) : null}
-              </View>
-            ))}
-            {notAttending.map((a) => (
-              <View key={a.user_id} style={styles.mRow}>
-                <Avatar nickname={a.profile?.nickname ?? '?'} uri={a.profile?.avatar_url} size={36} />
-                <Text style={[styles.mName, styles.mNameOut]}>{a.profile?.nickname ?? '알 수 없음'}</Text>
-                <View style={styles.absentTag}><Text style={styles.absentTagTxt}>불참</Text></View>
-              </View>
-            ))}
-            {attending.length === 0 && notAttending.length === 0 ? <Text style={styles.dimSmall}>아직 투표한 사람이 없어요.</Text> : null}
-          </View>
-
-          {/* 임원: 명단에 없는 클럽원 추가 */}
-          {isManager && candidates.length > 0 ? (
-            <View style={{ marginTop: 12, gap: 8 }}>
-              <Text style={styles.subLabel}>클럽원 추가</Text>
-              <View style={styles.chipWrap}>
-                {candidates.map((c) => (
-                  <Pressable key={c.id} onPress={() => addMember(c.id)} style={styles.addChip}>
-                    <Ionicons name="add" size={14} color="#16C784" />
-                    <Text style={styles.addChipTxt}>{c.nickname}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
+          <Text style={styles.dimSmall}>숫자를 누르면 명단을 볼 수 있어요.</Text>
         </View>
+        ) : null}
 
         {/* 대진 */}
+        {tab === 'draw' ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>대진</Text>
@@ -383,10 +384,11 @@ export default function ClubSessionDetail() {
             ) : null}
           </View>
 
-          {isManager && !drawOpen ? (
+          {/* 만들어진 대진은 날짜와 무관하게 항상 보여준다 — 안내는 대진이 아직 없을 때만 */}
+          {isManager && !drawOpen && matches.length === 0 ? (
             <View style={styles.lockedBox}>
               <Ionicons name="time-outline" size={18} color="#AAB4C0" />
-              <Text style={styles.dim}>대진은 모임 당일({sess.session_date.replaceAll('-', '.')}) 0시부터 생성돼요.</Text>
+              <Text style={styles.dim}>대진 자동 생성은 모임 당일({sess.session_date.replaceAll('-', '.')}) 0시부터 할 수 있어요.</Text>
             </View>
           ) : matches.length === 0 ? (
             <View style={styles.lockedBox}>
@@ -428,9 +430,13 @@ export default function ClubSessionDetail() {
                           </View>
                         </View>
                         <View style={styles.matchTeams}>
-                          <Text style={[styles.teamTxt, t1win && styles.win]} numberOfLines={1}>{nameOf(m.team1_player1)} · {nameOf(m.team1_player2)}</Text>
+                          <Text style={[styles.teamTxt, t1win && styles.win]} numberOfLines={1}>
+                            {nameBadge(m.team1_player1)}{m.team1_player2 ? <> · {nameBadge(m.team1_player2)}</> : null}
+                          </Text>
                           <Text style={styles.score}>{done ? `${m.team1_score} : ${m.team2_score}` : 'vs'}</Text>
-                          <Text style={[styles.teamTxt, t2win && styles.win, { textAlign: 'right' }]} numberOfLines={1}>{nameOf(m.team2_player1)} · {nameOf(m.team2_player2)}</Text>
+                          <Text style={[styles.teamTxt, t2win && styles.win, { textAlign: 'right' }]} numberOfLines={1}>
+                            {nameBadge(m.team2_player1)}{m.team2_player2 ? <> · {nameBadge(m.team2_player2)}</> : null}
+                          </Text>
                         </View>
                         {done && m.dupr_status === 'submitted' ? (
                           <View style={styles.duprTag}>
@@ -476,11 +482,18 @@ export default function ClubSessionDetail() {
             </View>
           )}
         </View>
+        ) : null}
 
         {/* 순위 */}
-        {standings.length > 0 ? (
+        {tab === 'rank' ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>순위</Text>
+            {standings.length === 0 ? (
+              <View style={styles.lockedBox}>
+                <Ionicons name="podium-outline" size={18} color="#AAB4C0" />
+                <Text style={styles.dim}>완료된 경기가 생기면 순위가 집계돼요.</Text>
+              </View>
+            ) : (
             <View style={{ gap: 6, marginTop: 8 }}>
               {standings.map((s, i) => (
                 <View key={s.userId} style={styles.standRow}>
@@ -492,9 +505,64 @@ export default function ClubSessionDetail() {
                 </View>
               ))}
             </View>
+            )}
           </View>
         ) : null}
       </ScrollView>
+
+      {/* 참석/불참/미투표 명단 모달 — 가운데 표시, 최대 높이 넘으면 내부 스크롤 */}
+      <Modal visible={listModal !== null} transparent animationType="fade" onRequestClose={() => setListModal(null)}>
+        <View style={styles.modalOverlay}>
+          {/* 바깥 탭 닫기 — 카드를 Pressable 로 감싸면 안드로이드에서 내부 ScrollView 제스처를 막아서, 배경 레이어로만 처리 */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setListModal(null)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {listModal === 'in' ? `참석 ${attending.length}명` : listModal === 'out' ? `불참 ${notAttending.length}명` : `미투표 ${candidates.length}명`}
+              </Text>
+              <Pressable onPress={() => setListModal(null)} hitSlop={8} style={styles.modalClose}>
+                <Ionicons name="close" size={20} color="#AAB4C0" />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalList} contentContainerStyle={{ gap: 8 }} persistentScrollbar>
+              {listModal === 'in'
+                ? attending.map((a) => (
+                    <View key={a.user_id} style={styles.mRow}>
+                      <Avatar nickname={a.profile?.nickname ?? '?'} uri={a.profile?.avatar_url} size={36} />
+                      <Text style={styles.mName}>{nameBadge(a.user_id)}</Text>
+                    </View>
+                  ))
+                : listModal === 'out'
+                  ? notAttending.map((a) => (
+                      <View key={a.user_id} style={styles.mRow}>
+                        <Avatar nickname={a.profile?.nickname ?? '?'} uri={a.profile?.avatar_url} size={36} />
+                        <Text style={[styles.mName, styles.mNameOut]}>{nameBadge(a.user_id)}</Text>
+                      </View>
+                    ))
+                  : candidates.map((c) => (
+                      <View key={c.id} style={styles.mRow}>
+                        <Avatar nickname={c.nickname} uri={c.avatar_url} size={36} />
+                        <Text style={styles.mName}>{nameBadge(c.id)}</Text>
+                        {isManager ? (
+                          <Pressable onPress={() => addMember(c.id)} disabled={busy} style={styles.modalAddBtn}>
+                            <Ionicons name="add" size={14} color="#07100D" />
+                            <Text style={styles.modalAddTxt}>참석 추가</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ))}
+              {listModal === 'in' && attending.length === 0 ? <Text style={styles.dimSmall}>아직 참석 투표한 사람이 없어요.</Text> : null}
+              {listModal === 'out' && notAttending.length === 0 ? <Text style={styles.dimSmall}>불참 투표한 사람이 없어요.</Text> : null}
+              {listModal === 'none' && candidates.length === 0 ? <Text style={styles.dimSmall}>모든 클럽원이 투표했어요.</Text> : null}
+            </ScrollView>
+            {(listModal === 'in' ? attending.length : listModal === 'out' ? notAttending.length : candidates.length) > 8 ? (
+              <Text style={styles.modalMore}>
+                아래로 스크롤하면 {listModal === 'in' ? attending.length : listModal === 'out' ? notAttending.length : candidates.length}명 전체를 볼 수 있어요
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -506,6 +574,11 @@ const styles = StyleSheet.create({
   dimSmall: { color: '#707B87', fontSize: 12, fontWeight: '600' },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.six },
   headerCard: { borderRadius: 20, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: Spacing.three, gap: 8 },
+  tabRow: { flexDirection: 'row', gap: 8 },
+  tabBtn: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  tabOn: { backgroundColor: '#16C784', borderColor: '#16C784' },
+  tabTxt: { color: '#AAB4C0', fontSize: 14, fontWeight: '800' },
+  tabTxtOn: { color: '#07100D' },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   hTitle: { flex: 1, color: '#F8FAFC', fontSize: 19, fontWeight: '900' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -535,7 +608,21 @@ const styles = StyleSheet.create({
   attendTagTxt: { color: '#16C784', fontSize: 11, fontWeight: '800' },
   absentTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(242,109,109,0.14)' },
   absentTagTxt: { color: '#F26D6D', fontSize: 11, fontWeight: '800' },
-  removeBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#151D25' },
+  // 참석 현황 명단 모달 (가운데 다이얼로그 — 최대 높이 고정, 초과분은 내부 스크롤)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.four },
+  modalCard: {
+    backgroundColor: '#10161D', borderRadius: 24,
+    borderCurve: 'continuous', paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.four,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)',
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  modalTitle: { color: '#F8FAFC', fontSize: 18, fontWeight: '900' },
+  modalClose: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#151D25' },
+  // 8줄 + 9번째 줄이 반쯤 걸치는 높이 — 명단이 더 있다는 게 눈에 보이게 (줄 높이 36 + 간격 8)
+  modalList: { flexGrow: 0, maxHeight: 374 },
+  modalMore: { color: '#707B87', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 10 },
+  modalAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, minHeight: 30, borderRadius: 999, backgroundColor: '#16C784' },
+  modalAddTxt: { color: '#07100D', fontSize: 12, fontWeight: '900' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   addChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(22,199,132,0.12)', borderWidth: 1, borderColor: 'rgba(22,199,132,0.25)' },
   addChipTxt: { color: '#16C784', fontSize: 13, fontWeight: '700' },
