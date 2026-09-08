@@ -3332,3 +3332,12 @@ Production Supabase migration status check:
   - `npx.cmd expo lint` passed.
 - Deployment:
   - No production deployment was performed.
+
+2026-09-08 Claude - 클럽 정기모임 중심 재구조화 + 대회 필터 + 결제 UX (main 반영):
+
+- Payment UX: subscribe/court 결제화면 상태바 자동숨김 + 우상단 닫기(취소 확인). 3.2.2엔 미포함(3.2.3 대상).
+- 클럽: 경기 결과/수동기록 화면 삭제 -> 정기모임 상세 [모임/대진/순위] 탭으로 통합. 참석 현황은 숫자 필+가운데 명단 모달. 대진 편집 단식/복식 토글, 선수 DUPR 인증 뱃지(+경기시작 다이얼로그 미인증 안내). 지난 모임은 운영진 전용. 월례대회 메뉴 "추후 오픈"(comingSoon 플래그).
+- 대회: 클럽 월례대회(club_id 있음) 공개 목록/홈 추천 제외. 필터를 모달로(종목/연도/월, FilterSection 으로 확장 가능 — 지역 등 추가 예정 고려).
+- README v3.2.2 기준 전면 갱신. dev 시드: tester01~15@peanut.test(tester!1234, 4명 DUPR verified), 10월/2025 테스트 대회.
+- 다음 세션: 대회 참가비 결제(waitlist 승격 포함) 착수 예정.
+- 파일 경계 주의: meetup/create.tsx 는 코덱스 소유 유지, 이번에 안 건드림.
