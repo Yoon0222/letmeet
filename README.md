@@ -1,78 +1,87 @@
-# 피넛 🥜 — 피클볼 커뮤니티 매칭 앱
+# 피넛 🥜 — 피클볼 슈퍼앱
 
 > **PEANUT** — **P**lay · **E**ngage · **A**chieve
 > 슬로건: _for sports nuts_ — 스포츠에 진심인 사람들을 위해
 
-가까운 코트에서 함께 칠 사람을 찾는 피클볼 슈퍼앱입니다.
-**Expo (React Native) + Supabase** 기반의 모바일 앱과, 대회 운영을 위한 **Next.js 관리자 웹**으로 구성됩니다.
+번개 모임 매칭부터 클럽 운영, 코트 예약·결제, 대회 진행, **DUPR 공식 레이팅 연동**까지 담은 피클볼 슈퍼앱입니다.
+**Expo (React Native) + Supabase** 모바일 앱과, 운영을 위한 **Next.js 관리자 웹**으로 구성됩니다. (현재 모바일 v3.2.2, 스토어 출시)
 
 이 저장소는 두 개의 앱을 담습니다.
 
 | 앱 | 위치 | 스택 | 대상 |
 | --- | --- | --- | --- |
 | 📱 모바일 앱 | 저장소 루트 | Expo SDK 56 · React Native · expo-router | 일반 사용자 |
-| 🖥️ 관리자 웹 | [`web-admin/`](web-admin/) | Next.js 16 · React 19 · Tailwind | 대회 주최자/운영자 |
+| 🖥️ 관리자 웹 | [`web-admin/`](web-admin/) | Next.js 16 · React 19 · Tailwind | 운영자/코트 관리자/대회 주최자 |
 
-두 앱은 **같은 Supabase 프로젝트(DB·Auth)** 를 공유합니다.
+두 앱은 **같은 Supabase 프로젝트(DB·Auth·Edge Functions)** 를 공유합니다.
 
 ---
 
 ## 기능 (현재)
 
-### 📱 모바일 앱
+### 📱 모바일 앱 — 하단 탭: 홈 · 모임 · 코트 · 커뮤니티 · 전체
 | 영역 | 내용 |
 | --- | --- |
-| 🔐 인증 | 이메일 로그인 (Supabase Auth) · **카카오** 로그인(코드·연결 완료, 이메일 동의는 비즈앱 승인 대기) |
-| 🏠 홈 | 요약 허브 — 다가오는 내 모임 · 빠른 실행 · 추천 모임 · 추천 클럽 |
-| ⚡ 매칭 | 번개 모임 피드(지역 필터), 모임 생성(시간·장소·실력대·정원), 참가/취소 |
-| 👥 클럽 | 동호회 개설, 목록/상세, 가입/탈퇴 |
-| 🏆 대회 | 대회 목록(단식/복식 필터), 참가 신청/취소, **복식 파트너 검색·선택**, **대진표 열람**(조 순위표 + 브래킷 트리 + 내 경기 하이라이트), 내 경기 차례 푸시 알림 |
-| 👤 내 정보 | 프로필(닉네임·실력 DUPR 2.0~8.0·지역·플레이 스타일), 참여 모임 관리, 로그아웃 |
+| 🔐 인증 | 이메일 · **카카오 · 구글 · 애플** 로그인, 연결된 로그인 관리, 회원 탈퇴 |
+| 🏠 홈 | 다가오는 내 일정(모임·대회·예약) · 코트 예약 바로가기 · 추천 모임/클럽 · 모집 중 대회 · **내 클럽 공지** |
+| ⚡ 모임(번개) | **일반/DUPR 매치 탭 분리**, 모임 생성(단식·복식·자유, DUPR 인증/DUPR+ 조건), 참가 승인·게스트비, 경기 기록(방 형태 따라 단·복식, 최종 점검 모달 → **DUPR 서버 등록**), 기록 완료 시 목록에서 자동 숨김, 수정·삭제는 운영자 요청 흐름 |
+| 🏟️ 코트 | 네이버 지도 검색, 시간제 예약, **토스페이먼츠 결제**, 코트별 단계형 환불 정책, 내 예약 관리·취소 환불 |
+| 👥 클럽 | 개설·가입 승인·임원 임명, **프리미엄 구독(토스 자동결제)** — 게시판(공지·댓글, 홈 노출) · **정기모임**(참석 투표 → 아메리카노 대진(단식/복식) → 점수 → 순위, 모임/대진/순위 탭, **선수 DUPR 인증 뱃지** + DUPR 일괄 등록) · 월례대회(추후 오픈) |
+| 🏆 대회 | 공개 대회 목록(**필터 모달: 종목·연도·월**, 클럽 월례대회 제외), 참가 신청·복식 파트너 검색, 대진표(조 순위 + 브래킷), 내 차례 푸시 |
+| 🏅 DUPR | **공식 파트너 연동(운영 키)** — SSO 계정 연결/해제, 단·복식 레이팅 + 추이 그래프, RATING 웹훅 자동 반영, DUPR 인증 모임·대회 게이팅(DUPR+ 는 Premium+Verified 만) |
+| 💬 커뮤니티 | 카테고리 게시판(글·댓글) |
+| 👤 내 정보 | 프로필·피넛 아바타 25종/업로드, DUPR 레이팅 카드·그래프, 자격 칩 |
+| ⋯ 기타 | 알림함, 고객지원(분쟁 접수), 사업자 정보 표기, 강제 업데이트 게이트 |
 
 ### 🖥️ 관리자 웹 (web-admin)
-- **대회 개설·운영** — 목록/상세, 참가신청 승인·거절(거절 시 목록에서 숨김)
-- **대진 진행 엔진** — 조별리그 → 토너먼트 → 우승, 점수 입력·다음 라운드 자동. **단식/복식 · 조당 인원 · 몇 강부터 · 바이 · 정원** 설정
-- **역할 기반 접근** — `player < organizer < court_manager < super_admin`. 대회 개설은 `organizer` 이상만
-- **사용자 관리**(super_admin) · **전체 대회 열람**(super_admin)
-- **감사 로그** (`/audit`) — 승인/거절/개설/수정/권한변경을 DB 트리거로 자동 기록 (누가·무엇·언제·어떻게)
-- **내 경기 차례 알림** — 대진에서 선수에게 푸시 발송(🔔, `notify-turn` Edge Function)
+- **대회 개설·운영** — 진행 방식 3종: 조별+토너먼트 / KDK 개인전 / 단체전(오더 동시제출·서브매치), 점수 입력·자동 진행, DUPR+ 대회 설정
+- **코트 관리** — 코트 등록·운영시간·가격·**환불 정책(단계형)**, 예약/결제 현황, 코트 등록 요청 처리
+- **경기 요청 처리** — 사용자가 요청한 기록 수정·삭제를 운영자가 실행(DUPR 재등록/삭제 연동)
+- **역할 기반 접근** — `player < organizer < court_manager < super_admin`
+- **감사 로그** — 시간·행위자·역할·행위별 검색 필터
+- **사용자 관리 · 신고 처리 · 랜딩/환불정책 페이지**
+
+### ⚡ Edge Functions (Supabase)
+`dupr-verify`(SSO 연결·해제·자격 동기화) · `dupr-match`(경기 등록/수정/삭제) · `dupr-webhook`(RATING 수신) · `toss-confirm`/`toss-cancel`(코트 결제·환불) · `toss-billing-issue`/`charge`/`cancel`(클럽 구독) · `notify-turn`/`notify-tie`(대회 푸시)
 
 ---
 
 ## 빠른 시작
 
 ### 1. Supabase 프로젝트 준비
-1. [supabase.com](https://supabase.com) 에서 무료 프로젝트 생성
+1. [supabase.com](https://supabase.com) 에서 프로젝트 생성
 2. **SQL Editor** 에 [`supabase/schema.sql`](supabase/schema.sql) 전체를 붙여넣고 실행
-   - 테이블(profiles / meetups / clubs / tournaments 등), RLS 정책, 트리거, 뷰가 한 번에 생성됩니다.
-   - 이미 예전 스키마를 실행했다면, [`supabase/migrations/`](supabase/migrations/) 의 `0001`~`0010` 을 순서대로 실행하세요.
-3. **Authentication → Providers**
-   - **Email** 활성화 (빠른 테스트를 위해 "Confirm email" 을 끄면 가입 즉시 로그인. 운영 시엔 켜두세요.)
-   - **Kakao** Provider(선택) — 카카오 **플랫폼 키 → REST API 키 → 리다이렉트 URI**에 `https://<ref>.supabase.co/auth/v1/callback` 등록 후, Supabase에 REST API 키(Client ID)·Client Secret 입력. ⚠️ 이메일 동의(`account_email`)까지 받으려면 카카오 **비즈앱 전환**(개인정보처리방침 URL·심사)이 필요합니다.
-4. 관리자 웹을 쓰려면 최초 **super_admin** 을 지정합니다 (SQL Editor):
+   - 테이블·RLS·트리거·뷰가 한 번에 생성됩니다. 기존 DB는 [`supabase/migrations/`](supabase/migrations/) 를 번호순(`0001`~`0088`)으로 실행하세요.
+3. **Authentication → Providers** — Email 활성화, 소셜(카카오·구글·애플)은 각 콘솔에서 리다이렉트 URI `https://<ref>.supabase.co/auth/v1/callback` 등록 후 키 입력
+4. **Edge Functions 배포** (DUPR·결제·알림 사용 시):
+   ```bash
+   npx supabase functions deploy dupr-verify dupr-match dupr-webhook toss-confirm toss-cancel toss-billing-issue toss-billing-charge toss-billing-cancel notify-turn notify-tie
+   ```
+   시크릿(값은 각 콘솔에서 발급): `DUPR_CLIENT_KEY/SECRET/API_BASE/SSO_BASE/PUBLIC_BASE/WEBHOOK_SECRET`, `TOSS_SECRET_KEY`
+5. 최초 **super_admin** 지정:
    ```sql
    update public.profiles set role = 'super_admin'
    where id = (select id from auth.users where email = 'YOUR@EMAIL');
    ```
-5. **Project Settings → API** 에서 `URL` 과 `anon public` 키 복사
+6. **Project Settings → API** 에서 `URL` 과 `anon public` 키 복사
 
 ### 2. 모바일 앱 실행
-프로젝트 루트의 `.env` 를 채웁니다 ([`.env.example`](.env.example) 참고):
+프로젝트 루트 `.env` ([`.env.example`](.env.example) 참고):
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
+EXPO_PUBLIC_NAVER_MAP_CLIENT_ID=...        # 코트 지도
+EXPO_PUBLIC_TOSS_CLIENT_KEY=...            # 결제 (테스트 키 가능)
 ```
 ```bash
 npm install        # 최초 1회
 npm start          # Metro 개발 서버
 ```
-- Expo SDK 56 은 Expo Go 와 호환되지 않으므로 실기기는 **개발 빌드**로 실행합니다:
-  `eas build -p android --profile development` 후 `npx expo start --dev-client`
-- 웹 미리보기는 `npm run web`
-- `.env` 가 비어 있으면 앱에 **Supabase 설정 안내 화면**이 표시됩니다.
+- Expo SDK 56 은 Expo Go 와 호환되지 않으므로 실기기는 **개발 빌드**로: `eas build -p android --profile development` → `npx expo start --dev-client`
+- `.env` 가 비어 있으면 앱에 설정 안내 화면이 표시됩니다.
 
 ### 3. 관리자 웹 실행
-`web-admin/.env.local` 을 만들고 **같은 Supabase 프로젝트** 키를 넣습니다:
+`web-admin/.env.local` 에 **같은 Supabase 프로젝트** 키:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
@@ -82,6 +91,7 @@ cd web-admin
 npm install
 npm run dev        # http://localhost:3000
 ```
+배포는 `web-admin/` 폴더에서 `npx vercel --prod` (루트 아님).
 
 ---
 
@@ -90,79 +100,54 @@ npm run dev        # http://localhost:3000
 ```
 src/                              # 📱 모바일 앱 (Expo)
 ├── app/                          # expo-router 파일 기반 라우팅
-│   ├── _layout.tsx               # 루트: Provider + 인증 가드 + 로딩 오버레이
-│   ├── config-missing.tsx        # .env 미설정 안내
-│   ├── (auth)/                   # 비로그인 그룹: sign-in / sign-up
-│   ├── (tabs)/                   # 로그인 그룹 (하단 탭)
-│   │   ├── index.tsx             # 홈 (요약 허브)
-│   │   ├── matches.tsx           # 매칭 = 번개 모임 피드
-│   │   ├── clubs.tsx             # 클럽 목록
-│   │   ├── tournaments.tsx       # 대회 목록 (단식/복식 필터)
-│   │   └── profile.tsx           # 내 정보
-│   ├── meetup/                   # create(모달) · [id](상세)
-│   ├── club/                     # create(모달) · [id](상세)
-│   ├── tournament/[id].tsx       # 대회 상세 (참가 신청·복식 파트너·대진표)
-│   └── profile/edit.tsx          # 프로필 수정 (모달)
-├── components/                   # meetup-card, club-card, tournament-card, bracket-tree, ui/(button·avatar·kakao-button·loading-overlay 등)
-├── contexts/                     # auth(세션·프로필·푸시토큰), loading(전역 로딩)
-├── lib/                          # supabase · types(도메인+Database) · format · bracket · notifications
-└── constants/theme.ts            # 브랜드 색상/간격
+│   ├── _layout.tsx               # 루트: Provider + 인증 가드 + 결제 딥링크 복귀
+│   ├── (auth)/                   # 비로그인: sign-in / sign-up
+│   ├── (tabs)/                   # 하단 탭: index(홈)·matches(모임)·court(코트)·community·more(전체)
+│   │                             #  + clubs·tournaments·profile (전체 메뉴 경유)
+│   ├── meetup/                   # 모임 생성·상세·경기 기록(record)
+│   ├── club/                     # 상세·게시판(board/post)·정기모임(sessions, session/[id]·score·match-edit)
+│   │                             #  ·반복 스케줄·회원 관리·월례대회
+│   ├── court/                    # 코트 목록(지도)·상세·내 예약
+│   ├── payment/                  # 코트 결제·클럽 구독(빌링)·콜백
+│   ├── tournament/[id].tsx       # 대회 상세 (정보/참가/대진 탭)
+│   ├── dupr-connect.tsx          # DUPR SSO 연결
+│   └── community/ · player/ · profile/ · notifications · support
+├── components/                   # 카드·브래킷·DUPR 레이팅 그래프·사업자 푸터·ui/
+├── contexts/                     # auth · loading · notifications · i18n
+└── lib/                          # supabase · types · dupr · payments · americano · format …
 
 web-admin/                        # 🖥️ 관리자 웹 (Next.js)
-├── app/                          # login · tournaments(목록/[id]/new) · users · audit
-├── components/                   # protected(역할 가드) · app-header
-└── lib/                          # supabase · use-session · use-role · types · format · bracket
+└── app/                          # tournaments · courts · court-requests · match-requests
+                                  #  · users · audit · reports · payment · refund-policy · landing
 
 supabase/
-├── schema.sql                    # 전체 스키마 (최초 1회 실행)
-├── functions/notify-turn/        # Edge Function — 내 경기 차례 푸시 발송
-└── migrations/                   # 0001 dupr · 0002 kakao · 0003 clubs · 0004 tournaments · 0005 roles
-                                  #  · 0006 matches · 0007 discipline · 0008 partner · 0009 audit · 0010 push_token
-```
-
----
-
-## 개발 스크립트
-
-**모바일 앱 (루트)**
-```bash
-npm start            # 개발 서버
-npm run android      # 안드로이드 실행
-npm run ios          # iOS 실행 (macOS)
-npm run web          # 웹 미리보기
-npx tsc --noEmit     # 타입 체크
-npx expo lint        # 린트
-```
-
-**관리자 웹 (web-admin/)**
-```bash
-npm run dev          # 개발 서버 (localhost:3000)
-npm run build        # 프로덕션 빌드
-npm run lint         # 린트
+├── schema.sql                    # 전체 스키마 (최초 1회)
+├── functions/                    # Edge Functions 10종 (위 표 참고)
+└── migrations/                   # 0001 ~ 0088 (번호순 실행)
 ```
 
 ---
 
 ## 데이터 모델 요약
-- **profiles** — `auth.users` 와 1:1, 회원가입 트리거로 자동 생성. 실력(DUPR)·지역·`role`·`push_token` 포함.
-- **meetups / meetup_participants** — 번개 모임과 참가자(M:N). 생성 시 호스트 자동 참가.
-- **clubs / club_members** — 동호회와 회원(M:N).
-- **tournaments / tournament_entries / tournament_matches** — 대회 · 참가신청(승인/대기, 복식 `partner_id`) · 대진 경기(조별/토너먼트).
-- **audit_logs** — 주요 행위 감사 로그. DB 트리거로 자동 기록, 조회는 `super_admin` 만(불변 로그).
-- **뷰** — `meetups_with_counts` · `clubs_with_counts` · `tournaments_with_counts` (본체 + 개설자 정보 + 인원 집계).
-- **역할** — `my_role()` 헬퍼 + `enforce_role_change` 트리거로 권한 상승 차단. 부여는 `super_admin` 만.
-- 모든 테이블에 **RLS** 적용: 조회는 공개, 쓰기는 본인/호스트/주최자만.
+- **profiles** — 가입 트리거로 자동 생성. 실력·지역·역할·푸시 토큰 + **DUPR**(`dupr_id`·단/복식 레이팅·`dupr_status`·프리미엄 자격) — DUPR 컬럼은 서버(service_role)만 쓰기.
+- **meetups / meetup_matches** — 번개 모임(종목·DUPR 인증/DUPR+), 경기 기록(게임 스코어, DUPR 등록 상태). 수정·삭제는 **match_change_requests** 로 운영자에게 요청.
+- **clubs / club_members** — 클럽·회원(승인·임원). 프리미엄 구독 상태(토스 빌링) 포함.
+- **club_sessions / club_session_players / club_session_matches** — 정기모임·참석 투표·아메리카노 대진(단/복식, DUPR 모드·등록 상태). 반복 스케줄은 `club_session_schedules`.
+- **club_posts / club_post_comments** — 클럽 게시판(공지는 홈 노출).
+- **courts / court_reservations / payments** — 코트·시간제 예약·토스 결제(환불 정책 단계별).
+- **tournaments / tournament_entries / tournament_matches** — 대회(3개 진행 방식, `club_id` 로 클럽 월례대회 구분) · 참가(복식 파트너) · 대진.
+- **audit_logs** — 운영 행위 감사 로그(불변, super_admin 조회).
+- 모든 테이블 **RLS**: 조회는 공개(민감 정보 제외), 쓰기는 본인/호스트/운영자만.
 
 ---
 
 ## 로드맵
-- [x] **커뮤니티 매칭** — 번개 모임(매칭 탭) + 홈 허브
-- [x] **클럽(동호회)** — 개설 · 회원 관리
-- [x] **카카오 로그인** — 코드·연결 완료 (이메일 동의는 비즈앱 전환 승인 대기)
-- [x] **대회 1단계** — 공유 DB + 관리자 웹(개설·참가신청) + 역할 체계
-- [x] **대회 2단계(대부분)** — 대진 엔진(조별→토너먼트→우승), 단식/복식·조/본선/바이, 모바일 참가·복식 파트너, **대진표 브래킷 트리 열람**, 감사 로그, 내 경기 푸시(코드)
-- [ ] 대회 잔여 — 참가비 결제·정원/대기열, 진행자 "카톡 울리기"(노쇼 호출), 3·4위전
-- [ ] 코트 예약 + 결제 (네이버 지도·PG 연동)
-- [ ] 모임/클럽 채팅
-- [ ] 경기 기록 / 엘로 랭킹
-- [ ] 커뮤니티 게시판 · 용품 마켓
+- [x] 커뮤니티 매칭(번개) · 클럽 · 커뮤니티 게시판
+- [x] 소셜 로그인 4종 (이메일·카카오·구글·애플)
+- [x] 대회 — 진행 방식 3종(조별+토너먼트 / KDK / 단체전) + 대진표·푸시
+- [x] 코트 예약 + 토스페이먼츠 결제 + 환불 정책
+- [x] 클럽 프리미엄 — 구독 결제(빌링) · 정기모임 대진/순위 · 게시판
+- [x] **DUPR 공식 연동** — SSO·레이팅·웹훅·인증 경기 등록 (운영 키 전환 완료)
+- [ ] 클럽 월례대회 오픈 (기능 구현 완료, 노출 대기)
+- [ ] 대회 참가비 결제·대기열 승격 알림톡, 진행자 노쇼 호출
+- [ ] 모임/클럽 채팅 · 용품 마켓
