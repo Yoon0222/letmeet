@@ -66,3 +66,6 @@ tmp/
 output/
 
 .vercel
+
+# Firebase 클라이언트 설정 — 공개 repo라 커밋 제외 (Firebase 콘솔에서 재다운로드, EAS 빌드는 .easignore 로 포함)
+google-services.json
