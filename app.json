@@ -26,6 +26,7 @@
     },
     "android": {
       "package": "com.pinut.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#163C33",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
