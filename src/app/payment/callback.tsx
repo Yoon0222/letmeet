@@ -104,8 +104,15 @@ export default function TossPaymentCallbackRoute() {
       }
 
       try {
-        await confirmTossPayment(result);
+        const res = await confirmTossPayment(result);
         if (!mounted) return;
+        // 대회 참가비 결제면 대회 상세로, 코트 예약이면 내 예약으로
+        if (res && 'entryConfirmed' in res && res.entryConfirmed) {
+          setMessage('결제가 확인되어 참가가 확정되었습니다.');
+          if (res.tournamentId) router.replace(`/tournament/${res.tournamentId}` as never);
+          else router.replace('/(tabs)/tournaments' as never);
+          return;
+        }
         setMessage('결제가 확인되어 예약이 완료되었습니다.');
         router.replace('/court/reservations');
       } catch (error) {

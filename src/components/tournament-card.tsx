@@ -58,7 +58,8 @@ export function TournamentCard({
           <View style={styles.pill}>
             <Ionicons name="people-outline" size={13} color="#AAB4C0" />
             <Text style={styles.pillText}>
-              {t.approved_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
+              {/* 유료 대회는 결제 대기(pending)도 정원을 점유하므로 합산 표시 (0089) */}
+              {t.approved_count + t.pending_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
             </Text>
           </View>
         </View>

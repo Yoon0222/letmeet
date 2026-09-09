@@ -540,6 +540,10 @@ export type TournamentEntry = {
   partner_id: string | null;
   seed: number | null;
   checked_in_at: string | null;
+  // 참가비 결제 (0089, 유료 대회) — 서버(toss-confirm)만 기록
+  payment_id: string | null;
+  paid_at: string | null;
+  payment_deadline: string | null;
   created_at: string;
 };
 
@@ -1142,6 +1146,7 @@ export interface Database {
       is_club_session_manager: { Args: { p_session_id: string }; Returns: boolean };
       is_club_session_member: { Args: { p_session_id: string }; Returns: boolean };
       generate_due_club_sessions: { Args: { p_club_id?: string | null }; Returns: number };
+      expire_unpaid_tournament_entries: { Args: { p_tournament_id?: string | null }; Returns: number };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

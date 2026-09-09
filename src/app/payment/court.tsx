@@ -17,6 +17,8 @@ type Params = {
   orderId?: string;
   orderName?: string;
   amount?: string;
+  kind?: string; // 'court'(기본) | 'tournament' — 대회 참가비 결제(0089)도 이 화면을 쓴다
+  tournamentId?: string;
 };
 
 const APP_URL_PREFIX = 'pickleball://';
@@ -456,6 +458,11 @@ export default function CourtPaymentRoute() {
   const orderId = String(params.orderId ?? '');
   const orderName = String(params.orderName ?? '코트 예약');
   const amount = Number(params.amount ?? 0);
+  const kind = String(params.kind ?? 'court') === 'tournament' ? 'tournament' : 'court';
+  const tournamentId = String(params.tournamentId ?? '');
+  // 결제 실패/취소/완료 후 돌아갈 곳
+  const exitRoute = kind === 'tournament' ? (`/tournament/${tournamentId}` as const) : ('/court' as const);
+  const successRoute = kind === 'tournament' ? (`/tournament/${tournamentId}` as const) : ('/court/reservations' as const);
   const customerKey = session?.user.id ?? 'anonymous';
   const confirmingRef = useRef(false);
   const completedRef = useRef(false);
@@ -466,7 +473,7 @@ export default function CourtPaymentRoute() {
   // null 이면 하단 상태바 숨김 — 결제창 위에 안내가 계속 떠 있지 않도록.
   const [statusText, setStatusText] = useState<string | null>('결제창을 준비하고 있어요.');
 
-  const valid = isTossConfigured && paymentId && orderId && amount > 0;
+  const valid = isTossConfigured && paymentId && orderId && amount > 0 && (kind === 'court' || !!tournamentId);
   const paymentHtml = useMemo(
     () =>
       createPaymentHtml({
@@ -517,7 +524,7 @@ export default function CourtPaymentRoute() {
         setActiveCourtPaymentReturn(null);
         setStatusText(null); // 완료 화면이 대신 안내
         successRouteTimerRef.current = setTimeout(() => {
-          router.replace('/court/reservations');
+          router.replace(successRoute as never);
         }, 900);
       } catch (error) {
         confirmingRef.current = false;
@@ -528,7 +535,7 @@ export default function CourtPaymentRoute() {
         setConfirming(false);
       }
     },
-    [amount, orderId, paymentId, router],
+    [amount, orderId, paymentId, router, successRoute],
   );
 
   const confirmSuccess = useCallback(
@@ -561,9 +568,9 @@ export default function CourtPaymentRoute() {
       await cancelPendingPayment(paymentId);
       setStatusText(message);
       setActiveCourtPaymentReturn(null);
-      Alert.alert('결제 실패', message, [{ text: '확인', onPress: () => router.replace('/court') }]);
+      Alert.alert('결제 실패', message, [{ text: '확인', onPress: () => router.replace(exitRoute as never) }]);
     },
-    [paymentId, router],
+    [exitRoute, paymentId, router],
   );
 
   const handleIncomingUrl = useCallback(
@@ -623,13 +630,13 @@ export default function CourtPaymentRoute() {
 
     if (!completedRef.current && paymentId) {
       void cancelPendingPayment(paymentId).finally(() => {
-        router.replace('/court');
+        router.replace(exitRoute as never);
       });
       return;
     }
 
-    router.replace('/court');
-  }, [paymentId, router]);
+    router.replace(exitRoute as never);
+  }, [exitRoute, paymentId, router]);
 
   // 닫기(✕)·안드로이드 뒤로가기 공용 — 결제 도중 실수로 나가 주문이 취소되는 걸 확인으로 막는다.
   const confirmLeave = useCallback(() => {
@@ -645,7 +652,7 @@ export default function CourtPaymentRoute() {
   }, [leavePayment]);
 
   useEffect(() => {
-    if (valid) {
+    if (valid && kind === 'court') {
       setActiveCourtPaymentReturn({
         paymentId,
         orderId,
@@ -666,7 +673,7 @@ export default function CourtPaymentRoute() {
       }
       setActiveCourtPaymentReturn(null);
     };
-  }, [amount, handleIncomingUrl, orderId, orderName, paymentId, valid]);
+  }, [amount, handleIncomingUrl, kind, orderId, orderName, paymentId, valid]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -712,8 +719,8 @@ export default function CourtPaymentRoute() {
         {paymentFinished ? (
           <View style={styles.finishedState}>
             <ActivityIndicator color={AppColors.primary} />
-            <Text style={styles.finishedTitle}>예약이 완료되었습니다.</Text>
-            <Text style={styles.finishedText}>내 예약으로 이동하고 있어요.</Text>
+            <Text style={styles.finishedTitle}>{kind === 'tournament' ? '참가가 확정되었습니다!' : '예약이 완료되었습니다.'}</Text>
+            <Text style={styles.finishedText}>{kind === 'tournament' ? '대회 화면으로 이동하고 있어요.' : '내 예약으로 이동하고 있어요.'}</Text>
           </View>
         ) : (
           <WebView

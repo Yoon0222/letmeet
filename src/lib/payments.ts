@@ -94,6 +94,68 @@ export async function createCourtPaymentHold(args: {
   };
 }
 
+// 대회 참가비 주문 생성 (0089) — 결제 완료(toss-confirm)가 참가를 확정한다
+export async function createTournamentEntryPayment(args: {
+  tournamentId: string;
+  title: string;
+  fee: number;
+  uid: string;
+}): Promise<CourtPaymentResult> {
+  if (!isTossConfigured) {
+    return { ok: false, reason: 'config', message: 'Toss client key is missing.' };
+  }
+  if (args.fee <= 0) {
+    return { ok: false, reason: 'error', message: '참가비가 0원인 대회는 결제가 필요 없어요.' };
+  }
+  const orderId = `trn_${Date.now().toString(36)}_${randomPart()}`;
+  const orderName = `${args.title} 참가비`;
+  const { data: payment, error } = await supabase
+    .from('payments')
+    .insert({
+      order_id: orderId,
+      user_id: args.uid,
+      order_type: 'tournament',
+      target_id: args.tournamentId,
+      order_name: orderName,
+      amount: args.fee,
+      status: 'pending',
+      provider: 'toss',
+    })
+    .select('id, order_id, order_name, amount')
+    .single();
+  if (error || !payment) {
+    return { ok: false, reason: 'error', message: error?.message };
+  }
+  return { ok: true, paymentId: payment.id, orderId: payment.order_id, orderName: payment.order_name, amount: payment.amount };
+}
+
+// 대회 참가 취소 (0089) — 결제됐으면 환불(시작 전 전액), 행 삭제로 대기열 자동 승격
+export async function cancelTournamentEntry(
+  tournamentId: string,
+): Promise<{ ok: true; refunded: boolean; amount: number } | { ok: false; error: string }> {
+  const { data, error } = await supabase.functions.invoke('toss-cancel', { body: { tournamentId } });
+  if (error) {
+    const context = (error as unknown as { context?: unknown }).context;
+    let message = error.message;
+    if (context instanceof Response) {
+      const bodyText = await context.clone().text().catch(() => '');
+      const body = bodyText ? safeJsonParse(bodyText) : null;
+      const raw = typeof body?.error === 'string' ? body.error : undefined;
+      message =
+        raw === 'refund_window_closed'
+          ? '대회 시작 후에는 취소할 수 없어요.'
+          : raw === 'draw_locked'
+            ? '대진 확정 후에는 참가를 취소할 수 없어요. 운영자에게 문의해 주세요.'
+            : raw === 'refund_failed'
+              ? '환불 처리에 실패했어요. 잠시 후 다시 시도해주세요.'
+              : raw ?? message;
+    }
+    return { ok: false, error: message };
+  }
+  if (data?.error) return { ok: false, error: data.error };
+  return data as { ok: true; refunded: boolean; amount: number };
+}
+
 export async function confirmTossPayment(args: {
   paymentId?: string;
   paymentKey?: string;
@@ -136,7 +198,7 @@ export async function confirmTossPayment(args: {
     throw error;
   }
   return data as
-    | { ok: true; reservationIds: string[] }
+    | { ok: true; reservationIds: string[]; entryConfirmed?: boolean; tournamentId?: string }
     | { ok: false; pending: true; status?: string; message?: string };
 }
 
