@@ -32,13 +32,24 @@ Deno.serve(async (req) => {
   const caller = userData?.user;
   if (!caller) return json({ error: 'unauthorized' }, 401);
 
-  // 2) 경기 + 대회(주최자) 조회
+  // 2) 경기 + 대회(주최자) + 배정 코트 조회
   const { data: match } = await admin
     .from('tournament_matches')
-    .select('tournament_id, entry1_id, entry2_id, tournaments(organizer_id)')
+    .select('tournament_id, entry1_id, entry2_id, court_id, tournaments(organizer_id)')
     .eq('id', match_id)
     .maybeSingle();
   if (!match) return json({ error: 'match not found' }, 404);
+
+  // 코트가 배정돼 있으면 알림 문구에 코트명 포함 (0092)
+  let courtLabel: string | null = null;
+  if (match.court_id) {
+    const { data: court } = await admin
+      .from('tournament_courts')
+      .select('name, indoor')
+      .eq('id', match.court_id)
+      .maybeSingle();
+    if (court) courtLabel = `${court.name}${court.indoor === true ? ' (실내)' : court.indoor === false ? ' (실외)' : ''}`;
+  }
 
   // 3) 권한: 대회 주최자 또는 슈퍼관리자
   const { data: prof } = await admin.from('profiles').select('role').eq('id', caller.id).maybeSingle();
@@ -71,7 +82,7 @@ Deno.serve(async (req) => {
         p_user: uid,
         p_type: 'match_turn',
         p_title: '내 경기 차례예요',
-        p_body: '곧 경기가 시작됩니다. 코트로 이동해 주세요!',
+        p_body: courtLabel ? `곧 경기가 시작됩니다. ${courtLabel} 코트로 이동해 주세요!` : '곧 경기가 시작됩니다. 코트로 이동해 주세요!',
         p_target_type: 'tournament',
         p_target_id: match.tournament_id,
       }),

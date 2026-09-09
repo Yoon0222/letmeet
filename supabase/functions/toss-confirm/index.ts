@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
   let paymentQuery = admin
     .from('payments')
-    .select('id, user_id, order_id, amount, status')
+    .select('id, user_id, order_id, amount, status, order_type, target_id')
     .eq('user_id', user.id);
 
   paymentQuery = paymentId ? paymentQuery.eq('id', paymentId) : paymentQuery.eq('order_id', orderId);
@@ -64,6 +64,9 @@ Deno.serve(async (req) => {
   if (payment.user_id !== user.id) return json({ error: 'forbidden' }, 403);
   if (payment.order_id !== orderId || payment.amount !== amount) return json({ error: 'payment mismatch' }, 409);
   if (payment.status === 'paid') {
+    if (payment.order_type === 'tournament') {
+      return json({ ok: true, alreadyPaid: true, entryConfirmed: true, tournamentId: payment.target_id, reservationIds: [] });
+    }
     const { data: reservations } = await admin
       .from('court_reservations')
       .select('id')
@@ -140,6 +143,39 @@ Deno.serve(async (req) => {
     .eq('status', 'pending');
 
   if (updateError) return json({ error: updateError.message }, 500);
+
+  // 대회 참가비: 결제 완료 = 참가 확정 (0089)
+  if (payment.order_type === 'tournament' && payment.target_id) {
+    const { data: entry, error: entryError } = await admin
+      .from('tournament_entries')
+      .update({ status: 'approved', paid_at: paidAt, payment_id: payment.id, payment_deadline: null })
+      .eq('tournament_id', payment.target_id)
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'waitlist'])
+      .select('user_id')
+      .maybeSingle();
+    if (entryError) return json({ error: entryError.message }, 500);
+    if (!entry) {
+      // 기한 만료로 신청이 지워진 뒤 결제가 도착한 희귀 케이스 — 결제는 됐으니 확정으로 복구
+      const { data: existing } = await admin
+        .from('tournament_entries')
+        .select('status')
+        .eq('tournament_id', payment.target_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!existing) {
+        const { error: insertError } = await admin.from('tournament_entries').insert({
+          tournament_id: payment.target_id,
+          user_id: user.id,
+          status: 'approved',
+          paid_at: paidAt,
+          payment_id: payment.id,
+        });
+        if (insertError) return json({ error: insertError.message }, 500);
+      }
+    }
+    return json({ ok: true, paymentKey: resolvedPaymentKey, orderId, entryConfirmed: true, tournamentId: payment.target_id, reservationIds: [] });
+  }
 
   const { data: reservations, error: reservationError } = await admin
     .from('court_reservations')

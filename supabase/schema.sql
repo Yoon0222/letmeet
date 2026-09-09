@@ -981,6 +981,9 @@ create table if not exists public.tournament_entries (
   partner_id    uuid references public.profiles(id) on delete set null, -- 복식 파트너(회원 연결)
   seed          int,                               -- 대진 시드(추후)
   checked_in_at timestamptz,                       -- 출전 신고(당일 체크인) 시각
+  payment_id    uuid,                              -- 참가비 결제(0089, FK는 payments 생성 후 아래에서 부여)
+  paid_at       timestamptz,                       -- 참가비 결제 완료 시각(0089)
+  payment_deadline timestamptz,                    -- 결제 마감(0089, 유료 pending 24h)
   created_at    timestamptz not null default now(),
   primary key (tournament_id, user_id)
 );
@@ -1284,6 +1287,12 @@ create table if not exists public.payments (
 create index if not exists payments_user_idx on public.payments (user_id, created_at desc);
 create index if not exists payments_status_idx on public.payments (status, created_at);
 create index if not exists payments_target_idx on public.payments (order_type, target_id);
+
+-- 대회 참가비 결제 FK (0089) — tournament_entries 는 payments 보다 먼저 생성되므로 여기서 부여
+alter table public.tournament_entries drop constraint if exists tournament_entries_payment_id_fkey;
+alter table public.tournament_entries
+  add constraint tournament_entries_payment_id_fkey
+  foreign key (payment_id) references public.payments(id) on delete set null;
 alter table public.payments enable row level security;
 drop policy if exists "payments_select" on public.payments;
 create policy "payments_select" on public.payments
@@ -1478,7 +1487,7 @@ begin
   if new.partner_id is not null and new.partner_id = new.user_id then
     raise exception '본인을 파트너로 지정할 수 없어요.';
   end if;
-  if exists (
+  if tg_op = 'INSERT' and exists (
     select 1 from public.tournament_entries e
     where e.tournament_id = new.tournament_id
       and (e.user_id = new.user_id or e.partner_id = new.user_id)
@@ -1488,6 +1497,7 @@ begin
   if new.partner_id is not null and exists (
     select 1 from public.tournament_entries e
     where e.tournament_id = new.tournament_id
+      and e.user_id <> new.user_id -- 내 행(파트너 변경 대상)은 제외 (0090)
       and (e.user_id = new.partner_id or e.partner_id = new.partner_id)
   ) then
     raise exception '선택한 파트너는 이미 이 대회에 참가 중이에요.';
@@ -1497,20 +1507,27 @@ end;
 $$;
 drop trigger if exists on_no_double_entry on public.tournament_entries;
 create trigger on_no_double_entry
-  before insert on public.tournament_entries
+  before insert or update of partner_id on public.tournament_entries
   for each row execute function public.enforce_no_double_entry();
 
--- 대기열: 정원 초과 신청은 waitlist, 슬롯이 비면 대기 맨 앞 자동 승격 (0016)
+-- 대기열: 정원 초과 신청은 waitlist, 슬롯이 비면 대기 맨 앞 자동 승격 (0016, 0089 결제 확장)
+--   · 유료(fee>0): 정원 내 신청 = '결제 대기'(pending) + 24h payment_deadline. 결제 완료(toss-confirm)가 approved.
+--   · 무료(fee=0): 신청 즉시 approved (선착순).
 create or replace function public.enforce_waitlist()
 returns trigger language plpgsql security definer as $$
-declare cap int; occupied int;
+declare cap int; occupied int; vfee int;
 begin
   if new.status = 'pending' then
-    select max_participants into cap from public.tournaments where id = new.tournament_id;
+    select max_participants, fee into cap, vfee from public.tournaments where id = new.tournament_id;
     select count(*) into occupied from public.tournament_entries
       where tournament_id = new.tournament_id and status in ('pending', 'approved');
     if cap is not null and occupied >= cap then
       new.status := 'waitlist';
+      new.payment_deadline := null;
+    elsif coalesce(vfee, 0) > 0 then
+      new.payment_deadline := now() + interval '24 hours';
+    else
+      new.status := 'approved';
     end if;
   end if;
   return new;
@@ -1522,11 +1539,11 @@ create trigger on_waitlist_insert
 
 create or replace function public.promote_waitlist()
 returns trigger language plpgsql security definer as $$
-declare cap int; occupied int; tid uuid; nextw uuid;
+declare cap int; vfee int; vtitle text; occupied int; tid uuid; nextw uuid;
 begin
   if pg_trigger_depth() > 1 then return null; end if;
   tid := coalesce(new.tournament_id, old.tournament_id);
-  select max_participants into cap from public.tournaments where id = tid;
+  select max_participants, fee, title into cap, vfee, vtitle from public.tournaments where id = tid;
   if cap is null then return null; end if;
   loop
     select count(*) into occupied from public.tournament_entries
@@ -1536,8 +1553,20 @@ begin
       where tournament_id = tid and status = 'waitlist'
       order by created_at asc limit 1;
     exit when nextw is null;
-    update public.tournament_entries set status = 'pending'
-      where tournament_id = tid and user_id = nextw;
+    if coalesce(vfee, 0) > 0 then
+      update public.tournament_entries
+        set status = 'pending', payment_deadline = now() + interval '24 hours'
+        where tournament_id = tid and user_id = nextw;
+      perform public.push_notify(nextw, 'system', '대기열 승격 🎉',
+        coalesce(vtitle, '대회') || ' 자리가 났어요! 24시간 안에 참가비를 결제하면 참가가 확정됩니다.',
+        'tournament', tid);
+    else
+      update public.tournament_entries set status = 'approved'
+        where tournament_id = tid and user_id = nextw;
+      perform public.push_notify(nextw, 'system', '참가 확정 🎉',
+        coalesce(vtitle, '대회') || ' 대기열에서 승격되어 참가가 확정됐어요.',
+        'tournament', tid);
+    end if;
   end loop;
   return null;
 end; $$;
@@ -1545,6 +1574,111 @@ drop trigger if exists on_waitlist_promote on public.tournament_entries;
 create trigger on_waitlist_promote
   after update or delete on public.tournament_entries
   for each row execute function public.promote_waitlist();
+
+-- 결제 기한 만료 정리(0089) — 앱이 대회 상세 로드 시 호출(on-read) + (선택) pg_cron
+create or replace function public.expire_unpaid_tournament_entries(p_tournament_id uuid default null)
+returns int language plpgsql security definer set search_path = public as $$
+declare v_count int := 0; v record;
+begin
+  for v in
+    select e.tournament_id, e.user_id
+    from public.tournament_entries e
+    join public.tournaments t on t.id = e.tournament_id
+    where t.fee > 0 and e.status = 'pending' and e.paid_at is null
+      and e.payment_deadline is not null and e.payment_deadline < now()
+      and (p_tournament_id is null or e.tournament_id = p_tournament_id)
+  loop
+    delete from public.tournament_entries
+      where tournament_id = v.tournament_id and user_id = v.user_id;
+    perform public.push_notify(v.user_id, 'system', '대회 신청 만료',
+      '결제 기한(24시간)이 지나 참가 신청이 자동 취소됐어요. 자리가 남아 있으면 다시 신청할 수 있어요.',
+      'tournament', v.tournament_id);
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end; $$;
+revoke execute on function public.expire_unpaid_tournament_entries(uuid) from public, anon;
+grant execute on function public.expire_unpaid_tournament_entries(uuid) to authenticated, service_role;
+
+-- 결제 우회 차단(0089) — 참가자 본인은 결제 컬럼·유료 대회 확정 상태를 직접 못 바꾼다
+--   (승인 주체: 결제 서버(service_role) / 주최자 / super_admin. 체크인 등 다른 컬럼은 허용)
+create or replace function public.protect_entry_payment()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare vfee int; vorg uuid;
+begin
+  if pg_trigger_depth() > 1 then return new; end if;
+  if coalesce(auth.jwt() ->> 'role', '') = 'service_role' then return new; end if;
+  if auth.uid() is null then return new; end if; -- 서버측 세션(콘솔·크론)
+  select fee, organizer_id into vfee, vorg from public.tournaments where id = new.tournament_id;
+  if auth.uid() = vorg or public.my_role() = 'super_admin' then return new; end if;
+  if new.paid_at is distinct from old.paid_at
+     or new.payment_id is distinct from old.payment_id
+     or new.payment_deadline is distinct from old.payment_deadline then
+    raise exception 'payment fields are server-managed';
+  end if;
+  if coalesce(vfee, 0) > 0 and new.status = 'approved' and old.status is distinct from 'approved' then
+    raise exception 'paid tournament entries are confirmed by payment';
+  end if;
+  return new;
+end; $$;
+drop trigger if exists on_protect_entry_payment on public.tournament_entries;
+create trigger on_protect_entry_payment
+  before update on public.tournament_entries
+  for each row execute function public.protect_entry_payment();
+
+-- 조추첨 후 참가 잠금(0091) — 대진 생성된 대회의 approved 참가자는 스스로 취소 불가
+create or replace function public.protect_entry_after_draw()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare vorg uuid;
+begin
+  if pg_trigger_depth() > 1 then return old; end if;
+  if coalesce(auth.jwt() ->> 'role', '') = 'service_role' then return old; end if;
+  if auth.uid() is null then return old; end if;
+  if old.status <> 'approved' then return old; end if;
+  if not exists (select 1 from public.tournament_matches m where m.tournament_id = old.tournament_id) then
+    return old;
+  end if;
+  select organizer_id into vorg from public.tournaments where id = old.tournament_id;
+  if auth.uid() = vorg or public.my_role() = 'super_admin' then return old; end if;
+  raise exception '대진 확정 후에는 참가를 취소할 수 없어요. 운영자에게 문의해 주세요.';
+end; $$;
+drop trigger if exists on_protect_entry_after_draw on public.tournament_entries;
+create trigger on_protect_entry_after_draw
+  before delete on public.tournament_entries
+  for each row execute function public.protect_entry_after_draw();
+
+-- 코트 배정 알림(0092) — 확정(court_confirmed) 순간 해당 경기 선수(+파트너)에게 푸시
+create or replace function public.notify_court_assigned()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare vtitle text; vcourt text; vindoor boolean; u uuid;
+begin
+  if new.court_id is null or new.court_confirmed is not true then return new; end if;
+  if coalesce(old.court_confirmed, false) = true and new.court_id is not distinct from old.court_id then
+    return new;
+  end if;
+  select title into vtitle from public.tournaments where id = new.tournament_id;
+  select name, indoor into vcourt, vindoor from public.tournament_courts where id = new.court_id;
+  for u in
+    select e.user_id from public.tournament_entries e
+      where e.tournament_id = new.tournament_id and e.user_id in (new.entry1_id, new.entry2_id)
+    union
+    select e.partner_id from public.tournament_entries e
+      where e.tournament_id = new.tournament_id and e.user_id in (new.entry1_id, new.entry2_id)
+        and e.partner_id is not null
+  loop
+    perform public.push_notify(
+      u, 'match_turn', '코트 배정 🏟️',
+      coalesce(vtitle, '대회') || ' — ' || coalesce(vcourt, '코트')
+        || case when vindoor is true then ' (실내)' when vindoor is false then ' (실외)' else '' end
+        || ' 코트로 배정됐어요. 경기 준비해 주세요!',
+      'tournament', new.tournament_id);
+  end loop;
+  return new;
+end; $$;
+drop trigger if exists on_notify_court_assigned on public.tournament_matches;
+create trigger on_notify_court_assigned
+  after update on public.tournament_matches
+  for each row execute function public.notify_court_assigned();
 
 -- ============================================================
 -- UGC 신고·차단 (moderation) — 0030
@@ -2012,25 +2146,41 @@ begin
   -- 내가 유발한 알림은 나에게 보내지 않음 (내 글에 내가 댓글 등)
   if p_actor is not null and p_actor = p_user then return; end if;
 
+  -- 푸시는 notifications AFTER INSERT 트리거(push_on_notification, 0090)가 전담한다
   insert into public.notifications (user_id, type, title, body, target_type, target_id, actor_id)
   values (p_user, p_type, p_title, p_body, p_target_type, p_target_id, p_actor);
+end;
+$$;
 
-  select push_token into v_token from public.profiles where id = p_user;
-  if v_token is null or v_token = '' then return; end if;
-
+-- "모든 알림은 푸시로" (0090) — 어떤 경로로 알림이 쌓여도 Expo 푸시 발송
+create or replace function public.push_on_notification()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_token text;
+begin
+  select push_token into v_token from public.profiles where id = new.user_id;
+  if v_token is null or v_token = '' then return null; end if;
   perform net.http_post(
     url     := 'https://exp.host/--/api/v2/push/send',
     headers := jsonb_build_object('Content-Type', 'application/json'),
     body    := jsonb_build_object(
       'to', v_token,
       'sound', 'default',
-      'title', p_title,
-      'body', p_body,
-      'data', jsonb_build_object('target_type', p_target_type, 'target_id', p_target_id)
+      'title', new.title,
+      'body', new.body,
+      'data', jsonb_build_object('target_type', new.target_type, 'target_id', new.target_id)
     )
   );
+  return null;
 end;
 $$;
+drop trigger if exists on_notification_push on public.notifications;
+create trigger on_notification_push
+  after insert on public.notifications
+  for each row execute function public.push_on_notification();
 
 -- (C) 안읽음 읽음처리 RPC (전체 또는 특정 id 목록) --------------------------
 create or replace function public.mark_notifications_read(p_ids uuid[] default null)
