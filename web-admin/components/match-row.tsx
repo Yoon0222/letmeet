@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import type { TournamentCourt, TournamentMatch } from '@/lib/types';
 
-// 조별리그·본선 공용 경기 행 (점수 입력 + 차례 알림 + 코트 배정)
+// 조별리그·본선 공용 경기 행. 기본은 열람 전용(readOnly) — 점수 입력·차례 알림은 '코트 배정' 탭에서.
 export function MatchRow({
   m,
   name,
@@ -15,19 +15,22 @@ export function MatchRow({
   onNotify,
   onAssignCourt,
   avatarOf,
+  readOnly = false,
 }: {
   m: TournamentMatch;
   name: (uid: string | null) => string;
   isOrganizer: boolean;
   courts?: TournamentCourt[];
-  onSave: (m: TournamentMatch, s1: number, s2: number) => void;
-  onNotify: (m: TournamentMatch) => void;
+  onSave?: (m: TournamentMatch, s1: number, s2: number) => void;
+  onNotify?: (m: TournamentMatch) => void;
   onAssignCourt?: (m: TournamentMatch, courtId: string | null) => void;
   avatarOf?: (uid: string | null) => { url: string | null; nickname: string } | null;
+  readOnly?: boolean;
 }) {
   const [s1, setS1] = useState<string>(m.score1?.toString() ?? '');
   const [s2, setS2] = useState<string>(m.score2?.toString() ?? '');
   const done = m.status === 'done';
+  const editable = isOrganizer && !readOnly;
   const bothPresent = !!m.entry1_id && !!m.entry2_id; // 양쪽 팀 확정
   const isBye = done && !bothPresent; // 부전승(자동 확정)
   const court = courts.find((c) => c.id === m.court_id) ?? null;
@@ -45,15 +48,15 @@ export function MatchRow({
           <span className="text-xs text-slate-400">부전승</span>
         ) : !bothPresent ? (
           <span className="text-xs text-slate-400">대기</span>
-        ) : done && !isOrganizer ? (
+        ) : done && !editable ? (
           <span className="tabular-nums">{m.score1} : {m.score2}</span>
-        ) : isOrganizer ? (
+        ) : editable ? (
           <div className="flex items-center gap-1">
             <input value={s1} onChange={(e) => setS1(e.target.value)} inputMode="numeric" className="w-12 rounded border border-slate-300 px-1.5 py-1 text-center" />
             <span className="text-slate-400">:</span>
             <input value={s2} onChange={(e) => setS2(e.target.value)} inputMode="numeric" className="w-12 rounded border border-slate-300 px-1.5 py-1 text-center" />
             <button
-              onClick={() => onSave(m, Number(s1), Number(s2))}
+              onClick={() => onSave?.(m, Number(s1), Number(s2))}
               disabled={s1 === '' || s2 === ''}
               className="ml-1 rounded bg-slate-800 px-2 py-1 text-xs text-white hover:bg-slate-700 disabled:opacity-40"
             >
@@ -67,7 +70,7 @@ export function MatchRow({
           {label(m.entry2_id)}
           {avatarOf?.(m.entry2_id) && <Avatar url={avatarOf(m.entry2_id)!.url} nickname={avatarOf(m.entry2_id)!.nickname} size={22} />}
         </span>
-        {isOrganizer && !done && bothPresent && (
+        {editable && !done && bothPresent && onNotify && (
           <button
             onClick={() => onNotify(m)}
             title="이 경기 선수들에게 차례 알림 보내기"
@@ -82,7 +85,7 @@ export function MatchRow({
       {courts.length > 0 && bothPresent && !done && (
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-xs text-slate-400">🏟 코트</span>
-          {isOrganizer && !done && onAssignCourt ? (
+          {editable && !done && onAssignCourt ? (
             <select
               value={m.court_id ?? ''}
               onChange={(e) => onAssignCourt(m, e.target.value || null)}

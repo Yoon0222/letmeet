@@ -264,6 +264,10 @@ export type TournamentEntry = {
   partner_id: string | null;
   seed: number | null;
   checked_in_at: string | null;
+  // 참가비 결제 (0089, 유료 대회)
+  payment_id: string | null;
+  paid_at: string | null;
+  payment_deadline: string | null;
   created_at: string;
 };
 

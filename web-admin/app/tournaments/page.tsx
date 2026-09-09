@@ -39,6 +39,8 @@ function TournamentsInner() {
   const isSuperAdmin = role === 'super_admin';
   const [rows, setRows] = useState<TournamentWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
+  // 목록 필터: 진행(접수 중·진행 중) / 종료(종료·취소) / 전체
+  const [filter, setFilter] = useState<'active' | 'ended' | 'all'>('active');
 
   const load = useCallback(async () => {
     const uid = session?.user.id;
@@ -59,13 +61,21 @@ function TournamentsInner() {
 
   return (
     <div>
-      <div>
-        <h1 className="text-2xl font-semibold">{isSuperAdmin ? '전체 대회' : '내 대회'}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {isSuperAdmin
-            ? '모든 운영자의 대회를 조회·관리할 수 있어요.'
-            : '개설한 대회를 운영하고 참가 신청을 관리하세요.'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{isSuperAdmin ? '전체 대회' : '내 대회'}</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isSuperAdmin
+              ? '모든 운영자의 대회를 조회·관리할 수 있어요.'
+              : '개설한 대회를 운영하고 참가 신청을 관리하세요.'}
+          </p>
+        </div>
+        <Link
+          href="/tournaments/new"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+        >
+          <span className="text-base leading-none">＋</span> 새 대회
+        </Link>
       </div>
 
       {loading ? (
@@ -75,56 +85,82 @@ function TournamentsInner() {
           {isSuperAdmin ? '아직 개설된 대회가 없습니다.' : '아직 개설한 대회가 없습니다. 첫 대회를 만들어보세요.'}
         </div>
       ) : (
-        <div className="mt-6 grid gap-3">
-          {groupByMonth(rows).map((g) => (
-            <Fragment key={g.key}>
-              <h2 className="mt-2 text-sm font-semibold text-slate-500 first:mt-0">{g.label}</h2>
-              {g.items.map((t) => {
-                const isEnded = t.status === 'finished' || t.status === 'cancelled';
-                return (
-                  <Link
-                    key={t.id}
-                    href={`/tournaments/${t.id}`}
-                    className={`rounded-xl border p-4 ${
-                      isEnded
-                        ? 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
-                        : 'border-slate-200 bg-white hover:border-emerald-400'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">{formatDateTime(t.start_at)}</span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[t.status]}`}>
-                        {TOURNAMENT_STATUS_LABEL[t.status]}
-                      </span>
-                    </div>
-                    <h3 className="mt-1 text-lg font-medium">{t.title}</h3>
-                    <p className="mt-0.5 text-sm text-slate-500">
-                      {t.venue || '장소 미정'}
-                      {t.region ? ` · ${t.region}` : ''}
-                    </p>
-                    <div className="mt-3 flex gap-4 text-sm text-slate-600">
-                      <span>
-                        승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
-                      </span>
-                      {t.pending_count > 0 && <span className="text-amber-600">대기 {t.pending_count}건</span>}
-                    </div>
-                  </Link>
-                );
-              })}
-            </Fragment>
-          ))}
-        </div>
+        (() => {
+          const active = rows.filter((t) => t.status === 'registration' || t.status === 'ongoing');
+          const ended = rows.filter((t) => t.status === 'finished' || t.status === 'cancelled');
+          const shown = filter === 'active' ? active : filter === 'ended' ? ended : rows;
+          const chip = (key: typeof filter, label: string, count: number) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                filter === key
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {label} {count}
+            </button>
+          );
+          return (
+            <>
+              {/* 진행/종료 필터 */}
+              <div className="mt-5 flex gap-2">
+                {chip('active', '진행 중', active.length)}
+                {chip('ended', '종료', ended.length)}
+                {chip('all', '전체', rows.length)}
+              </div>
+
+              {shown.length === 0 ? (
+                <p className="mt-6 rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                  {filter === 'active' ? '접수 중이거나 진행 중인 대회가 없습니다.' : '종료된 대회가 없습니다.'}
+                </p>
+              ) : (
+                <div className="mt-5 grid gap-3">
+                  {groupByMonth(shown).map((g) => (
+                    <Fragment key={g.key}>
+                      <h2 className="mt-2 text-sm font-semibold text-slate-500 first:mt-0">{g.label}</h2>
+                      {g.items.map((t) => {
+                        const isEnded = t.status === 'finished' || t.status === 'cancelled';
+                        return (
+                          <Link
+                            key={t.id}
+                            href={`/tournaments/${t.id}`}
+                            className={`rounded-xl border p-4 ${
+                              isEnded
+                                ? 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
+                                : 'border-slate-200 bg-white hover:border-emerald-400'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-slate-500">{formatDateTime(t.start_at)}</span>
+                              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[t.status]}`}>
+                                {TOURNAMENT_STATUS_LABEL[t.status]}
+                              </span>
+                            </div>
+                            <h3 className="mt-1 text-lg font-medium">{t.title}</h3>
+                            <p className="mt-0.5 text-sm text-slate-500">
+                              {t.venue || '장소 미정'}
+                              {t.region ? ` · ${t.region}` : ''}
+                            </p>
+                            <div className="mt-3 flex gap-4 text-sm text-slate-600">
+                              <span>
+                                승인 <b className="text-slate-900">{t.approved_count}</b>/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
+                              </span>
+                              {t.pending_count > 0 && <span className="text-amber-600">대기 {t.pending_count}건</span>}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()
       )}
 
-      {/* 리스트 하단 — 새 대회(전용 페이지로 이동) */}
-      <div className="mt-6">
-        <Link
-          href="/tournaments/new"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
-        >
-          <span className="text-base leading-none">＋</span> 새 대회
-        </Link>
-      </div>
     </div>
   );
 }

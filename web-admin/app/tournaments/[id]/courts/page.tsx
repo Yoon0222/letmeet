@@ -2,13 +2,35 @@
 
 import { useState } from 'react';
 
-import { computeAutoAssign, computeQueueOrder } from '@/lib/court-assign';
+import { autoAdvanceCourts, computeAutoAssign, computeQueueOrder } from '@/lib/court-assign';
+import { submitTournamentMatch } from '@/lib/dupr';
+import { advanceKnockoutWinners } from '@/lib/knockout';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
 import type { TournamentMatch } from '@/lib/types';
 
 import { useTournament } from '../_ctx';
 import { CourtManager } from './CourtManager';
+
+// 코트 카드용 점수 입력 — 경기 운영(점수·차례알림)은 이 보드에서 한다
+function ScoreInput({ m, onSave }: { m: TournamentMatch; onSave: (m: TournamentMatch, s1: number, s2: number) => void }) {
+  const [s1, setS1] = useState<string>(m.score1?.toString() ?? '');
+  const [s2, setS2] = useState<string>(m.score2?.toString() ?? '');
+  return (
+    <div className="flex items-center justify-center gap-1.5">
+      <input value={s1} onChange={(e) => setS1(e.target.value)} inputMode="numeric" placeholder="0" className="w-14 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center text-base font-bold" />
+      <span className="text-slate-400">:</span>
+      <input value={s2} onChange={(e) => setS2(e.target.value)} inputMode="numeric" placeholder="0" className="w-14 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center text-base font-bold" />
+      <button
+        onClick={() => onSave(m, Number(s1), Number(s2))}
+        disabled={s1 === '' || s2 === ''}
+        className="ml-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40"
+      >
+        점수 저장
+      </button>
+    </div>
+  );
+}
 
 // 경기 라벨 (예선 3조 / 본선 4강 …)
 function matchLabel(m: TournamentMatch): string {
@@ -104,6 +126,32 @@ export default function CourtsTab() {
   async function confirmMatch(matchId: string, confirmed: boolean) {
     await supabase.from('tournament_matches').update({ court_confirmed: confirmed }).eq('id', matchId);
     reload();
+  }
+
+  // 점수 저장 — 예선/본선 공용 (본선은 승자 다음 라운드 진출까지). 저장 후 자동 모드면 다음 경기 투입.
+  async function saveScore(m: TournamentMatch, s1: number, s2: number) {
+    if (!t) return;
+    if (s1 === s2) {
+      alert('무승부는 없어요. 점수를 다르게 입력하세요.');
+      return;
+    }
+    const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
+    await supabase.from('tournament_matches').update({ score1: s1, score2: s2, winner_id, status: 'done' }).eq('id', m.id);
+    void submitTournamentMatch(m.id); // 인증 대회면 DUPR 등록(비차단)
+    if (m.phase === 'knockout') await advanceKnockoutWinners(t.id); // 승자 다음 라운드 진출
+    if (courts.length > 0 && t.court_assign_mode === 'auto') await autoAdvanceCourts(t.id);
+    reload();
+  }
+
+  // 차례 알림 — 이 경기 선수들에게 푸시
+  async function notifyTurn(m: TournamentMatch) {
+    const { data, error } = await supabase.functions.invoke('notify-turn', { body: { match_id: m.id } });
+    if (error) {
+      alert(`알림 전송 실패: ${error.message}`);
+      return;
+    }
+    const sent = (data as { sent?: number })?.sent ?? 0;
+    alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
   }
 
   async function confirmAll() {
@@ -245,23 +293,34 @@ export default function CourtsTab() {
                       </div>
                     </div>
                     {isOrganizer && (
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => confirmMatch(busy.id, !busy.court_confirmed)}
-                          className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold ${
-                            busy.court_confirmed
-                              ? 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
-                              : 'bg-slate-900 text-white hover:bg-slate-700'
-                          }`}
-                        >
-                          {busy.court_confirmed ? '확정 취소' : '경기 확정'}
-                        </button>
-                        <button
-                          onClick={() => assign(busy.id, null)}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                        >
-                          배정 해제
-                        </button>
+                      <div className="mt-3 space-y-2">
+                        {/* 경기 운영은 여기서: 점수 입력 → 저장 시 경기 종료 + (자동 모드) 다음 경기 투입 */}
+                        <ScoreInput key={busy.id} m={busy} onSave={saveScore} />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => notifyTurn(busy)}
+                            title="이 경기 선수들에게 차례 알림 보내기"
+                            className="flex-1 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                          >
+                            🔔 차례 알림
+                          </button>
+                          <button
+                            onClick={() => confirmMatch(busy.id, !busy.court_confirmed)}
+                            className={`rounded-lg px-3 py-2 text-xs font-bold ${
+                              busy.court_confirmed
+                                ? 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                                : 'bg-slate-900 text-white hover:bg-slate-700'
+                            }`}
+                          >
+                            {busy.court_confirmed ? '확정 취소' : '경기 확정'}
+                          </button>
+                          <button
+                            onClick={() => assign(busy.id, null)}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                          >
+                            배정 해제
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

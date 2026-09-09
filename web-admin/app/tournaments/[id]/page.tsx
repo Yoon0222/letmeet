@@ -49,7 +49,11 @@ export default function EntriesTab() {
   const waitlistRank = new Map<string, number>();
   entries.filter((e) => e.status === 'waitlist').forEach((e, i) => waitlistRank.set(e.user_id, i + 1));
   const statusText = (e: (typeof entries)[number]) =>
-    e.status === 'waitlist' ? `대기 ${waitlistRank.get(e.user_id) ?? '-'}번` : ENTRY_STATUS_LABEL[e.status];
+    e.status === 'waitlist'
+      ? `대기 ${waitlistRank.get(e.user_id) ?? '-'}번`
+      : e.status === 'pending' && t.fee > 0
+        ? '결제 대기'
+        : ENTRY_STATUS_LABEL[e.status];
 
   async function setEntryStatus(userId: string, status: EntryStatus) {
     await supabase.from('tournament_entries').update({ status }).eq('tournament_id', id).eq('user_id', userId);
@@ -134,6 +138,13 @@ export default function EntriesTab() {
                     {e.checked_in_at && (
                       <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">✓ 출전</span>
                     )}
+                    {/* 참가비 결제 상태 (0089, 유료 대회) */}
+                    {t.fee > 0 &&
+                      (e.paid_at ? (
+                        <span className="ml-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">💳 결제됨</span>
+                      ) : e.status === 'approved' ? (
+                        <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">미결제</span>
+                      ) : null)}
                   </td>
                   {isOrganizer && (
                     <td className="px-4 py-2">

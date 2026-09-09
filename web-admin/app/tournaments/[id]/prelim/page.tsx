@@ -12,9 +12,7 @@ import {
   roundName,
   standings,
 } from '@/lib/bracket';
-import { autoAdvanceCourts } from '@/lib/court-assign';
 import { supabase } from '@/lib/supabase';
-import { submitTournamentMatch } from '@/lib/dupr';
 import { useSession } from '@/lib/use-session';
 import { TOURNAMENT_FORMAT_LABELS, type TournamentMatch } from '@/lib/types';
 
@@ -94,33 +92,7 @@ export default function PrelimTab() {
     reload();
   }
 
-  async function saveScore(m: TournamentMatch, s1: number, s2: number) {
-    if (s1 === s2) {
-      alert('무승부는 없어요. 점수를 다르게 입력하세요.');
-      return;
-    }
-    const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
-    await supabase.from('tournament_matches').update({ score1: s1, score2: s2, winner_id, status: 'done' }).eq('id', m.id);
-    void submitTournamentMatch(m.id); // 인증 대회면 DUPR 등록(비차단)
-    // 경기가 끝나 코트가 비면 대기 경기를 자동 투입(미확정) — 자동배정 모드에서만
-    if (courts.length > 0 && t?.court_assign_mode === 'auto') await autoAdvanceCourts(id);
-    reload();
-  }
-
-  async function notifyTurn(m: TournamentMatch) {
-    const { data, error } = await supabase.functions.invoke('notify-turn', { body: { match_id: m.id } });
-    if (error) {
-      alert(`알림 전송 실패: ${error.message}`);
-      return;
-    }
-    const sent = (data as { sent?: number })?.sent ?? 0;
-    alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
-  }
-
-  async function assignCourt(m: TournamentMatch, courtId: string | null) {
-    await supabase.from('tournament_matches').update({ court_id: courtId }).eq('id', m.id);
-    reload();
-  }
+  // 점수 입력·차례 알림·코트 지정은 '코트 배정' 탭에서 처리한다 (여기는 조·결과 열람 전용)
 
   // 조별리그 없이 바로 본선으로 진행하는 대회
   if (groupMatches.length === 0 && koMatches.length > 0) {
@@ -266,7 +238,7 @@ export default function PrelimTab() {
             </table>
             <div className="mt-3 space-y-1.5">
               {shownMatches.map((m) => (
-                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} onSave={saveScore} onNotify={notifyTurn} onAssignCourt={assignCourt} avatarOf={avatarOf} />
+                <MatchRow key={m.id} m={m} name={name} isOrganizer={isOrganizer} courts={courts} readOnly avatarOf={avatarOf} />
               ))}
             </div>
           </div>
