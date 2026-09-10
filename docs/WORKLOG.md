@@ -81,6 +81,11 @@
 
 ## 2026-09-10
 
+### 본선 결승 확정 시 대회 자동 '종료' 전환
+- **결정**: 결승(본선 최종 라운드) 승자가 확정되면 대회 status 를 ongoing→finished 로 자동 전환(기존엔 우승 배너만·계속 '진행중'). **3·4위전은 미도입**(사용자 판단 — 불필요).
+- **만든 것**: `web-admin/lib/knockout.ts` 에 `maybeFinishTournament`(개인/KDK)·`maybeFinishTeamTournament`(단체전). courts `saveScore`·team `saveTie` 의 knockout 분기 훅. 멱등 + `status='ongoing'` 조건만 전환. **가드: 최종 라운드가 정확히 1경기일 때만**(부분 생성 브래킷 오인 방지).
+- **메모/주의**: dev 검증 — 결승 1경기 대회 점수→finished 확인, 복식 32드로(round1 16경기)는 발동 안 함 확인. web-admin Vercel 재배포(pinut.org) 완료. 기존 lint 에러 3건(dupr-connect·team·team-roster set-state-in-effect)은 이 변경과 무관.
+
 ### v3.2.3 릴리스 — 토스 심사 합격 → 라이브 결제 개통 (실결제 전환)
 - **결정**: 토스 결제경로 심사 합격 → **"API 개별 연동 키"(MID pinuty6fym) 페어로 라이브 전환**. 결제창 SDK(payment)+자동결제(빌링)가 전부 이 페어라 gck(주문서형) 키는 사용 안 함. dev(로컬 .env + dev Supabase)는 test 키 유지 — 개발 테스트에 실과금 방지.
 - **만든 것**: ① prod DB에 0089~0092 적용·검증(docs/PROD_APPLY_0091_0092.sql 신규, 사용자 SQL 에디터 실행) ② 엣지함수 toss-confirm·toss-cancel·notify-turn prod 배포 ③ prod TOSS_SECRET_KEY→live_sk(사용자) ④ eas.json production→live_ck ⑤ v3.2.3 태그, dev·main 푸시(29f3840) ⑥ EAS 프로덕션 빌드(안드+iOS) 시작.
