@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-08-19 (Codex: 클럽 프리미엄 1개월 체험 + 경기 결과 관리 MVP)
+Last updated: 2026-09-10 (Claude: v3.2.3 릴리스 — 토스 라이브 결제 개통)
 
 ## Purpose
 
@@ -22,6 +22,22 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-09-10, v3.2.3 릴리스 — 토스 라이브 키 전환·실결제 개통)
+
+- **What changed**:
+  - **토스 결제경로 심사 합격** → 라이브 전환 완료. 키는 **"API 개별 연동 키"(MID pinuty6fym)** 페어 사용 — 결제창 SDK(payment)와 자동결제(빌링) 모두 이 페어. gck(주문서형·결제창형) 키는 사용하지 않음.
+  - prod DB에 0089~0092 적용·검증(참가비 결제 구조 + 전체 알림 푸시 트리거 + 조추첨 취소 잠금 + 코트 배정 알림). 신규 번들 `docs/PROD_APPLY_0091_0092.sql`.
+  - 엣지함수 `toss-confirm`·`toss-cancel`·`notify-turn` prod 배포. prod 시크릿 `TOSS_SECRET_KEY` → live_sk(사용자 직접).
+  - `eas.json` production env → `live_ck_...`. `app.json` 3.2.3. 태그 `v3.2.3`, dev·main 푸시(`29f3840`).
+  - EAS 프로덕션 빌드 시작 — Android versionCode 27, iOS buildNumber 25.
+- **Why**: 심사 합격으로 실결제 가능해짐. FCM 푸시(9/10)와 9/8~9/10 대회 작업분을 3.2.3 한 빌드로 묶음.
+- **Files touched**: `eas.json`, `app.json`, `.gitignore`, `docs/PROD_APPLY_0091_0092.sql`, `docs/WORKLOG.md`.
+- **Validation**: prod DB 검증 쿼리 통과(컬럼3·트리거5·함수8). 라이브 키 실결제 검증은 **3.2.3 빌드 설치 후** 소액 결제→취소 왕복 예정(아직 미실행).
+- **Follow-up / 주의**:
+  - **dev는 test 키 유지** (로컬 .env + dev Supabase) — 개발 결제 테스트에 실과금 없음. prod 시크릿이 live라 **구버전 스토어 앱(test_ck)의 결제는 confirm 실패** — 3.2.3 배포로 해소.
+  - 스토어 제출 대기(iOS는 EAS의 ASC API 토큰 401 경고 있었음 — submit 시 재로그인 필요 가능). Play 배포 시 **앱 서명 키 SHA-1을 GCP API 키 제한 목록에 추가** 필수(FCM).
+  - 노션 릴리스 노트·기능 현황 갱신 보류(커넥터 미연결) — 다음 노션 연결 세션에서.
 
 ### Claude -> Codex (2026-09-02, DUPR 리뷰 대응 + meetup/create.tsx 수정 공지)
 
