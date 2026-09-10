@@ -33,7 +33,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://jbvtdthtmrlndduqiikj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_daAIr4VpcBjpfGmzx38dAA__yevC6La",
-        "EXPO_PUBLIC_TOSS_CLIENT_KEY": "live_ck_DnyRpQWGrN945gaRkYkBVKwv1M9E"
+        "EXPO_PUBLIC_TOSS_CLIENT_KEY": "test_ck_nRQoOaPz8Lzn5zZz4pvNVy47BMw6"
       }
     }
   },
