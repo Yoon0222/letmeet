@@ -8,25 +8,8 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { AppAlert as Alert } from '@/lib/feedback';
+import { digitsOf, formatPhone, isValidMobile } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
-
-// 입력값에서 숫자만 추출
-function digitsOf(v: string) {
-  return v.replace(/\D/g, '').slice(0, 11);
-}
-
-// 010-1234-5678 형태로 표시 포맷
-function formatPhone(digits: string) {
-  const d = digits.slice(0, 11);
-  if (d.length < 4) return d;
-  if (d.length < 8) return `${d.slice(0, 3)}-${d.slice(3)}`;
-  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
-}
-
-// 한국 휴대폰: 01[0/1/6/7/8/9] + 7~8자리 (총 10~11자리)
-function isValidMobile(digits: string) {
-  return /^01[016789]\d{7,8}$/.test(digits);
-}
 
 export default function OnboardingPhone() {
   const { session, refreshProfile, signOut } = useAuth();

@@ -12,14 +12,16 @@ import { PEANUT_AVATARS, peanutFromUrl, peanutUrl } from '@/constants/avatars';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { skillLabel } from '@/lib/format';
+import { digitsOf, formatPhone, isValidMobile } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 import { PLAY_STYLE_LABELS, type PlayStyle } from '@/lib/types';
 
 export default function EditProfile() {
   const router = useRouter();
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile, phone, refreshProfile } = useAuth();
 
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
+  const [phoneDigits, setPhoneDigits] = useState(digitsOf(phone ?? ''));
   const [skill, setSkill] = useState(profile?.skill_level ?? 3.5);
   const [region, setRegion] = useState(profile?.region ?? '');
   const [style, setStyle] = useState<PlayStyle>(profile?.play_style ?? 'all');
@@ -124,6 +126,10 @@ export default function EditProfile() {
       Alert.alert('닉네임', '닉네임을 입력해주세요.');
       return;
     }
+    if (!isValidMobile(phoneDigits)) {
+      Alert.alert('전화번호', '올바른 휴대폰 번호를 입력해 주세요. (예: 010-1234-5678)');
+      return;
+    }
     if (!session?.user.id) return;
     setSaving(true);
     const { error } = await supabase
@@ -137,9 +143,18 @@ export default function EditProfile() {
         updated_at: new Date().toISOString(),
       })
       .eq('id', session.user.id);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       Alert.alert('저장 실패', error.message);
+      return;
+    }
+    // 전화번호는 본인 전용 테이블(user_contact)에 저장 — 숫자만
+    const { error: phoneErr } = await supabase
+      .from('user_contact')
+      .upsert({ id: session.user.id, phone: phoneDigits, updated_at: new Date().toISOString() });
+    setSaving(false);
+    if (phoneErr) {
+      Alert.alert('저장 실패', phoneErr.message);
       return;
     }
     await refreshProfile();
@@ -185,6 +200,16 @@ export default function EditProfile() {
         </View>
 
         <TextField label="닉네임" value={nickname} onChangeText={setNickname} maxLength={20} placeholder="닉네임" />
+
+        <TextField
+          label="휴대폰 번호"
+          value={formatPhone(phoneDigits)}
+          onChangeText={(v) => setPhoneDigits(digitsOf(v))}
+          keyboardType="number-pad"
+          placeholder="010-1234-5678"
+          maxLength={13}
+          hint="경기·예약 안내용 · 비공개(본인만 볼 수 있어요)"
+        />
 
         <View style={styles.field}>
           <Text style={styles.label}>실력 (DUPR 기준)</Text>
