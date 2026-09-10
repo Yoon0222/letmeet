@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { advanceCountForGroupSize, buildGroups, firstRoundPairs, groupCountForSize, roundName } from '@/lib/bracket';
-import { advanceTeamKnockout } from '@/lib/knockout';
+import { advanceTeamKnockout, maybeFinishTeamTournament } from '@/lib/knockout';
 import { supabase } from '@/lib/supabase';
 import { teamStandings, tieWinner } from '@/lib/team-bracket';
 import { useSession } from '@/lib/use-session';
@@ -132,7 +132,10 @@ export default function TeamBracketTab() {
         .from('tournament_ties')
         .update({ winner_team_id: winnerTeamId, status: w ? 'done' : 'scheduled' })
         .eq('id', tie.id);
-      if (tie.phase === 'knockout') await advanceTeamKnockout(id);
+      if (tie.phase === 'knockout') {
+        await advanceTeamKnockout(id);
+        await maybeFinishTeamTournament(id); // 결승 타이 확정 시 대회 자동 종료
+      }
     }
     load();
   }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { autoAdvanceCourts, computeAutoAssign, computeQueueOrder } from '@/lib/court-assign';
 import { submitTournamentMatch } from '@/lib/dupr';
-import { advanceKnockoutWinners } from '@/lib/knockout';
+import { advanceKnockoutWinners, maybeFinishTournament } from '@/lib/knockout';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/use-session';
 import type { TournamentMatch } from '@/lib/types';
@@ -138,7 +138,10 @@ export default function CourtsTab() {
     const winner_id = s1 > s2 ? m.entry1_id : m.entry2_id;
     await supabase.from('tournament_matches').update({ score1: s1, score2: s2, winner_id, status: 'done' }).eq('id', m.id);
     void submitTournamentMatch(m.id); // 인증 대회면 DUPR 등록(비차단)
-    if (m.phase === 'knockout') await advanceKnockoutWinners(t.id); // 승자 다음 라운드 진출
+    if (m.phase === 'knockout') {
+      await advanceKnockoutWinners(t.id); // 승자 다음 라운드 진출
+      await maybeFinishTournament(t.id); // 결승 확정 시 대회 자동 종료
+    }
     if (courts.length > 0 && t.court_assign_mode === 'auto') await autoAdvanceCourts(t.id);
     reload();
   }
