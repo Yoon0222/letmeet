@@ -130,7 +130,6 @@ function AuditInner() {
   // 행위자 입력 400ms 디바운스
   useEffect(() => {
     const t = setTimeout(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActorQ(actorInput.trim());
       setPage(0);
     }, 400);

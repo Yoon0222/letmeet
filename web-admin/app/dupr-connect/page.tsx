@@ -48,6 +48,8 @@ export default function DuprConnectPage() {
   useEffect(() => {
     const { ck, sso } = getUrlParams();
     if (!ck) {
+      // 클라이언트에서만 아는 URL 파라미터로 초기 상태를 채우는 효과 (동기 setState 의도)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus('error');
       setMsg('DUPR 연동 설정이 없어요. 앱에서 다시 시도해 주세요.');
       return;

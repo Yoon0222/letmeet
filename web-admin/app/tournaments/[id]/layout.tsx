@@ -16,7 +16,7 @@ function Header() {
   const { id } = useParams<{ id: string }>();
   const pathname = usePathname();
   const { session } = useSession();
-  const { t, courts, reload, query, setQuery } = useTournament();
+  const { t, reload, query, setQuery } = useTournament();
 
   if (!t) return <p className="text-slate-500">불러오는 중…</p>;
 
