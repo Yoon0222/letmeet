@@ -81,6 +81,11 @@
 
 ## 2026-09-11
 
+### 고객지원 이메일 통일 + 프로필 수정에 전화번호
+- **결정**: 고객지원·문의 이메일을 **pinut@pinut.org** 로 통일(사용자 지정). 공개 웹페이지에서 운영자 개인 gmail 노출 제거. 전화번호는 온보딩에서만 받던 걸 **프로필 수정에서도 확인·수정** 가능하게(오타·변경 대응).
+- **만든 것**: support.tsx 대표주소 교체(gmail CC는 수신 안전망 유지), web-admin 랜딩·계정삭제·환불정책 이메일 교체 + Vercel 재배포(pinut.org 반영 확인). profile/edit.tsx 휴대폰 필드, 공용 유틸 src/lib/phone.ts(온보딩과 공유).
+- **메모/주의**: 실기기 검증 — 프로필 수정에 저장된 번호 표시→변경 저장→user_contact 갱신(created_at 유지)→홈 복귀. tsc/lint 통과.
+
 ### 전화번호 온보딩 게이트 — 모든 로그인 방식 공통 수집
 - **결정**: 구글·애플 소셜 로그인은 전화번호를 안 주므로, **로그인 방식 무관하게 로그인 후 번호 없으면 온보딩 화면 강제**(앱 진입 차단)로 1회 수집. 전화번호는 개인정보라 **공개 조회(using(true))인 profiles 대신 본인 전용 테이블 user_contact**(0093, RLS 본인만). **그냥 입력**(형식 검증만) — SMS 인증은 추후 발송대행사 계약 때. (알림톡·본인인증은 오픈 제외/미정 결정 — [[pickleball-backlog]])
 - **만든 것**: 0093 user_contact 테이블+RLS, auth 컨텍스트 phone/contactReady 노출, _layout needsPhone 게이트 분기, src/app/onboarding/phone.tsx(010 포맷·숫자 저장·이탈구). docs/PROD_APPLY_0093.sql.
