@@ -60,10 +60,13 @@ function extractPaymentRedirectUrl(url: string) {
 }
 
 function RootNavigator() {
-  const { session, initializing } = useAuth();
+  const { session, initializing, phone, contactReady } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const signedIn = !!session;
+  // 로그인했지만 전화번호 미입력이면 온보딩으로 (조회 완료 후에만 판단 → 로딩 중 오작동 방지).
+  // 로그인 방식(이메일·구글·애플·카카오)과 무관하게 여기서 1회 수집한다.
+  const needsPhone = signedIn && contactReady && !phone;
 
   // Supabase 설정이 비어 있으면 안내 화면으로. (로그인 가드는 아래 Stack.Protected 가 선언적으로 처리)
   useEffect(() => {
@@ -118,8 +121,13 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
 
-      {/* 로그인 필요 — 앱의 모든 화면 */}
-      <Stack.Protected guard={signedIn}>
+      {/* 로그인했지만 전화번호 미입력 — 온보딩 게이트(앱 진입 차단) */}
+      <Stack.Protected guard={needsPhone}>
+        <Stack.Screen name="onboarding/phone" options={{ headerShown: false, gestureEnabled: false }} />
+      </Stack.Protected>
+
+      {/* 로그인 + 전화번호 완료 — 앱의 모든 화면 */}
+      <Stack.Protected guard={signedIn && !needsPhone}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="meetup/create"

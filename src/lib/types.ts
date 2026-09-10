@@ -45,6 +45,14 @@ export type Profile = {
   updated_at: string;
 };
 
+// 사용자 전화번호 (0093) — 개인정보라 profiles 와 분리한 본인 전용 테이블.
+export type UserContact = {
+  id: string;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DuprLevel = 'linked' | 'verified';
 export type DuprVerifyResult = {
   ok: true;
@@ -811,6 +819,12 @@ export interface Database {
         Row: Profile;
         Insert: WriteDefaults<Profile> & { id: string; nickname: string };
         Update: WriteDefaults<Profile>;
+        Relationships: [];
+      };
+      user_contact: {
+        Row: UserContact;
+        Insert: WriteDefaults<UserContact> & { id: string };
+        Update: WriteDefaults<UserContact>;
         Relationships: [];
       };
       dupr_rating_history: {

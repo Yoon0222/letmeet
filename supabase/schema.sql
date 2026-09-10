@@ -201,6 +201,25 @@ drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
 
+-- 사용자 전화번호 (0093) — 개인정보라 공개 profiles 대신 본인 전용 테이블에 저장.
+-- 로그인 방식과 무관하게 온보딩에서 1회 수집. service_role 은 RLS 우회(추후 서버 발송용).
+create table if not exists public.user_contact (
+  id         uuid primary key references public.profiles(id) on delete cascade,
+  phone      text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.user_contact enable row level security;
+drop policy if exists "user_contact_select_own" on public.user_contact;
+create policy "user_contact_select_own" on public.user_contact
+  for select using (auth.uid() = id);
+drop policy if exists "user_contact_insert_own" on public.user_contact;
+create policy "user_contact_insert_own" on public.user_contact
+  for insert with check (auth.uid() = id);
+drop policy if exists "user_contact_update_own" on public.user_contact;
+create policy "user_contact_update_own" on public.user_contact
+  for update using (auth.uid() = id) with check (auth.uid() = id);
+
 -- meetup_matches: 조회 공개, 쓰기는 해당 번개 호스트만 (0059).
 alter table public.meetup_matches enable row level security;
 drop policy if exists meetup_matches_select on public.meetup_matches;

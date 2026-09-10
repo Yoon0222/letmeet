@@ -23,6 +23,10 @@ WebBrowser.maybeCompleteAuthSession();
 interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
+  /** 본인 전화번호 (user_contact) — 온보딩 게이트 판단용. null=미입력 */
+  phone: string | null;
+  /** 전화번호 조회가 끝났는지 (게이트는 조회 완료 후에만 판단) */
+  contactReady: boolean;
   /** 초기 세션 로딩 여부 */
   initializing: boolean;
   signUp: (email: string, password: string, nickname: string) => Promise<void>;
@@ -40,6 +44,8 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [contactReady, setContactReady] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
   const loadProfile = useCallback(async (userId: string) => {
@@ -53,6 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setProfile(data ?? null);
+
+    // 전화번호(본인 전용)도 함께 로드 — 온보딩 게이트 판단용
+    const { data: contact } = await supabase
+      .from('user_contact')
+      .select('phone')
+      .eq('id', userId)
+      .maybeSingle();
+    setPhone(contact?.phone ?? null);
+    setContactReady(true);
     // DUPR 자격 캐시가 24h 초과면 백그라운드로 재조회(운영요건). 갱신되면 프로필 재로드.
     if (data?.dupr_status === 'verified') {
       maybeSyncEntitlements(data.dupr_entitlements_synced_at)
@@ -94,7 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
       setSession(newSession);
-      if (!newSession) setProfile(null);
+      if (!newSession) {
+        setProfile(null);
+        setPhone(null);
+        setContactReady(false);
+      }
       setInitializing(false);
     });
 
@@ -204,6 +223,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setPhone(null);
+    setContactReady(false);
   }, []);
 
   // 회원 탈퇴: 본인 계정(auth.users) 삭제 → 데이터 연쇄 정리 → 로그아웃
@@ -212,6 +233,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     await supabase.auth.signOut();
     setProfile(null);
+    setPhone(null);
+    setContactReady(false);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -222,6 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       profile,
+      phone,
+      contactReady,
       initializing,
       signUp,
       signIn,
@@ -232,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteAccount,
       refreshProfile,
     }),
-    [session, profile, initializing, signUp, signIn, signInWithKakao, signInWithGoogle, signInWithApple, signOut, deleteAccount, refreshProfile],
+    [session, profile, phone, contactReady, initializing, signUp, signIn, signInWithKakao, signInWithGoogle, signInWithApple, signOut, deleteAccount, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
