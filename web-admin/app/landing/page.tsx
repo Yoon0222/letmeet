@@ -327,10 +327,10 @@ export default async function LandingPage() {
             </p>
           </div>
           <a
-            href="mailto:troy.yoonsik.shin@gmail.com?subject=P!NUT%20문의"
+            href="mailto:pinut@pinut.org?subject=P!NUT%20문의"
             className="inline-flex h-14 items-center justify-center rounded-2xl bg-[#111827] px-7 text-base font-extrabold text-white transition hover:bg-black"
           >
-            troy.yoonsik.shin@gmail.com
+            pinut@pinut.org
           </a>
         </div>
       </section>

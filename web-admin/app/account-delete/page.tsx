@@ -39,10 +39,10 @@ export default function AccountDeletePage() {
                 앱에 접근할 수 없는 경우 아래 이메일로 가입 계정 이메일과 함께 삭제 요청을 보내주세요.
               </p>
               <a
-                href="mailto:troy.yoonsik.shin@gmail.com?subject=P!NUT%20계정%20삭제%20요청"
+                href="mailto:pinut@pinut.org?subject=P!NUT%20계정%20삭제%20요청"
                 className="mt-4 inline-flex h-14 items-center justify-center rounded-2xl bg-[#111827] px-6 text-base font-extrabold text-white transition hover:bg-black"
               >
-                troy.yoonsik.shin@gmail.com
+                pinut@pinut.org
               </a>
             </div>
 

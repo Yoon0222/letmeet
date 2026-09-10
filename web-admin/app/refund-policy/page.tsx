@@ -12,7 +12,7 @@ const businessInfo = {
   representative: process.env.NEXT_PUBLIC_BUSINESS_REPRESENTATIVE ?? '신윤식',
   address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS ?? '인천광역시 검단구 묵지3로 3, 1동 4층 401호(불로동)',
   phone: process.env.NEXT_PUBLIC_BUSINESS_PHONE ?? '010 5270 2034',
-  email: process.env.NEXT_PUBLIC_BUSINESS_EMAIL ?? 'troy.yoonsik.shin@gmail.com',
+  email: process.env.NEXT_PUBLIC_BUSINESS_EMAIL ?? 'pinut@pinut.org',
 };
 
 export default function RefundPolicyPage() {
