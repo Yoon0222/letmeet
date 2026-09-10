@@ -84,7 +84,8 @@
 ### v3.2.3 릴리스 — 토스 심사 합격 → 라이브 결제 개통 (실결제 전환)
 - **결정**: 토스 결제경로 심사 합격 → **"API 개별 연동 키"(MID pinuty6fym) 페어로 라이브 전환**. 결제창 SDK(payment)+자동결제(빌링)가 전부 이 페어라 gck(주문서형) 키는 사용 안 함. dev(로컬 .env + dev Supabase)는 test 키 유지 — 개발 테스트에 실과금 방지.
 - **만든 것**: ① prod DB에 0089~0092 적용·검증(docs/PROD_APPLY_0091_0092.sql 신규, 사용자 SQL 에디터 실행) ② 엣지함수 toss-confirm·toss-cancel·notify-turn prod 배포 ③ prod TOSS_SECRET_KEY→live_sk(사용자) ④ eas.json production→live_ck ⑤ v3.2.3 태그, dev·main 푸시(29f3840) ⑥ EAS 프로덕션 빌드(안드+iOS) 시작.
-- **메모/주의**: 시크릿이 live라 **3.2.3 설치 전 구버전(test_ck) 결제는 confirm 실패**(실사용 없어 무해). "실제로 결제되지 않습니다" 문구는 토스가 키 보고 띄우는 것 → 3.2.3부터 사라짐. 남은 것: 소액 실결제→취소 왕복 검증, 스토어 제출, **Play 앱 서명 키 SHA-1을 GCP API 키 제한에 추가**(스토어판 푸시), 노션 릴리스 노트(커넥터 미연결로 보류). Claude용 Supabase/EAS/Vercel CLI 권한은 .claude/settings.local.json(gitignore)에 등록.
+- **메모/주의**: Claude용 Supabase/EAS/Vercel CLI 권한은 .claude/settings.local.json(gitignore)에 등록. 노션 릴리스 노트는 커넥터 미연결로 보류.
+- **⚠️ 당일 원복 (카드사 심사 대기)**: 토스 본심사 합격 후에도 **카드사별 심사**가 남아 라이브 카드결제 불가 판명 → 같은 날 **테스트 키(기존 nRQ 페어)로 전면 원복**(eas.json `2510726`, prod TOSS_SECRET_KEY 다이제스트가 8/24 원본과 일치 확인). 라이브 빌드(And v27)·테스트 재빌드(v28/b26) 전부 취소, iOS b25(라이브 키)는 TestFlight 업로드만 — **심사 제출 금지**. web-admin Vercel 배포(pinut.org)와 prod DB·엣지함수는 유지(테스트 키와 호환, 라이브 준비 완료 상태). **재전환 절차**: prod 시크릿=live_sk → eas.json=live_ck(DnyR...) → 재빌드·출시 → 소액 결제→취소 검증.
 
 ### 대회 운영 UX 개편 — 코트 중심 운영·알림 + 선수 화면 재구성
 - **결정**: (어드민) 점수 입력·차례 알림을 조/본선 표시에서 **코트 배정 탭의 코트 카드**로 이동(조·본선 탭은 열람 전용) — 운영은 코트 보드 한 곳에서. 코트 **확정 시 선수에게 자동 푸시**(0092), 차례 알림엔 코트명 포함. (앱) 대회 상세를 [정보/참가자/순위] 탭으로 분리하고 정보 탭 상단에 **내 현황 카드**(상태 뱃지·내 조·전적·조 순위·다음 경기+코트, 탭하면 대진으로). 조추첨 후엔 확정 참가자 취소·신규 신청 잠금(0091, 앱+DB 트리거+toss-cancel 3중). 진행·종료 대회는 조추첨 공개 시각 무관 대진 공개.

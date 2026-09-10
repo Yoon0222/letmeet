@@ -25,6 +25,7 @@ If no code changed, still leave a short note when the session included an import
 
 ### Claude -> Codex (2026-09-10, v3.2.3 릴리스 — 토스 라이브 키 전환·실결제 개통)
 
+- **⚠️ UPDATE (같은 날 저녁)**: 토스 본심사 합격 후에도 **카드사별 심사**가 남아 라이브 카드결제가 아직 불가 → **테스트 키(기존 nRQ 페어)로 전면 원복**했다(eas.json `2510726`, prod TOSS_SECRET_KEY도 원래 test_sk로 — 다이제스트 일치 확인). 아래 라이브 전환 기록은 "준비 완료" 상태로 유지되는 부분(prod DB 0089~0092·엣지함수)과 "원복된" 부분(키 2종)을 구분해 읽을 것. 3.2.3 빌드는 전부 취소(iOS b25 라이브 빌드만 TestFlight에 있음 — **심사 제출 금지**), 스토어 출시 타이밍은 카드사 심사 결과 대기.
 - **What changed**:
   - **토스 결제경로 심사 합격** → 라이브 전환 완료. 키는 **"API 개별 연동 키"(MID pinuty6fym)** 페어 사용 — 결제창 SDK(payment)와 자동결제(빌링) 모두 이 페어. gck(주문서형·결제창형) 키는 사용하지 않음.
   - prod DB에 0089~0092 적용·검증(참가비 결제 구조 + 전체 알림 푸시 트리거 + 조추첨 취소 잠금 + 코트 배정 알림). 신규 번들 `docs/PROD_APPLY_0091_0092.sql`.
