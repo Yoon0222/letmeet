@@ -47,7 +47,7 @@ const businessInfo = {
   name: process.env.NEXT_PUBLIC_BUSINESS_NAME ?? '피넛',
   registrationNumber: process.env.NEXT_PUBLIC_BUSINESS_REGISTRATION_NUMBER ?? '221-14-95232',
   representative: process.env.NEXT_PUBLIC_BUSINESS_REPRESENTATIVE ?? '신윤식',
-  address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS ?? '인천광역시 경인대로3, 1동 4층 401호(물류동)',
+  address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS ?? '인천광역시 검단구 묵지3로 3, 1동 4층 401호(불로동)',
   phone: process.env.NEXT_PUBLIC_BUSINESS_PHONE ?? '010 5270 2034',
 };
 
