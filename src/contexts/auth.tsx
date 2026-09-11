@@ -56,11 +56,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     if (error) {
       console.warn('[auth] 프로필 로드 실패:', error.message);
-      return;
+    } else {
+      setProfile(data ?? null);
+      // DUPR 자격 캐시가 24h 초과면 백그라운드로 재조회(운영요건). 갱신되면 프로필 재로드.
+      if (data?.dupr_status === 'verified') {
+        maybeSyncEntitlements(data.dupr_entitlements_synced_at)
+          .then(async (synced) => {
+            if (!synced) return;
+            const { data: d2 } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+            if (d2) setProfile(d2);
+          })
+          .catch(() => {});
+      }
     }
-    setProfile(data ?? null);
 
-    // 전화번호(본인 전용)도 함께 로드 — 온보딩 게이트 판단용
+    // 전화번호(본인 전용) 로드 — profiles 조회 실패와 무관하게 항상 실행한다.
+    // (실패 시 contactReady 가 false 로 남아 온보딩 게이트가 우회되던 문제 방지)
     const { data: contact } = await supabase
       .from('user_contact')
       .select('phone')
@@ -68,16 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     setPhone(contact?.phone ?? null);
     setContactReady(true);
-    // DUPR 자격 캐시가 24h 초과면 백그라운드로 재조회(운영요건). 갱신되면 프로필 재로드.
-    if (data?.dupr_status === 'verified') {
-      maybeSyncEntitlements(data.dupr_entitlements_synced_at)
-        .then(async (synced) => {
-          if (!synced) return;
-          const { data: d2 } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-          if (d2) setProfile(d2);
-        })
-        .catch(() => {});
-    }
   }, []);
 
   // 세션 초기화 — 스플래시는 '세션 확인'까지만 기다린다 (프로필은 뒤에서 백그라운드 로드).
