@@ -79,6 +79,13 @@
 
 ---
 
+## 2026-09-16
+
+### v3.2.4 릴리스 — 토스 풀 라이브 결제 개통 (iOS·Android 제출)
+- **결정**: 카드사 심사 통과 → 풀 라이브. 버전 3.2.3(Play에 테스트성 배포됨)과 구분하려 **3.2.4로 bump**. eas.json production TOSS_CLIENT_KEY=**live_ck 커밋**(로컬 dev는 .env 테스트키라 무영향 — 프로덕션 빌드만 라이브).
+- **만든 것**: v3.2.4 태그(994b183), 라이브 프로덕션 빌드(Android vc30 2aa0ef77, iOS build28 fb8bafc9), iOS ASC 업로드+심사 제출, Android AAB Play 제출. prod TOSS_SECRET_KEY=live_sk(사용자, 다이제스트 fe2d2d10 확인).
+- **메모/주의**: 결제 페어 완성(앱 live_ck+서버 live_sk). prod 결제활동 점검(pending 0·마지막 9/10 내 테스트)이라 시크릿 전환 실사용 영향 0. ⚠️ 남은 것: (a) Play 앱 서명 키 SHA-1을 GCP API 키 제한에 추가(FCM), (b) 실결제 검증 1회(소액→취소, 카드 필요).
+
 ## 2026-09-11
 
 ### 고객지원 이메일 통일 + 프로필 수정에 전화번호
