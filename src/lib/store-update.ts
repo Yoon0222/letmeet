@@ -1,7 +1,12 @@
 // 스토어 인앱 업데이트 체크 — expo-in-app-updates
 //   Android: Play In-App Updates(네이티브), iOS: iTunes Search API → App Store 열기.
 //   ⚠️ 네이티브 모듈이라, 이 모듈이 없는 빌드(구 dev-client 등)에서는 방어적으로 no-op(크래시 방지).
-import { AppAlert as Alert } from '@/lib/feedback';
+//
+// 안내는 부팅 직후(앱 실행 시 UpdateGate)에 뜨므로 커스텀 AppAlert(JS <Modal>)가 아니라
+// OS 네이티브 Alert 을 쓴다. iOS 에서 네비게이션 전환 중 JS <Modal> 을 present 하면
+// 모달이 안 보인 채 터치만 먹혀 홈이 잠기는 프리즈가 있었다. 이 경로는 네이티브 모듈이
+// 있어야 도달하므로(웹은 모듈이 no-op → 여기 안 옴) 네이티브 Alert 로 충분하다.
+import { Alert } from 'react-native';
 
 // 네이티브 모듈 방어적 로드 — 없으면 null → 조용히 skip.
 let mod: { checkForUpdate?: () => Promise<CheckResult>; startUpdate?: (immediate?: boolean) => unknown } | null = null;

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { InteractionManager, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { checkStoreUpdate } from '@/lib/store-update';
@@ -35,9 +35,12 @@ export function UpdateGate({ children }: { children: React.ReactNode }) {
         return;
       }
       // 2) 강제가 아니면 → 스토어 인앱 업데이트 체크(권유). 네이티브 모듈 없으면 no-op.
+      //    부팅/네비게이션 전환이 끝난 뒤 안내한다 — 전환 중 안내가 뜨면 iOS 에서 프리즈 위험.
       if (!checked.current) {
         checked.current = true;
-        void checkStoreUpdate();
+        InteractionManager.runAfterInteractions(() => {
+          void checkStoreUpdate();
+        });
       }
     })();
     return () => {

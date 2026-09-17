@@ -79,6 +79,14 @@
 
 ---
 
+## 2026-09-17
+
+### iOS 부팅 프리즈 수정 — 스토어 업데이트 안내가 홈을 잠그던 버그
+- **증상**: 스토어에 새 버전이 있는 상태로 앱 실행 시, 홈은 뜨는데 아무 버튼도 안 눌리는 프리즈(iOS). 업데이트 안내 다이얼로그는 보이지 않음.
+- **원인**: `checkStoreUpdate` 가 부팅 직후(`UpdateGate` useEffect) 권장 업데이트 안내를 `AppAlert`(FeedbackHost 의 JS `<Modal>`)로 띄우는데, iOS 네비게이션 전환 중 JS Modal 을 present 하면 모달이 안 보인 채 터치만 먹혀 화면이 잠김. (다른 다이얼로그는 사용자 조작 후라 무사)
+- **수정**: (1) `src/lib/store-update.ts` — 부팅 안내를 네이티브 `Alert` 로 교체(이 경로는 네이티브 모듈이 있어야 도달 → 웹 미영향). (2) `src/components/update-gate.tsx` — 체크를 `InteractionManager.runAfterInteractions` 로 전환 완료 후 지연.
+- **메모/주의**: tsc·lint 통과. ⚠️ **iOS 실기기/프로덕션 빌드로 확인 필요**(여기선 빌드 불가). `min_version` 강제 게이트(전체 차단 화면)는 이 버그와 무관.
+
 ## 2026-09-16
 
 ### v3.2.4 릴리스 — 토스 풀 라이브 결제 개통 (iOS·Android 제출)
