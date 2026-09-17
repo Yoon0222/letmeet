@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
@@ -51,6 +51,22 @@ export default function TabsLayout() {
         },
         tabBarIconStyle: styles.tabIcon,
         tabBarItemStyle: styles.tabItem,
+        // 탭 버튼 터치 영역을 셀 전체(flex:1)로 채우고 hitSlop 으로 주변 여백까지 확대 →
+        // 아이콘을 정확히 안 눌러도 근처만 눌러도 반응한다.
+        tabBarButton: (props) => (
+          <Pressable
+            onPress={props.onPress}
+            onLongPress={props.onLongPress}
+            accessibilityRole="button"
+            accessibilityState={props.accessibilityState}
+            accessibilityLabel={props.accessibilityLabel}
+            testID={props.testID}
+            hitSlop={{ top: 16, bottom: 12, left: 6, right: 6 }}
+            android_ripple={{ color: 'rgba(255,255,255,0.08)', borderless: true }}
+            style={styles.tabButton}>
+            {props.children}
+          </Pressable>
+        ),
       }}>
       <Tabs.Screen
         name="index"
@@ -142,6 +158,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingHorizontal: 0,
     height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabButton: {
+    flex: 1,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
