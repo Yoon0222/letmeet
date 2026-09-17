@@ -70,3 +70,9 @@ output/
 
 # Firebase 클라이언트 설정 — 공개 repo라 커밋 제외 (Firebase 콘솔에서 재다운로드, EAS 빌드는 .easignore 로 포함)
 google-services.json
+
+# 세션 생성 산출물·임시 (덱/계약서/배너 등) 및 도구 임시 폴더 — 커밋 안 함
+/outputs/
+/.codex-build/
+/.codex-finalizer/
+.chart-data-*/
