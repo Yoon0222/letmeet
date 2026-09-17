@@ -81,6 +81,11 @@
 
 ## 2026-09-17
 
+### 3.2.5 빌드 — iOS 프리즈 + 하단 탭 터치 수정
+- **결정**: 사용자 영향 버그 2건(iOS 업데이트 안내 프리즈, 하단 탭 터치 정확도) 수정 후 3.2.4→**3.2.5** patch bump, 프로덕션 빌드(all).
+- **만든 것**: `app.json` 3.2.5, EAS production 빌드(빌드번호 remote autoIncrement). 탭: 커스텀 `tabBarButton`(flex:1+hitSlop).
+- **메모/주의**: 실기기에서 (1) 스토어 업데이트 상황 프리즈 해소, (2) 탭 근처 터치 확인 후 스토어 제출. web-admin은 이미 Vercel 재배포됨(pinut.org).
+
 ### iOS 부팅 프리즈 수정 — 스토어 업데이트 안내가 홈을 잠그던 버그
 - **증상**: 스토어에 새 버전이 있는 상태로 앱 실행 시, 홈은 뜨는데 아무 버튼도 안 눌리는 프리즈(iOS). 업데이트 안내 다이얼로그는 보이지 않음.
 - **원인**: `checkStoreUpdate` 가 부팅 직후(`UpdateGate` useEffect) 권장 업데이트 안내를 `AppAlert`(FeedbackHost 의 JS `<Modal>`)로 띄우는데, iOS 네비게이션 전환 중 JS Modal 을 present 하면 모달이 안 보인 채 터치만 먹혀 화면이 잠김. (다른 다이얼로그는 사용자 조작 후라 무사)
