@@ -57,6 +57,8 @@ function htmlEscape(v: string) {
 
 function billingHtml(args: { clientKey: string; customerKey: string; clubName: string; customerName?: string; customerEmail?: string }) {
   const successUrl = `${SUCCESS_URL}?flow=billing`;
+  // 테스트 키(test_ck)일 때만 "테스트 환경" 안내를 노출 — 라이브(live_ck)에선 숨김
+  const isTest = args.clientKey.startsWith('test_ck_');
   const info = JSON.stringify({
     clientKey: args.clientKey,
     customerKey: args.customerKey,
@@ -87,7 +89,7 @@ function billingHtml(args: { clientKey: string; customerKey: string; clubName: s
   <div class="wordmark">P<span>!</span>NUT</div>
   <section class="hero"><div class="eyebrow">Premium Subscription</div><h1>월 ${AMOUNT.toLocaleString('ko-KR')}원</h1><p class="order">${htmlEscape(args.clubName)} 프리미엄 구독</p></section>
   <section class="panel">
-    <div class="notice">테스트 환경입니다. 실제로 결제되지 않아요. 카드를 등록하면 매월 자동 결제됩니다.</div>
+    <div class="notice">${isTest ? '테스트 환경입니다. 실제로 결제되지 않아요. ' : ''}카드를 등록하면 매월 자동 결제됩니다.</div>
     <div class="rows">
       <div class="rowline"><span class="k">구독료</span><span>월 ${AMOUNT.toLocaleString('ko-KR')}원</span></div>
       <div class="rowline"><span class="k">결제 방식</span><span>카드 자동결제</span></div>

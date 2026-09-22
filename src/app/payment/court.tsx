@@ -114,6 +114,8 @@ function createPaymentHtml(args: {
   const failUrl = appendParams(FAIL_URL, { paymentId: args.paymentId, orderId: args.orderId });
   const title = htmlEscape(args.orderName);
   const amountLabel = `${args.amount.toLocaleString('ko-KR')}원`;
+  // 테스트 키(test_ck)일 때만 "테스트 환경" 안내를 노출 — 라이브(live_ck)에선 숨김
+  const isTest = tossClientKey.startsWith('test_ck_');
 
   return `<!doctype html>
 <html lang="ko">
@@ -314,7 +316,7 @@ function createPaymentHtml(args: {
     </section>
 
     <section class="panel">
-      <div class="notice">테스트 환경입니다. 실제로 결제되지 않아요.</div>
+      ${isTest ? '<div class="notice">테스트 환경입니다. 실제로 결제되지 않아요.</div>' : ''}
       <div class="summary">
         <div class="tile">
           <small>주문번호</small>
