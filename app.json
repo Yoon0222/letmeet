@@ -2,7 +2,7 @@
   "expo": {
     "name": "피넛",
     "slug": "pickleball",
-    "version": "3.2.6",
+    "version": "4.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pickleball",
