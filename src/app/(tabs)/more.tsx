@@ -47,7 +47,10 @@ export default function MoreScreen() {
         </View>
 
         <Pressable style={styles.profileCard} onPress={() => router.push('/(tabs)/profile' as never)}>
-          <Avatar nickname={profile?.nickname ?? 'P!NUT'} uri={profile?.avatar_url} size={56} />
+          <View>
+            <Avatar nickname={profile?.nickname ?? 'P!NUT'} uri={profile?.avatar_url} size={64} />
+            <View style={styles.onlineDot} />
+          </View>
           <View style={styles.profileText}>
             <Text style={styles.profileName} numberOfLines={1}>
               {profile?.nickname ?? 'P!NUT Player'}
@@ -90,7 +93,7 @@ export default function MoreScreen() {
         </View>
 
         {/* 사업자 정보 — 전자상거래 표시 의무 + PG 심사 요건 */}
-        <BusinessFooter />
+        <BusinessFooter compact />
       </ScrollView>
     </SafeAreaView>
   );
@@ -98,66 +101,58 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: dark.background },
-  content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: Spacing.three, paddingBottom: 124 },
-  header: { gap: 8 },
-  logo: { fontSize: 19, fontWeight: '900', color: dark.text, letterSpacing: 0 },
+  content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: Spacing.four, paddingBottom: 124 },
+  header: { gap: 7 },
+  logo: { fontSize: 17, fontWeight: '900', color: dark.text, letterSpacing: 0 },
   logoAccent: { color: Brand.primary },
-  title: { fontSize: 34, fontWeight: '900', color: dark.text, letterSpacing: 0 },
+  title: { fontSize: 32, fontWeight: '900', color: dark.text, letterSpacing: 0, marginTop: 8 },
   subtitle: { fontSize: 14, fontWeight: '600', lineHeight: 21, color: dark.textSecondary },
   profileCard: {
-    minHeight: 88,
+    minHeight: 82,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: Spacing.three,
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    backgroundColor: dark.surface,
-    borderWidth: 1,
-    borderColor: dark.line,
+    gap: 16,
+    paddingVertical: 2,
   },
+  onlineDot: { position: 'absolute', right: 0, bottom: 1, width: 16, height: 16, borderRadius: 8, backgroundColor: Brand.primary, borderWidth: 3, borderColor: dark.background },
   profileText: { flex: 1, gap: 4 },
-  profileName: { fontSize: 18, fontWeight: '900', color: dark.text },
+  profileName: { fontSize: 20, fontWeight: '900', color: dark.text },
   profileMeta: { fontSize: 13, fontWeight: '600', color: dark.textMuted },
   grid: { flexDirection: 'row', gap: Spacing.two },
   featureCard: {
     flex: 1,
-    minHeight: 132,
+    minHeight: 116,
     padding: Spacing.two,
-    borderRadius: 22,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: dark.surface,
     borderWidth: 1,
     borderColor: dark.line,
-    gap: 8,
+    gap: 7,
+    alignItems: 'center',
   },
   featureIcon: {
     width: 38,
     height: 38,
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(22,199,132,0.12)',
   },
-  featureTitle: { fontSize: 16, fontWeight: '900', color: dark.text },
-  featureSubtitle: { fontSize: 12, fontWeight: '600', lineHeight: 17, color: dark.textMuted },
-  section: { gap: 12 },
+  featureTitle: { fontSize: 15, fontWeight: '900', color: dark.text, textAlign: 'center' },
+  featureSubtitle: { fontSize: 11, fontWeight: '600', lineHeight: 16, color: dark.textMuted, textAlign: 'center' },
+  section: { gap: 8 },
   sectionTitle: { fontSize: 20, fontWeight: '900', color: dark.text },
   listCard: {
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    backgroundColor: dark.surface,
-    borderWidth: 1,
-    borderColor: dark.line,
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
-  row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: Spacing.three },
+  row: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: dark.line },
   rowIcon: {
     width: 34,
     height: 34,
-    borderRadius: 14,
+    borderRadius: 8,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',

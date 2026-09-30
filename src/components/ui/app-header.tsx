@@ -7,11 +7,12 @@ type AppHeaderProps = {
   title: string;
   subtitle?: string;
   rightIcon?: keyof typeof Ionicons.glyphMap;
+  rightAccent?: boolean;
   onRightPress?: () => void;
   onBack?: () => void; // 있으면 좌측 뒤로가기 버튼 표시(푸시로 진입한 탭 화면용)
 };
 
-export function AppHeader({ title, subtitle, rightIcon, onRightPress, onBack }: AppHeaderProps) {
+export function AppHeader({ title, subtitle, rightIcon, rightAccent = false, onRightPress, onBack }: AppHeaderProps) {
   return (
     <View style={styles.wrap}>
       {onBack ? (
@@ -24,8 +25,8 @@ export function AppHeader({ title, subtitle, rightIcon, onRightPress, onBack }: 
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
       {rightIcon ? (
-        <Pressable onPress={onRightPress} hitSlop={8} style={styles.iconButton}>
-          <Ionicons name={rightIcon} size={22} color="#F8FAFC" />
+        <Pressable onPress={onRightPress} hitSlop={8} style={[styles.iconButton, rightAccent && styles.iconButtonAccent]}>
+          <Ionicons name={rightIcon} size={22} color={rightAccent ? '#07100D' : '#F8FAFC'} />
         </Pressable>
       ) : null}
     </View>
@@ -66,5 +67,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
+  },
+  iconButtonAccent: {
+    backgroundColor: '#8AF52C',
+    borderColor: '#8AF52C',
   },
 });

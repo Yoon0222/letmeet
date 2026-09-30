@@ -7,6 +7,8 @@ import type { Court } from '@/lib/types';
 export type CourtMapProps = {
   courts: Court[];
   onSelect: (id: string) => void;
+  onPreview?: (id: string | null) => void;
+  showCard?: boolean;
   center?: { latitude: number; longitude: number };
   focus?: string;
 };

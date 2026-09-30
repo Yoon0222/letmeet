@@ -11,6 +11,8 @@ import type { Court } from '@/lib/types';
 export type CourtMapProps = {
   courts: Court[];
   onSelect: (id: string) => void;
+  onPreview?: (id: string | null) => void;
+  showCard?: boolean;
   center?: { latitude: number; longitude: number };
   /** 검색어 등 — 값이 바뀌면 courts(검색결과)가 보이도록 카메라 이동 */
   focus?: string;
@@ -21,15 +23,24 @@ const avg = (ns: number[]) => ns.reduce((a, b) => a + b, 0) / ns.length;
 const geo = (courts: Court[]) => courts.filter((c) => c.latitude != null && c.longitude != null);
 
 // 네이티브 전용 — 네이버 지도 SDK. (웹에서는 court-map.tsx 폴백이 로드됨)
-export default function CourtMap({ courts, onSelect, center: centerProp, focus }: CourtMapProps) {
+export default function CourtMap({ courts, onSelect, onPreview, showCard = true, center: centerProp, focus }: CourtMapProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const ref = useRef<NaverMapViewRef>(null);
+  const hasCenteredOnUser = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const pts = geo(courts);
   const center = centerProp ?? (pts.length ? { latitude: avg(pts.map((p) => p.latitude as number)), longitude: avg(pts.map((p) => p.longitude as number)) } : SEOUL);
   const selected = pts.find((c) => c.id === selectedId) ?? null;
   const cardBottom = 86 + Math.max(insets.bottom, 16);
+
+  // 위치 권한 확인은 지도 생성 이후 끝날 수 있으므로, 좌표가 도착하면 처음 한 번 내 위치로 이동한다.
+  useEffect(() => {
+    if (!mapReady || !centerProp || hasCenteredOnUser.current) return;
+    hasCenteredOnUser.current = true;
+    ref.current?.animateCameraTo({ ...centerProp, zoom: 14, duration: 500 });
+  }, [centerProp, mapReady]);
 
   // 검색 시: 결과 코트들이 화면에 들어오도록 카메라 이동
   useEffect(() => {
@@ -62,21 +73,23 @@ export default function CourtMap({ courts, onSelect, center: centerProp, focus }
         ref={ref}
         style={styles.fill}
         initialCamera={{ ...center, zoom: 11 }}
-        isShowLocationButton={false}
-        onTapMap={() => setSelectedId(null)}>
+        onInitialized={() => setMapReady(true)}
+        isNightModeEnabled
+        isShowLocationButton={!!centerProp}
+        onTapMap={() => { setSelectedId(null); onPreview?.(null); }}>
         {pts.map((c) => (
           <NaverMapMarkerOverlay
             key={c.id}
             latitude={c.latitude as number}
             longitude={c.longitude as number}
-            onTap={() => setSelectedId(c.id)}
+            onTap={() => { setSelectedId(c.id); onPreview?.(c.id); }}
             caption={{ text: c.name, color: Brand.primary }}
           />
         ))}
       </NaverMapView>
 
       {/* 마커 탭 시 사진·정보 팝업 */}
-      {selected ? (
+      {selected && showCard ? (
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, bottom: cardBottom }]}>
           <Pressable style={styles.cardRow} onPress={() => onSelect(selected.id)}>
             {selected.images?.[0] ? (

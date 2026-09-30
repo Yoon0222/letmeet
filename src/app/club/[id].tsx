@@ -13,7 +13,7 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { cancelClubSubscription } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
-import type { ClubMemberWithProfile, ClubSubscription, ClubWithCounts } from '@/lib/types';
+import type { ClubMemberWithProfile, ClubPostWithAuthor, ClubSession, ClubSubscription, ClubWithCounts } from '@/lib/types';
 
 const fmtYmd = (iso: string) => {
   const d = new Date(iso);
@@ -38,6 +38,9 @@ export default function ClubDetail() {
 
   const [club, setClub] = useState<ClubWithCounts | null>(null);
   const [members, setMembers] = useState<ClubMemberWithProfile[]>([]);
+  const [posts, setPosts] = useState<ClubPostWithAuthor[]>([]);
+  const [sessions, setSessions] = useState<ClubSession[]>([]);
+  const [matchCount, setMatchCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -46,16 +49,40 @@ export default function ClubDetail() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [{ data: c }, { data: m }] = await Promise.all([
+    const today = new Date().toISOString().slice(0, 10);
+    const [{ data: c }, { data: m }, { data: p }, { data: sessionRows }] = await Promise.all([
       supabase.from('clubs_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('club_members')
         .select('*, profiles(id, nickname, skill_level, avatar_url, region)')
         .eq('club_id', id)
         .order('joined_at', { ascending: true }),
+      supabase
+        .from('club_posts_with_authors')
+        .select('*')
+        .eq('club_id', id)
+        .order('is_notice', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(3),
+      supabase
+        .from('club_sessions')
+        .select('*')
+        .eq('club_id', id)
+        .gte('session_date', today)
+        .neq('status', 'canceled')
+        .order('session_date', { ascending: true })
+        .limit(10),
     ]);
     setClub(c ?? null);
     setMembers((m as unknown as ClubMemberWithProfile[]) ?? []);
+    setPosts((p as ClubPostWithAuthor[] | null) ?? []);
+    const nextSessions = (sessionRows as ClubSession[] | null) ?? [];
+    setSessions(nextSessions);
+    const { count } = await supabase
+      .from('club_match_results')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', id);
+    setMatchCount(count ?? 0);
     // 구독 정보 — 클럽장 본인만 조회(안전 컬럼만, 빌링키 제외)
     if (c && c.owner_id === uid) {
       const { data: s } = await supabase
@@ -90,9 +117,20 @@ export default function ClubDetail() {
     navigation.setOptions({
       title: club?.name ?? '클럽',
       headerRight:
-        club && !isOwner
-          ? () => <ReportBlock targetType="club" targetId={club.id} targetUserId={club.owner_id} targetLabel={club.name} onBlocked={() => router.back()} />
-          : undefined,
+        club && isOwner
+          ? () => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="클럽 설정"
+                hitSlop={8}
+                onPress={() => router.push({ pathname: '/club/edit', params: { clubId: club.id } })}
+                style={styles.headerSettingsButton}>
+                <Ionicons name="settings-outline" size={22} color="#F8FAFC" />
+              </Pressable>
+            )
+          : club
+            ? () => <ReportBlock targetType="club" targetId={club.id} targetUserId={club.owner_id} targetLabel={club.name} onBlocked={() => router.back()} />
+            : undefined,
     });
   }, [navigation, club, isOwner, router]);
 
@@ -181,21 +219,6 @@ export default function ClubDetail() {
     );
   }
 
-  function confirmDelete() {
-    Alert.alert('클럽 삭제', '클럽을 삭제하면 되돌릴 수 없어요. 진행할까요?', [
-      { text: '닫기', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          if (!id) return;
-          await supabase.from('clubs').delete().eq('id', id);
-          router.back();
-        },
-      },
-    ]);
-  }
-
   // 운영자: 클럽 대표 사진 업로드/변경
   async function pickPhoto() {
     if (!isOwner || !id || uploading) return;
@@ -257,11 +280,26 @@ export default function ClubDetail() {
     );
   }
 
+  const approvedMembers = members.filter((member) => member.status === 'approved');
+  const upcoming = sessions[0] ?? null;
+  const canSeeClubContent = isApprovedMember || isOwner;
+  const upcomingTime = upcoming?.start_at
+    ? new Date(upcoming.start_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null;
+
+  const openMenu = (menu: ClubMenu) => {
+    if (menu.comingSoon) {
+      Alert.alert('추후 오픈', `${menu.label} 기능은 곧 열려요. 조금만 기다려주세요!`);
+      return;
+    }
+    router.push({ pathname: menu.path, params: { clubId: club.id } });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 클럽 로고 (정사각) — 운영자는 탭해서 변경 */}
-        <View style={styles.titleRow}>
+        <View style={styles.hero}>
+          <View style={styles.titleRow}>
           <Pressable onPress={pickPhoto} disabled={!isOwner || uploading} style={styles.logoWrap}>
             {club.image_url ? (
               <Image source={{ uri: club.image_url }} style={styles.logo} />
@@ -277,22 +315,104 @@ export default function ClubDetail() {
             ) : null}
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{club.name}</Text>
-            <Text style={styles.meta}>
-              {club.region || '지역 미설정'} · 멤버 {club.member_count}명
-            </Text>
+            <Text style={styles.title} numberOfLines={1}>{club.name}</Text>
+            <Text style={styles.meta}>{club.description || `${club.region || '지역 미설정'}에서 함께 즐기는 피클볼 클럽`}</Text>
+          </View>
+          {isPremiumUsable ? <Badge label="PREMIUM" color="#16C784" bg="rgba(22,199,132,0.14)" /> : null}
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}><Text style={styles.statValue}>{club.member_count}</Text><Text style={styles.statLabel}>멤버</Text></View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}><Text style={styles.statValue}>{sessions.length}</Text><Text style={styles.statLabel}>예정 모임</Text></View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}><Text style={styles.statValue}>{matchCount}</Text><Text style={styles.statLabel}>경기 기록</Text></View>
           </View>
         </View>
 
-        {club.description ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>소개</Text>
-            <Text style={styles.desc}>{club.description}</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>우리 클럽 회원</Text>
+            <Pressable onPress={() => openMenu(CLUB_MENUS[3])} style={styles.moreButton}>
+              <Text style={styles.moreText}>전체 보기</Text><Ionicons name="chevron-forward" size={14} color="#707B87" />
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.memberRow}>
+            {approvedMembers.slice(0, 8).map((member) => (
+              <View key={member.user_id} style={styles.memberItem}>
+                {member.profiles.avatar_url ? <Image source={{ uri: member.profiles.avatar_url }} style={styles.avatar} /> : (
+                  <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{member.profiles.nickname.slice(0, 1)}</Text></View>
+                )}
+                <Text style={styles.memberName} numberOfLines={1}>{member.profiles.nickname}</Text>
+              </View>
+            ))}
+            {approvedMembers.length === 0 ? <Text style={styles.emptyInline}>아직 승인된 회원이 없어요.</Text> : null}
+          </ScrollView>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>다가오는 일정</Text>
+            {canSeeClubContent ? <Pressable onPress={() => openMenu(CLUB_MENUS[1])} style={styles.moreButton}><Text style={styles.moreText}>전체 보기</Text><Ionicons name="chevron-forward" size={14} color="#707B87" /></Pressable> : null}
+          </View>
+          <Pressable disabled={!canSeeClubContent} onPress={() => openMenu(CLUB_MENUS[1])} style={styles.scheduleCard}>
+            <View style={styles.dateBox}>
+              <Text style={styles.dateMonth}>{upcoming ? `${Number(upcoming.session_date.slice(5, 7))}월` : '-'}</Text>
+              <Text style={styles.dateDay}>{upcoming ? Number(upcoming.session_date.slice(8, 10)) : '-'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.scheduleTitle}>{upcoming?.title || '예정된 일정이 없어요'}</Text>
+              <Text style={styles.scheduleMeta}>{upcoming ? `${upcomingTime ? `${upcomingTime} · ` : ''}${upcoming.location || '장소 미정'} · 코트 ${upcoming.court_count}면` : '새 정기모임이 등록되면 여기에 표시돼요.'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#707B87" />
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>공지사항</Text>
+            {canSeeClubContent ? <Pressable onPress={() => openMenu(CLUB_MENUS[0])} style={styles.moreButton}><Text style={styles.moreText}>전체 보기</Text><Ionicons name="chevron-forward" size={14} color="#707B87" /></Pressable> : null}
+          </View>
+          <View style={styles.noticeList}>
+            {posts.length > 0 && canSeeClubContent ? posts.map((post) => (
+              <Pressable key={post.id} onPress={() => router.push({ pathname: '/club/post/[id]', params: { id: post.id, clubId: club.id } } as never)} style={styles.noticeRow}>
+                <Ionicons name={post.is_notice ? 'megaphone' : 'document-text-outline'} size={16} color={post.is_notice ? '#16C784' : '#707B87'} />
+                <Text style={styles.noticeTitle} numberOfLines={1}>{post.title}</Text>
+                <Text style={styles.noticeDate}>{post.created_at.slice(5, 10).replace('-', '.')}</Text>
+              </Pressable>
+            )) : <Text style={styles.emptyInline}>{canSeeClubContent ? '등록된 공지가 없어요.' : '클럽 가입 후 공지를 확인할 수 있어요.'}</Text>}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>경기 기록</Text>
+            {canSeeClubContent ? <Pressable onPress={() => openMenu(CLUB_MENUS[1])} style={styles.moreButton}><Text style={styles.moreText}>전체 보기</Text><Ionicons name="chevron-forward" size={14} color="#707B87" /></Pressable> : null}
+          </View>
+          <View style={styles.recordCard}>
+            <View style={styles.recordMetric}><Text style={styles.recordLabel}>누적 경기</Text><Text style={styles.recordValue}>{matchCount}<Text style={styles.recordUnit}> 경기</Text></Text></View>
+            <View style={styles.recordDivider} />
+            <View style={styles.recordMetric}><Text style={styles.recordLabel}>등록 회원</Text><Text style={styles.recordValue}>{club.member_count}<Text style={styles.recordUnit}> 명</Text></Text></View>
+            <View style={styles.recordDivider} />
+            <View style={styles.recordMetric}><Text style={styles.recordLabel}>예정 모임</Text><Text style={styles.recordValue}>{sessions.length}<Text style={styles.recordUnit}> 회</Text></Text></View>
+          </View>
+        </View>
+
+        {canSeeClubContent ? (
+          <View style={styles.quickGrid}>
+            {CLUB_MENUS.filter((menu) => menu.key === 'sessions' || menu.key === 'tournaments' || (menu.key === 'members' && isOwner)).map((menu) => (
+              <Pressable key={menu.key} onPress={() => openMenu(menu)} style={styles.quickButton}>
+                <Ionicons name={menu.icon} size={18} color={menu.comingSoon ? '#707B87' : '#16C784'} />
+                <Text style={styles.quickLabel}>{menu.label}</Text>
+              </Pressable>
+            ))}
           </View>
         ) : null}
 
         {isOwner ? (
-        <View style={styles.premiumCard}>
+        <View style={styles.manageSection}>
+          <Text style={styles.sectionTitle}>클럽 운영</Text>
+          <View style={styles.premiumCard}>
           <View style={styles.premiumTop}>
             <View>
               <Text style={styles.premiumEyebrow}>{isPremiumUsable ? 'PREMIUM CLUB' : 'CLUB PLAN'}</Text>
@@ -341,53 +461,20 @@ export default function ClubDetail() {
           ) : (
             <Text style={styles.subSub}>구독 결제는 곧 지원될 예정이에요.</Text>
           )}
-        </View>
-        ) : null}
-
-        {/* 클럽 활동 메뉴 — 각각 전용 페이지로. 비회원은 회원 관리만 노출 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>클럽 활동</Text>
-          <View style={styles.menuList}>
-            {(isApprovedMember || isOwner ? CLUB_MENUS : CLUB_MENUS.filter((menu) => menu.key === 'members')).map((menu) => (
-              <Pressable
-                key={menu.key}
-                onPress={() =>
-                  menu.comingSoon
-                    ? Alert.alert('추후 오픈', `${menu.label} 기능은 곧 열려요. 조금만 기다려주세요!`)
-                    : router.push({ pathname: menu.path, params: { clubId: club.id } })
-                }
-                style={[styles.menuCard, menu.comingSoon && styles.menuCardSoon]}>
-                <View style={styles.menuIcon}>
-                  <Ionicons name={menu.icon} size={20} color={menu.comingSoon ? '#707B87' : '#16C784'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.menuLabel}>{menu.label}</Text>
-                  <Text style={styles.menuDesc}>{menu.desc}</Text>
-                </View>
-                {menu.comingSoon ? (
-                  <View style={styles.soonChip}>
-                    <Text style={styles.soonChipTxt}>추후 오픈</Text>
-                  </View>
-                ) : (
-                  <Ionicons name="chevron-forward" size={18} color="#707B87" />
-                )}
-              </Pressable>
-            ))}
           </View>
         </View>
+        ) : null}
       </ScrollView>
 
-      <View style={styles.actionBar}>
-        {isOwner ? (
-          <Button title="클럽 삭제" variant="danger" onPress={confirmDelete} />
-        ) : isPending ? (
+      {!isOwner ? <View style={styles.actionBar}>
+        {isPending ? (
           <Button title="가입 신청 취소 (승인 대기 중)" variant="outline" onPress={confirmLeave} loading={acting} />
         ) : isApprovedMember ? (
           <Button title="클럽 탈퇴" variant="outline" onPress={confirmLeave} loading={acting} />
         ) : (
           <Button title="가입 신청하기" onPress={join} loading={acting} />
         )}
-      </View>
+      </View> : null}
     </SafeAreaView>
   );
 }
@@ -396,7 +483,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#070A0D' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
   notFound: { color: '#AAB4C0', fontSize: 15 },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
+  content: { padding: Spacing.three, gap: Spacing.four, paddingBottom: Spacing.five },
+  hero: { gap: Spacing.three },
   cover: { width: '100%', height: 170, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D' },
   coverEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   coverEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
@@ -404,14 +492,49 @@ const styles = StyleSheet.create({
   coverEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   icon: { width: 52, height: 52, borderRadius: 14, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.14)', alignItems: 'center', justifyContent: 'center' },
-  logoWrap: { width: 64, height: 64 },
-  logo: { width: 64, height: 64, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D' },
-  logoPlaceholder: { width: 64, height: 64, borderRadius: 18, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.14)', alignItems: 'center', justifyContent: 'center' },
+  logoWrap: { width: 66, height: 66 },
+  logo: { width: 66, height: 66, borderRadius: 33, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 2, borderColor: '#16C784' },
+  logoPlaceholder: { width: 66, height: 66, borderRadius: 33, borderCurve: 'continuous', backgroundColor: 'rgba(22,199,132,0.14)', borderWidth: 2, borderColor: '#16C784', alignItems: 'center', justifyContent: 'center' },
   logoBadge: { position: 'absolute', right: -3, bottom: -3, width: 24, height: 24, borderRadius: 999, backgroundColor: '#16C784', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#070A0D' },
-  title: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
-  meta: { fontSize: 14, color: '#AAB4C0', marginTop: 2 },
-  section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
+  title: { flexShrink: 1, fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
+  headerSettingsButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  meta: { fontSize: 13, lineHeight: 18, color: '#AAB4C0', marginTop: 3 },
+  statsRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  statItem: { flex: 1, alignItems: 'center', gap: 2 },
+  statValue: { color: '#F8FAFC', fontSize: 18, fontWeight: '900' },
+  statLabel: { color: '#707B87', fontSize: 11, fontWeight: '700' },
+  statDivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.09)' },
+  section: { gap: 10 },
+  sectionTitle: { fontSize: 17, fontWeight: '900', color: '#F8FAFC' },
+  moreButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 1, paddingLeft: 10 },
+  moreText: { color: '#707B87', fontSize: 12, fontWeight: '700' },
+  memberRow: { gap: 12, paddingRight: Spacing.three },
+  memberItem: { width: 52, alignItems: 'center', gap: 6 },
+  avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#10161D' },
+  avatarFallback: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: '#182129', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  avatarInitial: { color: '#F8FAFC', fontSize: 16, fontWeight: '900' },
+  memberName: { maxWidth: 52, color: '#AAB4C0', fontSize: 11, fontWeight: '700' },
+  emptyInline: { color: '#707B87', fontSize: 13, lineHeight: 20, fontWeight: '600', paddingVertical: 8 },
+  scheduleCard: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  dateBox: { width: 48, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(22,199,132,0.14)' },
+  dateMonth: { color: '#16C784', fontSize: 10, fontWeight: '800' },
+  dateDay: { color: '#F8FAFC', fontSize: 21, fontWeight: '900' },
+  scheduleTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '900' },
+  scheduleMeta: { color: '#AAB4C0', fontSize: 12, lineHeight: 17, fontWeight: '600', marginTop: 5 },
+  noticeList: { paddingHorizontal: 14, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  noticeRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.09)' },
+  noticeTitle: { flex: 1, color: '#F8FAFC', fontSize: 13, fontWeight: '700' },
+  noticeDate: { color: '#707B87', fontSize: 10, fontWeight: '600' },
+  recordCard: { minHeight: 80, flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  recordMetric: { flex: 1, alignItems: 'center', gap: 7 },
+  recordLabel: { color: '#707B87', fontSize: 11, fontWeight: '700' },
+  recordValue: { color: '#F8FAFC', fontSize: 18, fontWeight: '900' },
+  recordUnit: { color: '#AAB4C0', fontSize: 11, fontWeight: '700' },
+  recordDivider: { width: 1, height: 34, backgroundColor: 'rgba(255,255,255,0.09)' },
+  quickGrid: { flexDirection: 'row', gap: 8 },
+  quickButton: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  quickLabel: { color: '#F8FAFC', fontSize: 13, fontWeight: '800' },
+  manageSection: { gap: 10, paddingTop: Spacing.two },
   desc: { fontSize: 15, lineHeight: 22, color: '#AAB4C0', marginTop: 6 },
   premiumCard: {
     marginTop: Spacing.two,

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/ui/avatar';
 import { Spacing } from '@/constants/theme';
 import { categoryMeta } from '@/lib/community';
 import { formatRelative } from '@/lib/format';
@@ -24,7 +25,7 @@ export function CommunityPostCard({
           <Ionicons name={cat.icon} size={12} color={cat.color} />
           <Text style={[styles.badgeText, { color: cat.color }]}>{cat.label}</Text>
         </View>
-        <Text style={styles.time}>{formatRelative(post.created_at)}</Text>
+        {post.is_pinned ? <View style={styles.pinned}><Ionicons name="pin" size={12} color="#16C784" /><Text style={styles.pinnedText}>고정</Text></View> : null}
       </View>
 
       <View style={styles.body}>
@@ -42,14 +43,17 @@ export function CommunityPostCard({
       </View>
 
       <View style={styles.foot}>
-        <Text style={styles.author} numberOfLines={1}>
-          {post.author_nickname}
-        </Text>
+        <View style={styles.authorWrap}>
+          <Avatar nickname={post.author_nickname} uri={post.author_avatar_url} size={26} />
+          <Text style={styles.author} numberOfLines={1}>{post.author_nickname}</Text>
+          <Text style={styles.dot}>·</Text>
+          <Text style={styles.time}>{formatRelative(post.created_at)}</Text>
+        </View>
         <View style={styles.metrics}>
-          <Ionicons name="heart-outline" size={14} color="#9CA3AF" />
-          <Text style={styles.metric}>{post.like_count}</Text>
-          <Ionicons name="chatbubble-outline" size={14} color="#9CA3AF" style={{ marginLeft: 10 }} />
+          <Ionicons name="chatbubble-outline" size={16} color="#9CA3AF" />
           <Text style={styles.metric}>{post.comment_count}</Text>
+          <Ionicons name="heart-outline" size={16} color="#9CA3AF" style={{ marginLeft: 12 }} />
+          <Text style={styles.metric}>{post.like_count}</Text>
         </View>
       </View>
     </Pressable>
@@ -58,24 +62,25 @@ export function CommunityPostCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#10161D',
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    padding: Spacing.three,
-    gap: 10,
+    paddingVertical: Spacing.three,
+    gap: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.10)',
   },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   badgeText: { fontSize: 12, fontWeight: '800' },
+  pinned: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  pinnedText: { fontSize: 11, color: '#16C784', fontWeight: '800' },
   time: { fontSize: 12, color: '#707B87' },
   body: { flexDirection: 'row', gap: 12 },
-  title: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
+  title: { fontSize: 17, fontWeight: '900', color: '#F8FAFC' },
   preview: { fontSize: 14, lineHeight: 20, color: '#AAB4C0', marginTop: 3 },
-  thumb: { width: 64, height: 64, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#151D25' },
+  thumb: { width: 82, height: 82, borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#151D25' },
   foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  author: { flex: 1, fontSize: 13, fontWeight: '600', color: '#AAB4C0' },
+  authorWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  author: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: '#D7DCE2' },
+  dot: { fontSize: 12, color: '#707B87' },
   metrics: { flexDirection: 'row', alignItems: 'center' },
   metric: { fontSize: 13, color: '#707B87', marginLeft: 3, fontWeight: '700' },
 });

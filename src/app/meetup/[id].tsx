@@ -28,9 +28,9 @@ export default function MeetupDetail() {
   const [meetup, setMeetup] = useState<MeetupWithCounts | null>(null);
   const [participants, setParticipants] = useState<ParticipantWithProfile[]>([]);
   const [reviewStats, setReviewStats] = useState<Record<string, { avg: number; count: number }>>({});
+  const [courtImage, setCourtImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -43,6 +43,12 @@ export default function MeetupDetail() {
         .order('joined_at', { ascending: true }),
     ]);
     setMeetup(m ?? null);
+    if (m?.court_id) {
+      const { data: court } = await supabase.from('courts').select('images, image_url').eq('id', m.court_id).maybeSingle();
+      setCourtImage(court?.images?.[0] ?? court?.image_url ?? null);
+    } else {
+      setCourtImage(null);
+    }
     const list = (p as unknown as ParticipantWithProfile[]) ?? [];
     setParticipants(list);
     // 참가자·신청자의 리뷰 요약(평균·개수) — 승인 판단에 노출
@@ -74,10 +80,12 @@ export default function MeetupDetail() {
   const isPending = myPart?.status === 'pending';
   const full = !!meetup && meetup.participant_count >= meetup.max_players;
   const closed = meetup?.status !== 'open';
+  const participantProgress = meetup ? Math.min(100, Math.max(0, (meetup.participant_count / meetup.max_players) * 100)) : 0;
+  const remainingSpots = meetup ? Math.max(0, meetup.max_players - meetup.participant_count) : 0;
 
   useEffect(() => {
     navigation.setOptions({
-      title: meetup?.title ?? '모임 상세',
+      title: '모임 상세',
       headerRight:
         meetup && !isHost
           ? () => <ReportBlock targetType="meetup" targetId={meetup.id} targetUserId={meetup.host_id} targetLabel={meetup.title} onBlocked={() => router.back()} />
@@ -164,43 +172,6 @@ export default function MeetupDetail() {
     load();
   }
 
-  // 호스트: 코트/장소 사진 업로드·변경
-  async function pickPhoto() {
-    if (!isHost || !id || uploading) return;
-    let ImagePicker: typeof import('expo-image-picker');
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      ImagePicker = require('expo-image-picker');
-    } catch {
-      Alert.alert('사진 업로드', '이 기능은 최신 앱 빌드에서 사용할 수 있어요.');
-      return;
-    }
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('권한 필요', '사진을 올리려면 갤러리 접근 권한이 필요해요.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
-    if (result.canceled) return;
-    const img = result.assets[0];
-    setUploading(true);
-    try {
-      const ext = (img.uri.split('.').pop() ?? 'jpg').toLowerCase();
-      const path = `${id}/cover_${Date.now()}.${ext}`;
-      const buf = await fetch(img.uri).then((r) => r.arrayBuffer());
-      const { error: upErr } = await supabase.storage.from('meetup-images').upload(path, buf, { contentType: img.mimeType ?? 'image/jpeg', upsert: true });
-      if (upErr) throw upErr;
-      const url = supabase.storage.from('meetup-images').getPublicUrl(path).data.publicUrl;
-      const { error: dbErr } = await supabase.from('meetups').update({ image_url: url }).eq('id', id);
-      if (dbErr) throw dbErr;
-      load();
-    } catch (e) {
-      Alert.alert('사진 업로드 실패', e instanceof Error ? e.message : '다시 시도해주세요.');
-    } finally {
-      setUploading(false);
-    }
-  }
-
   async function leave() {
     if (!uid || !id) return;
     setActing(true);
@@ -262,40 +233,30 @@ export default function MeetupDetail() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 코트/장소 사진 (있으면 표시, 호스트는 탭해서 변경) */}
-        {meetup.image_url ? (
-          <Pressable onPress={pickPhoto} disabled={!isHost || uploading}>
-            <Image source={{ uri: meetup.image_url }} style={styles.cover} />
-            {isHost ? (
-              <View style={styles.coverEdit}>
-                <Ionicons name="camera" size={14} color="#fff" />
-                <Text style={styles.coverEditText}>{uploading ? '올리는 중…' : '사진 변경'}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        ) : isHost ? (
-          <Pressable onPress={pickPhoto} disabled={uploading} style={styles.coverEmpty}>
-            <Ionicons name="image-outline" size={22} color="#16C784" />
-            <Text style={styles.coverEmptyText}>{uploading ? '올리는 중…' : '코트/장소 사진 추가'}</Text>
-          </Pressable>
-        ) : null}
-
         <View style={styles.statusRow}>
-          {closed ? (
-            <Badge label={meetup.status === 'cancelled' ? '취소된 모임' : '마감된 모임'} color="#E5484D" bg="rgba(229,72,77,0.14)" />
-          ) : full ? (
-            <Badge label="정원 마감" color="#F5A623" bg="rgba(245,166,35,0.16)" />
-          ) : (
-            <Badge label="모집중" />
-          )}
-          {meetup.discipline !== 'any' ? (
-            <Badge label={meetup.discipline === 'doubles' ? '복식' : '단식'} color="#0EA5E9" bg="rgba(14,165,233,0.12)" />
-          ) : null}
+          {closed ? <Badge label={meetup.status === 'cancelled' ? '취소된 모임' : '마감된 모임'} color="#E5484D" bg="rgba(229,72,77,0.14)" /> : full ? <Badge label="정원 마감" color="#F5A623" bg="rgba(245,166,35,0.16)" /> : <Badge label="모집중" />}
+          {meetup.discipline !== 'any' ? <Badge label={meetup.discipline === 'doubles' ? '복식' : '단식'} color="#0EA5E9" bg="rgba(14,165,233,0.12)" /> : null}
           {meetup.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
           {meetup.dupr_premium ? <Badge label="DUPR+ 전용" color="#8B5CF6" bg="rgba(139,92,246,0.14)" /> : null}
         </View>
 
         <Text style={styles.title}>{meetup.title}</Text>
+
+        <Image
+          source={courtImage ? { uri: courtImage } : require('@/assets/images/icon.png')}
+          style={[styles.cover, !courtImage && styles.coverFallback]}
+          resizeMode={courtImage ? 'cover' : 'contain'}
+        />
+
+        <View style={styles.primaryInfo}>
+          <View style={styles.primaryRow}><Ionicons name="calendar-outline" size={23} color="#F8FAFC" /><Text style={styles.primaryText}>{formatMeetupTime(meetup.start_time)}</Text></View>
+          <View style={styles.primaryRow}><Ionicons name="location-outline" size={23} color="#F8FAFC" /><Text style={styles.primaryText}>{meetup.location_name}{meetup.region ? ` · ${meetup.region}` : ''}</Text></View>
+        </View>
+
+        <View style={styles.capacitySection}>
+          <View style={styles.capacityTop}><Text style={styles.capacityTitle}>참가 {meetup.participant_count} / {meetup.max_players}명</Text><Text style={styles.remaining}>{full ? '정원이 마감됐어요' : `${remainingSpots}자리 남았어요`}</Text></View>
+          <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${participantProgress}%` }]} /></View>
+        </View>
 
         {/* DUPR 인증 번개 안내 + (호스트) 경기 기록 진입 */}
         {meetup.dupr_certified ? (
@@ -314,19 +275,16 @@ export default function MeetupDetail() {
           </Pressable>
         ) : null}
 
-        <View style={styles.infoCard}>
-          <InfoRow icon="time-outline" text={formatMeetupTime(meetup.start_time)} />
-          <InfoRow icon="hourglass-outline" text={`약 ${Math.round(meetup.duration_min / 60 * 10) / 10}시간`} />
-          <InfoRow icon="location-outline" text={`${meetup.location_name}${meetup.region ? ` · ${meetup.region}` : ''}`} />
-          <InfoRow icon="ribbon-outline" text={`실력 ${skillRangeLabel(meetup.skill_min, meetup.skill_max)}`} />
-          <InfoRow icon="people-outline" text={`정원 ${meetup.participant_count}/${meetup.max_players}명`} />
-          <InfoRow icon="cash-outline" text={meetup.fee > 0 ? `게스트비 ${meetup.fee.toLocaleString()}원` : '게스트비 무료'} />
-          {meetup.require_approval ? <InfoRow icon="shield-checkmark-outline" text="호스트 승인제 모임" /> : null}
+        <View style={styles.factsGrid}>
+          <FactCell icon="hourglass-outline" text={`약 ${Math.round(meetup.duration_min / 60 * 10) / 10}시간`} />
+          <FactCell icon="stats-chart-outline" text={skillRangeLabel(meetup.skill_min, meetup.skill_max)} />
+          <FactCell icon="cash-outline" text={meetup.fee > 0 ? `게스트비 ${meetup.fee.toLocaleString()}원` : '게스트비 무료'} />
+          <FactCell icon="people-outline" text={meetup.require_approval ? '호스트 승인제' : '바로 참가'} />
         </View>
 
         {meetup.description ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>소개</Text>
+            <Text style={styles.sectionTitle}>모임 소개</Text>
             <Text style={styles.desc}>{meetup.description}</Text>
           </View>
         ) : null}
@@ -386,6 +344,12 @@ export default function MeetupDetail() {
       </ScrollView>
 
       <View style={styles.actionBar}>
+        {!isHost && !closed && !isApproved && !isPending ? (
+          <View style={styles.joinSummary}>
+            <Ionicons name="shield-checkmark-outline" size={18} color="#16C784" />
+            <Text style={styles.joinSummaryText}>{meetup.fee > 0 ? `게스트비 ${meetup.fee.toLocaleString()}원` : '게스트비 무료'}{meetup.require_approval ? ' · 호스트 승인 후 확정' : ''}</Text>
+          </View>
+        ) : null}
         {isHost ? (
           !closed ? (
             <Button title="모임 취소하기" variant="danger" onPress={confirmCancelMeetup} />
@@ -411,11 +375,11 @@ export default function MeetupDetail() {
   );
 }
 
-function InfoRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+function FactCell({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color="#16C784" />
-      <Text style={styles.infoText}>{text}</Text>
+    <View style={styles.factCell}>
+      <Ionicons name={icon} size={21} color="#16C784" />
+      <Text style={styles.factText}>{text}</Text>
     </View>
   );
 }
@@ -425,13 +389,19 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
   notFound: { color: '#AAB4C0', fontSize: 15 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
-  cover: { width: '100%', height: 180, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#151D25' },
-  coverEdit: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(17,24,39,0.7)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  coverEditText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  coverEmpty: { height: 96, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
-  coverEmptyText: { fontSize: 14, fontWeight: '700', color: '#16C784' },
-  statusRow: { flexDirection: 'row', gap: 8 },
-  title: { fontSize: 24, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
+  cover: { width: '100%', height: 190, borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#151D25' },
+  coverFallback: { backgroundColor: '#070A0D' },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  title: { fontSize: 28, fontWeight: '900', color: '#F8FAFC' },
+  primaryInfo: { gap: 12, paddingVertical: 2 },
+  primaryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  primaryText: { flex: 1, color: '#F8FAFC', fontSize: 17, fontWeight: '700' },
+  capacitySection: { gap: 10, paddingVertical: Spacing.three, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  capacityTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  capacityTitle: { color: '#F8FAFC', fontSize: 17, fontWeight: '900' },
+  remaining: { color: '#16C784', fontSize: 14, fontWeight: '800' },
+  progressTrack: { height: 8, borderRadius: 4, backgroundColor: '#1B242D', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 4, backgroundColor: '#16C784' },
   duprBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -456,6 +426,9 @@ const styles = StyleSheet.create({
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: 15, fontWeight: '500', color: '#F8FAFC', flex: 1 },
+  factsGrid: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: 1, borderLeftWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  factCell: { width: '50%', minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRightWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  factText: { flex: 1, color: '#F8FAFC', fontSize: 14, fontWeight: '700' },
   section: { marginTop: Spacing.two },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
   sectionHint: { fontSize: 13, color: '#707B87', marginTop: 2 },
@@ -487,5 +460,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
+  actionBar: { padding: Spacing.three, gap: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
+  joinSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  joinSummaryText: { color: '#D7DCE2', fontSize: 13, fontWeight: '700' },
 });

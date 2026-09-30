@@ -6,7 +6,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DuprRatingCard } from '@/components/dupr-rating-card';
-import { MeetupCard } from '@/components/meetup-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
@@ -61,7 +60,8 @@ export default function ProfileScreen() {
       .from('meetups_with_counts')
       .select('*')
       .in('id', ids)
-      .order('start_time', { ascending: true });
+      .order('start_time', { ascending: false })
+      .limit(1);
     setMyMeetups(data ?? []);
   }, [session?.user.id]);
 
@@ -107,9 +107,7 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-back" size={18} color={dark.text} />
               </Pressable>
             ) : null}
-            <Text style={styles.logo}>
-              P!<Text style={styles.logoAccent}>NUT</Text>
-            </Text>
+            <Text style={styles.screenTitle}>내 정보</Text>
           </View>
           <View style={styles.topActions}>
             <Pressable style={styles.iconButton} onPress={() => router.push('/profile/edit')} hitSlop={8}>
@@ -122,29 +120,26 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileShell}>
-          <View style={styles.profileHeader}>
-            <Text style={styles.eyebrow}>{t('profile.title')}</Text>
-            <View style={[styles.verifiedBadge, !profile?.dupr_verified && styles.neutralBadge]}>
-              <Text style={[styles.verifiedText, !profile?.dupr_verified && styles.neutralBadgeText]}>
-                {profile?.dupr_verified ? 'DUPR Verified' : 'DUPR Pending'}
-              </Text>
-            </View>
-          </View>
-
           <View style={styles.playerRow}>
             <Avatar nickname={profile?.nickname ?? 'P!NUT'} uri={profile?.avatar_url} size={72} />
-            <View style={{ flex: 1 }}>
+            <View style={styles.playerInfo}>
               <Text style={styles.playerName} numberOfLines={1}>
                 {profile?.nickname ?? 'P!NUT Player'}
               </Text>
               <Text style={styles.playerMeta} numberOfLines={1}>
                 {profile?.region || '지역 미설정'} · {playStyleLabel(profile?.play_style ?? 'all')}
               </Text>
+              <View style={[styles.verifiedBadge, !profile?.dupr_verified && styles.neutralBadge]}>
+                <Text style={[styles.verifiedText, !profile?.dupr_verified && styles.neutralBadgeText]}>
+                  {profile?.dupr_verified ? 'DUPR 인증' : 'DUPR 연결 전'}
+                </Text>
+              </View>
             </View>
           </View>
 
           <View style={styles.ratingCard}>
-            <Text style={styles.ratingLabel}>{ratingLabel}</Text>
+            <View style={styles.ratingSummary}>
+              <Text style={styles.ratingLabel}>{ratingLabel}</Text>
             {duprConnected ? (
               // 복식/단식 레이팅 구분 표시 — 미채점(NR)도 명시
               <View style={styles.ratingCols}>
@@ -165,15 +160,22 @@ export default function ProfileScreen() {
             ) : (
               <View style={styles.ratingRow}>
                 <Text style={styles.ratingValue}>{rating.toFixed(2)}</Text>
-                <Text style={[styles.ratingDelta, styles.ratingDeltaMuted]}>Self rated</Text>
+                <View style={styles.selfRatingMeta}>
+                  <Text style={styles.skillText}>{skillLabel(profile?.skill_level ?? 3)}</Text>
+                  <Text style={[styles.ratingDelta, styles.ratingDeltaMuted]}>Self rated</Text>
+                </View>
               </View>
             )}
-            <Text style={styles.ratingUpdated}>
-              {duprConnected && profile?.dupr_synced_at ? `Updated ${profile.dupr_synced_at.slice(0, 10)}` : skillLabel(profile?.skill_level ?? 3)}
-            </Text>
+              {duprConnected ? <Text style={styles.ratingUpdated}>{profile?.dupr_synced_at ? `Updated ${profile.dupr_synced_at.slice(0, 10)}` : 'DUPR 연동됨'}</Text> : null}
+            </View>
+            {!duprConnected ? (
+              <Pressable onPress={() => router.push('/dupr-connect' as never)} style={styles.duprConnectButton}>
+                <Text style={styles.duprConnectText}>DUPR 연결하기</Text>
+              </Pressable>
+            ) : null}
             {/* DUPR 자격(엔티틀먼트) — 연결과 별개로 SSO 에서 동기화되는 멤버십 자격 (0061·0084) */}
             {profile?.dupr_status === 'verified' ? (
-              <>
+              <View style={styles.entitlementArea}>
                 <View style={styles.entRow}>
                   <EntChip label="BASIC" active={!!profile.dupr_basic} />
                   <EntChip label="DUPR+" active={!!profile.dupr_premium} tone="purple" />
@@ -213,13 +215,14 @@ export default function ProfileScreen() {
                   hitSlop={6}>
                   <Text style={styles.duprUnlinkText}>DUPR 연결 해제</Text>
                 </Pressable>
-              </>
+              </View>
             ) : null}
           </View>
 
-          {/* DUPR 레이팅 추이 선그래프 — 히스토리 2개 이상일 때만 표시 (퀵버튼 줄 대체) */}
-          {session?.user.id ? <DuprRatingCard userId={session.user.id} /> : null}
         </View>
+
+        {/* DUPR 레이팅 추이 선그래프 — 프로필 요약 바로 아래에서 유지 */}
+        {session?.user.id ? <DuprRatingCard userId={session.user.id} /> : null}
 
         {needsSetup ? (
           <Pressable onPress={() => router.push('/profile/edit')} style={styles.setupBanner}>
@@ -257,24 +260,6 @@ export default function ProfileScreen() {
             })}
           </View>
         </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{t('profile.myMeetups')}</Text>
-          <Text style={styles.countText}>{myMeetups.length}개</Text>
-        </View>
-
-        {myMeetups.length === 0 ? (
-          <View style={styles.emptyPanel}>
-            <Ionicons name="calendar-clear-outline" size={24} color={dark.textMuted} />
-            <Text style={styles.emptyText}>{t('profile.emptyMeetups')}</Text>
-          </View>
-        ) : (
-          <View style={{ gap: Spacing.three }}>
-            {myMeetups.map((m) => (
-              <MeetupCard key={m.id} meetup={m} onPress={() => router.push(`/meetup/${m.id}`)} />
-            ))}
-          </View>
-        )}
 
         <Pressable onPress={confirmSignOut} style={styles.signOutButton}>
           <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
@@ -350,11 +335,10 @@ function RecentActivityCard({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: dark.background },
-  content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: Spacing.three, paddingBottom: 124 },
+  content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, gap: Spacing.four, paddingBottom: 124 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   topLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  logo: { fontSize: 20, fontWeight: '900', color: dark.text, letterSpacing: 0 },
-  logoAccent: { color: Brand.primary },
+  screenTitle: { fontSize: 20, fontWeight: '900', color: dark.text },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   iconButton: {
     width: 38,
@@ -368,17 +352,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileShell: {
-    padding: Spacing.three,
-    gap: Spacing.three,
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    backgroundColor: dark.surface,
-    borderWidth: 1,
-    borderColor: dark.line,
+    gap: Spacing.four,
   },
-  profileHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  eyebrow: { fontSize: 13, fontWeight: '800', color: dark.textSecondary },
   verifiedBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 16,
@@ -388,29 +366,40 @@ const styles = StyleSheet.create({
   neutralBadge: { backgroundColor: 'rgba(255,255,255,0.08)' },
   verifiedText: { fontSize: 11, fontWeight: '900', color: Brand.primary },
   neutralBadgeText: { color: dark.textMuted },
-  playerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.one },
+  playerInfo: { flex: 1, alignItems: 'flex-start' },
   playerName: { fontSize: 24, fontWeight: '900', color: dark.text },
   playerMeta: { marginTop: 4, fontSize: 13, fontWeight: '600', color: dark.textSecondary },
   ratingCard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    paddingVertical: Spacing.four,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: 8,
     borderCurve: 'continuous',
-    backgroundColor: 'rgba(255,255,255,0.035)',
+    backgroundColor: dark.surface,
     borderWidth: 1,
     borderColor: dark.line,
   },
+  ratingSummary: { flex: 1, minWidth: 190 },
   ratingLabel: { fontSize: 13, fontWeight: '700', color: dark.textSecondary },
-  ratingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.one, marginTop: 8 },
-  ratingValue: { fontSize: 52, lineHeight: 58, fontWeight: '900', color: dark.text, fontVariant: ['tabular-nums'] },
-  ratingDelta: { paddingBottom: 8, fontSize: 15, fontWeight: '900', color: '#9BE137' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: 6 },
+  ratingValue: { fontSize: 48, lineHeight: 54, fontWeight: '900', color: dark.text, fontVariant: ['tabular-nums'] },
+  selfRatingMeta: { paddingLeft: Spacing.three, borderLeftWidth: 1, borderLeftColor: dark.line },
+  skillText: { fontSize: 18, fontWeight: '900', color: Brand.primary },
+  ratingDelta: { marginTop: 3, fontSize: 12, fontWeight: '700', color: '#9BE137' },
   ratingDeltaMuted: { color: dark.textMuted },
   ratingUpdated: { marginTop: 6, fontSize: 12, fontWeight: '600', color: dark.textMuted },
   ratingCols: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: Spacing.four },
   ratingCol: { alignItems: 'center', minWidth: 108 },
   ratingColLabel: { fontSize: 12.5, fontWeight: '800', color: dark.textSecondary, marginBottom: 2 },
   ratingColDivider: { width: 1, height: 44, backgroundColor: dark.line },
-  entRow: { flexDirection: 'row', gap: 6, marginTop: 12, justifyContent: 'center' },
+  duprConnectButton: { minHeight: 42, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: dark.textSecondary, alignItems: 'center', justifyContent: 'center' },
+  duprConnectText: { color: dark.text, fontSize: 13, fontWeight: '800' },
+  entitlementArea: { width: '100%' },
+  entRow: { flexDirection: 'row', gap: 6, marginTop: 4, justifyContent: 'flex-start' },
   entChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, borderCurve: 'continuous' },
   entChipText: { fontSize: 11.5, fontWeight: '800' },
   entWarn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
@@ -432,11 +421,10 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.one },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: dark.text },
   moreText: { fontSize: 13, fontWeight: '800', color: dark.textMuted },
-  countText: { fontSize: 13, fontWeight: '800', color: dark.textMuted },
   recentCard: {
     padding: Spacing.three,
-    gap: Spacing.three,
-    borderRadius: 20,
+    gap: Spacing.two,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: dark.surface,
     borderWidth: 1,
@@ -461,23 +449,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   languagePanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    backgroundColor: dark.surfaceSoft,
-    borderWidth: 1,
-    borderColor: dark.line,
+    gap: Spacing.two,
+    paddingVertical: Spacing.one,
   },
   panelTitle: { fontSize: 16, fontWeight: '900', color: dark.text },
   panelHint: { marginTop: 4, fontSize: 12, color: dark.textSecondary },
-  languageOptions: { flexDirection: 'row', gap: 8 },
+  languageOptions: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 8, backgroundColor: dark.surface, borderWidth: 1, borderColor: dark.line },
   languageButton: {
+    flex: 1,
     height: 36,
     paddingHorizontal: 12,
-    borderRadius: 16,
+    borderRadius: 6,
     borderCurve: 'continuous',
     backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
@@ -486,21 +468,10 @@ const styles = StyleSheet.create({
   languageButtonActive: { backgroundColor: Brand.primary },
   languageText: { fontSize: 12, fontWeight: '900', color: dark.textSecondary },
   languageTextActive: { color: '#FFFFFF' },
-  emptyPanel: {
-    alignItems: 'center',
-    gap: Spacing.one,
-    padding: Spacing.four,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    backgroundColor: dark.surface,
-    borderWidth: 1,
-    borderColor: dark.line,
-  },
-  emptyText: { fontSize: 14, lineHeight: 20, color: dark.textSecondary, textAlign: 'center' },
   signOutButton: {
     height: 56,
     marginTop: Spacing.three,
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: dark.line,

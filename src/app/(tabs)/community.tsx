@@ -2,10 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CommunityPostCard } from '@/components/community-post-card';
-import { AppFAB } from '@/components/ui/app-fab';
 import { AppHeader } from '@/components/ui/app-header';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
@@ -17,7 +16,6 @@ import type { CommunityCategory, CommunityPostWithCounts } from '@/lib/types';
 
 export default function CommunityScreen() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const uid = session?.user.id;
@@ -55,7 +53,13 @@ export default function CommunityScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <AppHeader title="커뮤니티" subtitle="자유롭게 이야기하고 정보를 나눠보세요" />
+        <AppHeader
+          title="커뮤니티"
+          subtitle="자유롭게 이야기하고 정보를 나눠보세요"
+          rightIcon="create-outline"
+          rightAccent
+          onRightPress={() => router.push(session ? ('/community/create' as never) : '/(auth)/sign-in')}
+        />
       </View>
 
       {/* 카테고리 탭 — 번개 목록의 일반/DUPR 탭과 동일한 디자인 */}
@@ -99,8 +103,6 @@ export default function CommunityScreen() {
           }
         />
       )}
-
-      <AppFAB icon="create" onPress={() => router.push(session ? ('/community/create' as never) : '/(auth)/sign-in')} style={[styles.fab, { bottom: 86 + Math.max(insets.bottom, 16) }]} />
     </SafeAreaView>
   );
 }
@@ -132,17 +134,17 @@ function FilterChip({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#070A0D' },
-  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.two },
-  chipsWrap: { paddingBottom: Spacing.three },
+  header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
+  chipsWrap: { paddingBottom: Spacing.three, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.10)' },
   chips: { paddingHorizontal: Spacing.four, gap: 8 },
   chip: {
-    height: 44,
-    paddingHorizontal: 16,
+    height: 38,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    borderRadius: 12,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: '#10161D',
     borderWidth: 1,
@@ -150,9 +152,8 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 14, fontWeight: '800', color: '#AAB4C0' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
+  list: { paddingHorizontal: Spacing.four, paddingBottom: 124 },
   empty: { alignItems: 'center', gap: 8, paddingTop: 80 },
   emptyTitle: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
   emptyBody: { fontSize: 16, color: '#AAB4C0' },
-  fab: { position: 'absolute', right: Spacing.four },
 });

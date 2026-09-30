@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
-import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AppSpacing, Radius, Typography } from '@/theme';
 import { formatMeetupTime, skillRangeLabel } from '@/lib/format';
@@ -20,47 +19,43 @@ export function TournamentCard({
   const ended = t.status === 'finished' || t.status === 'cancelled';
 
   return (
-    <AppCard onPress={onPress} style={[styles.card, ended && styles.ended]}>
-      {t.images?.[0] ? <Image source={{ uri: t.images[0] }} style={styles.cover} /> : null}
-      <View style={styles.topRow}>
-        <Text style={styles.time}>{formatMeetupTime(t.start_at)}</Text>
-        {registering ? (
-          <Badge label="접수중" />
-        ) : t.status === 'ongoing' ? (
-          <Badge label="진행중" color="#16C784" bg="rgba(22,199,132,0.14)" />
-        ) : (
-          <Badge label={t.status === 'finished' ? '종료' : '취소됨'} color="#AAB4C0" bg="rgba(255,255,255,0.07)" />
-        )}
-      </View>
-
-      <View style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={2}>{t.title}</Text>
-        <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#FBBF24" bg="rgba(251,191,36,0.14)" />
-      </View>
-
-      <View style={styles.metaRow}>
-        <Ionicons name="location-outline" size={15} color="#707B87" />
-        <Text style={styles.meta} numberOfLines={1}>
-          {t.venue || '장소 미정'}{t.region ? ` · ${t.region}` : ''}
-        </Text>
-      </View>
-
-      <View style={styles.bottomRow}>
-        <View style={styles.hostRow}>
-          <Avatar nickname={t.organizer_nickname} uri={t.organizer_avatar_url} size={28} />
-          <Text style={styles.host} numberOfLines={1}>{t.organizer_nickname}</Text>
+    <AppCard onPress={onPress} style={[styles.card, ended && styles.ended]} padded={false}>
+      {t.images?.[0] ? (
+        <Image source={{ uri: t.images[0] }} style={styles.cover} />
+      ) : (
+        <View style={[styles.cover, styles.coverEmpty]}>
+          <Ionicons name="trophy-outline" size={30} color="#707B87" />
         </View>
-        <View style={styles.tags}>
-          <View style={styles.pill}>
-            <Ionicons name="ribbon-outline" size={13} color="#AAB4C0" />
-            <Text style={styles.pillText}>{skillRangeLabel(t.skill_min, t.skill_max)}</Text>
+      )}
+      <View style={styles.body}>
+        <View style={styles.topRow}>
+          <Text style={styles.time} numberOfLines={1}>{formatMeetupTime(t.start_at)}</Text>
+          {registering ? (
+            <Badge label="접수중" />
+          ) : t.status === 'ongoing' ? (
+            <Badge label="진행중" color="#16C784" bg="rgba(22,199,132,0.14)" />
+          ) : (
+            <Badge label={t.status === 'finished' ? '종료' : '취소됨'} color="#AAB4C0" bg="rgba(255,255,255,0.07)" />
+          )}
+        </View>
+
+        <Text style={styles.title} numberOfLines={1}>{t.title}</Text>
+
+        <View style={styles.metaRow}>
+          <Ionicons name="location-outline" size={14} color="#707B87" />
+          <Text style={styles.meta} numberOfLines={1}>
+            {t.venue || '장소 미정'}{t.region ? ` · ${t.region}` : ''}
+          </Text>
+        </View>
+
+        <View style={styles.bottomRow}>
+          <View style={styles.tags}>
+            <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#FBBF24" bg="rgba(251,191,36,0.14)" />
+            <View style={styles.pill}><Text style={styles.pillText}>{skillRangeLabel(t.skill_min, t.skill_max)}</Text></View>
           </View>
-          <View style={styles.pill}>
-            <Ionicons name="people-outline" size={13} color="#AAB4C0" />
-            <Text style={styles.pillText}>
-              {/* 유료 대회는 결제 대기(pending)도 정원을 점유하므로 합산 표시 (0089) */}
-              {t.approved_count + t.pending_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}
-            </Text>
+          <View style={styles.capacity}>
+            <Ionicons name="people-outline" size={14} color="#AAB4C0" />
+            <Text style={styles.capacityText}>{t.approved_count + t.pending_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}</Text>
           </View>
         </View>
       </View>
@@ -69,19 +64,20 @@ export function TournamentCard({
 }
 
 const styles = StyleSheet.create({
-  card: { gap: AppSpacing.xs },
-  cover: { width: '100%', height: 140, borderRadius: Radius.card, borderCurve: 'continuous', backgroundColor: '#151D25', marginBottom: AppSpacing.xs },
+  card: { minHeight: 132, flexDirection: 'row', overflow: 'hidden' },
+  cover: { width: 124, alignSelf: 'stretch', backgroundColor: '#151D25' },
+  coverEmpty: { alignItems: 'center', justifyContent: 'center' },
+  body: { flex: 1, minWidth: 0, padding: AppSpacing.sm, gap: 7, justifyContent: 'space-between' },
   ended: { opacity: 0.62 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm },
-  time: { fontSize: 20, fontWeight: '900', color: '#F8FAFC' },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: AppSpacing.xs },
-  title: { ...Typography.cardTitle, color: '#F8FAFC', flex: 1 },
+  time: { flex: 1, fontSize: 12, fontWeight: '700', color: '#AAB4C0' },
+  title: { ...Typography.cardTitle, color: '#F8FAFC' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   meta: { ...Typography.caption, color: '#AAB4C0', flex: 1 },
-  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.sm, marginTop: AppSpacing.xs },
-  hostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  host: { fontSize: 13, fontWeight: '600', color: '#AAB4C0', flex: 1 },
-  tags: { flexDirection: 'row', gap: 8 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderRadius: Radius.chip, backgroundColor: 'rgba(255,255,255,0.07)' },
-  pillText: { fontSize: 13, fontWeight: '700', color: '#AAB4C0' },
+  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: AppSpacing.xs },
+  tags: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pill: { paddingHorizontal: 7, paddingVertical: 5, borderRadius: Radius.chip, backgroundColor: 'rgba(255,255,255,0.07)' },
+  pillText: { fontSize: 11, fontWeight: '700', color: '#AAB4C0' },
+  capacity: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  capacityText: { fontSize: 12, fontWeight: '800', color: '#F8FAFC' },
 });

@@ -11,11 +11,11 @@ const BIZ = [
   '전화번호 : 010-5270-2034',
 ];
 
-export function BusinessFooter() {
+export function BusinessFooter({ compact = false }: { compact?: boolean }) {
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, compact && styles.compactBox]}>
       {BIZ.map((line) => (
-        <Text key={line} style={styles.line}>
+        <Text key={line} style={[styles.line, compact && styles.compactLine]}>
           {line}
         </Text>
       ))}
@@ -34,5 +34,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     gap: 3,
   },
+  compactBox: {
+    marginTop: 4,
+    paddingHorizontal: 0,
+    paddingVertical: 18,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.09)',
+    gap: 5,
+  },
   line: { fontSize: 11.5, lineHeight: 17, color: '#8A94A0', fontWeight: '600' },
+  compactLine: { color: '#707B87', lineHeight: 18 },
 });

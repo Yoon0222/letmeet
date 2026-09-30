@@ -1,14 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
-import { CourtCard } from '@/components/court-card';
 import { EventPopup } from '@/components/event-popup';
 import { HomeSessionVote } from '@/components/home-session-vote';
-import { MeetupCard } from '@/components/meetup-card';
 import { TournamentCard } from '@/components/tournament-card';
 import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
@@ -47,6 +45,7 @@ export default function HomeScreen() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const courtImages = new Map(courts.map((court) => [court.id, court.images?.[0] ?? court.image_url ?? null]));
 
   const mySkill = profile?.skill_level ?? 3.5;
   const myRegion = profile?.region ?? '';
@@ -263,30 +262,20 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <HomeSessionVote />
-
         <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#9BE137" bg="rgba(155,225,55,0.14)" />
         {upcoming.length > 0 ? (
-          <View style={{ gap: Spacing.three }}>
-            {upcoming.map((item) => {
-              const meta = TYPE_META[item.type];
-              const today = item.dday <= 0;
-              return (
-                <AppCard key={item.key} onPress={() => router.push(item.route as never)} style={styles.scheduleCard}>
-                  <View style={[styles.scheduleIcon, { backgroundColor: meta.bg }]}>
-                    <Ionicons name={meta.icon} size={18} color={meta.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.scheduleTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.scheduleSub} numberOfLines={1}>{item.subtitle}</Text>
-                  </View>
-                  <View style={[styles.ddayBadge, today && styles.ddayToday]}>
-                    <Text style={[styles.ddayText, today && styles.ddayTodayText]}>{ddayLabel(item.dday)}</Text>
-                  </View>
-                </AppCard>
-              );
-            })}
-          </View>
+          (() => {
+            const item = upcoming[0];
+            const meta = TYPE_META[item.type];
+            const today = item.dday <= 0;
+            return (
+              <AppCard onPress={() => router.push(item.route as never)} style={styles.scheduleCard}>
+                <View style={[styles.scheduleIcon, { backgroundColor: meta.bg }]}><Ionicons name={meta.icon} size={20} color={meta.color} /></View>
+                <View style={{ flex: 1 }}><Text style={styles.scheduleTitle} numberOfLines={1}>{item.title}</Text><Text style={styles.scheduleSub} numberOfLines={1}>{item.subtitle}</Text></View>
+                <View style={[styles.ddayBadge, today && styles.ddayToday]}><Text style={[styles.ddayText, today && styles.ddayTodayText]}>{ddayLabel(item.dday)}</Text></View>
+              </AppCard>
+            );
+          })()
         ) : (
           <View style={styles.emptyCard}>
             <Ionicons name="calendar-outline" size={28} color="#707B87" />
@@ -295,83 +284,79 @@ export default function HomeScreen() {
           </View>
         )}
 
+        <HomeSessionVote />
+
+        <View style={styles.quickGrid}>
+          <QuickAction icon="flash-outline" label="모임 찾기" onPress={() => router.push('/(tabs)/matches')} />
+          <QuickAction icon="location-outline" label="코트 예약" onPress={() => router.push('/(tabs)/court' as never)} />
+          <QuickAction icon="trophy-outline" label="대회" tone="#FBBF24" onPress={() => router.push('/(tabs)/tournaments')} />
+          <QuickAction icon="people-outline" label="클럽" onPress={() => router.push('/(tabs)/clubs')} />
+        </View>
+
         {/* 내 클럽 공지 (0088) — 공지가 있을 때만 노출 */}
         {clubNotices.length > 0 ? (
-          <>
-            <SectionHeader
-              title="클럽 공지"
-              onMore={() => router.push({ pathname: '/club/board', params: { clubId: clubNotices[0].club_id } } as never)}
-              icon="megaphone-outline"
-              color="#F59E0B"
-              bg="rgba(245,158,11,0.14)"
-            />
-            <View style={{ gap: Spacing.two }}>
-              {clubNotices.map((n) => (
-                <AppCard
-                  key={n.id}
-                  onPress={() => router.push({ pathname: '/club/post/[id]', params: { id: n.id, clubId: n.club_id } } as never)}
-                  style={styles.noticeCard}>
-                  <View style={styles.noticeIcon}>
-                    <Ionicons name="megaphone" size={15} color="#F59E0B" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.noticeClub} numberOfLines={1}>{n.club_name}</Text>
-                    <Text style={styles.noticeTitle} numberOfLines={1}>{n.title}</Text>
-                  </View>
-                  <Text style={styles.noticeTime}>{formatMeetupTime(n.created_at)}</Text>
-                </AppCard>
-              ))}
-            </View>
-          </>
+          <AppCard onPress={() => router.push({ pathname: '/club/post/[id]', params: { id: clubNotices[0].id, clubId: clubNotices[0].club_id } } as never)} style={styles.noticeCard}>
+            <View style={styles.noticeIcon}><Ionicons name="megaphone" size={16} color="#16C784" /></View>
+            <Text style={styles.noticeClub}>클럽 공지</Text>
+            <View style={styles.noticeDivider} />
+            <Text style={styles.noticeTitle} numberOfLines={1}>{clubNotices[0].title}</Text>
+            <Ionicons name="chevron-forward" size={16} color="#707B87" />
+          </AppCard>
         ) : null}
 
-        {/* 코트 예약 — 둘러보고 예약하는 진입점 */}
-        <SectionHeader title="코트 예약" onMore={() => router.push('/(tabs)/court' as never)} icon="location-outline" color="#38BDF8" bg="rgba(56,189,248,0.14)" />
-        {courts.length > 0 ? (
-          <View style={{ gap: Spacing.three }}>
-            {courts.map((c) => (
-              <CourtCard key={c.id} court={c} onPress={() => router.push(`/court/${c.id}` as never)} />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.placeholder}>예약 가능한 코트를 준비 중이에요.</Text>
-        )}
+        <SectionHeader title="오늘 둘러보기" onMore={() => router.push('/(tabs)/matches')} icon="compass-outline" color="#16C784" bg="rgba(22,199,132,0.14)" />
+        <View style={styles.discoveryRow}>
+          {courts.slice(0, recommended[0] ? 1 : 2).map((court) => (
+            <DiscoveryCard key={court.id} imageUrl={court.images?.[0] ?? court.image_url} title={court.name} meta={`${court.indoor ? '실내' : '실외'} · ${court.hourly_price ? `시간당 ${court.hourly_price.toLocaleString()}원` : '무료'}`} badge="예약 보기" onPress={() => router.push(`/court/${court.id}` as never)} />
+          ))}
+          {recommended[0] ? <DiscoveryCard imageUrl={recommended[0].court_id ? courtImages.get(recommended[0].court_id) : null} title={recommended[0].title} meta={`${formatMeetupTime(recommended[0].start_time)} · ${recommended[0].participant_count}/${recommended[0].max_players}명`} badge="모집중" onPress={() => router.push(`/meetup/${recommended[0].id}`)} /> : null}
+        </View>
 
         {/* 모집 중인 대회 — 있을 때만 노출(비면 섹션 자체 숨김) */}
         {openTournaments.length > 0 && (
           <>
-            <SectionHeader title="대회" onMore={() => router.push('/(tabs)/tournaments')} icon="trophy-outline" color="#FBBF24" bg="rgba(251,191,36,0.14)" />
-            <View style={{ gap: Spacing.three }}>
-              {openTournaments.map((t) => (
-                <TournamentCard key={t.id} tournament={t} onPress={() => router.push(`/tournament/${t.id}`)} />
-              ))}
-            </View>
+            <SectionHeader title="접수 중인 대회" onMore={() => router.push('/(tabs)/tournaments')} icon="trophy-outline" color="#FBBF24" bg="rgba(251,191,36,0.14)" />
+            <TournamentCard tournament={openTournaments[0]} onPress={() => router.push(`/tournament/${openTournaments[0].id}`)} />
           </>
-        )}
-
-        <SectionHeader title="근처 추천 모임" onMore={() => router.push('/(tabs)/matches')} icon="flash-outline" color="#16C784" bg="rgba(22,199,132,0.14)" />
-        {recommended.length > 0 ? (
-          <View style={{ gap: Spacing.three }}>
-            {recommended.map((m) => (
-              <MeetupCard key={m.id} meetup={m} onPress={() => router.push(`/meetup/${m.id}`)} />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.placeholder}>아직 추천할 모임이 없어요. 첫 모임을 만들어보세요.</Text>
         )}
 
         <SectionHeader title="추천 클럽" onMore={() => router.push('/(tabs)/clubs')} icon="people-outline" color="#A78BFA" bg="rgba(167,139,250,0.14)" />
         {clubs.length > 0 ? (
-          <View style={{ gap: Spacing.three }}>
-            {clubs.map((c) => (
-              <ClubCard key={c.id} club={c} onPress={() => router.push(`/club/${c.id}`)} />
-            ))}
-          </View>
+          <ClubCard club={clubs[0]} onPress={() => router.push(`/club/${clubs[0].id}`)} />
         ) : (
           <Text style={styles.placeholder}>아직 클럽이 없어요. 새 클럽을 만들고 멤버를 모아보세요.</Text>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function QuickAction({ icon, label, tone = '#16C784', onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; tone?: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.quickAction}>
+      <Ionicons name={icon} size={23} color={tone} />
+      <Text style={styles.quickLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function DiscoveryCard({ imageUrl, title, meta, badge, onPress }: { imageUrl?: string | null; title: string; meta: string; badge: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.discoveryCard}>
+      {imageUrl ? (
+        <Image source={{ uri: imageUrl }} style={styles.discoveryImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.discoveryImage, styles.discoveryFallback]}>
+          <Text style={styles.discoveryLogo}>P!<Text style={styles.discoveryLogoAccent}>NUT</Text></Text>
+          <Ionicons name="tennisball-outline" size={28} color="#707B87" />
+        </View>
+      )}
+      <View style={styles.discoveryBody}>
+        <Text style={styles.discoveryTitle} numberOfLines={1}>{title}</Text>
+        <Text style={styles.discoveryMeta} numberOfLines={1}>{meta}</Text>
+        <View style={styles.discoveryBadge}><Text style={styles.discoveryBadgeText}>{badge}</Text></View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -418,11 +403,14 @@ const styles = StyleSheet.create({
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   more: { fontSize: 13, fontWeight: '800', color: '#707B87' },
   scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  noticeCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  noticeIcon: { width: 34, height: 34, borderRadius: 12, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(245,158,11,0.14)' },
-  noticeClub: { fontSize: 12, fontWeight: '800', color: '#F59E0B' },
-  noticeTitle: { fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginTop: 1 },
-  noticeTime: { fontSize: 11.5, fontWeight: '600', color: '#707B87' },
+  quickGrid: { flexDirection: 'row', gap: 8 },
+  quickAction: { flex: 1, height: 84, alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  quickLabel: { color: '#F8FAFC', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  noticeCard: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 8 },
+  noticeIcon: { width: 30, height: 30, borderRadius: 8, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,199,132,0.12)' },
+  noticeClub: { fontSize: 12, fontWeight: '900', color: '#16C784' },
+  noticeDivider: { width: 1, height: 18, backgroundColor: 'rgba(255,255,255,0.12)' },
+  noticeTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: '#F8FAFC' },
   scheduleIcon: { width: 40, height: 40, borderRadius: 16, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
   scheduleTitle: { fontSize: 16, fontWeight: '800', color: '#F8FAFC' },
   scheduleSub: { fontSize: 13, color: '#AAB4C0', marginTop: 2 },
@@ -430,6 +418,17 @@ const styles = StyleSheet.create({
   ddayText: { fontSize: 13, fontWeight: '800', color: '#AAB4C0' },
   ddayToday: { backgroundColor: '#16C784' },
   ddayTodayText: { color: '#FFFFFF' },
+  discoveryRow: { flexDirection: 'row', gap: 10, minHeight: 214 },
+  discoveryCard: { width: '48.5%', minWidth: 0, overflow: 'hidden', borderRadius: 8, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  discoveryImage: { width: '100%', height: 112, backgroundColor: '#151D25' },
+  discoveryFallback: { alignItems: 'center', justifyContent: 'center', gap: 8 },
+  discoveryLogo: { color: '#F8FAFC', fontSize: 18, fontWeight: '900' },
+  discoveryLogoAccent: { color: '#16C784' },
+  discoveryBody: { flex: 1, alignItems: 'flex-start', padding: 12, gap: 5 },
+  discoveryTitle: { width: '100%', color: '#F8FAFC', fontSize: 14, fontWeight: '900' },
+  discoveryMeta: { width: '100%', color: '#AAB4C0', fontSize: 11, fontWeight: '600' },
+  discoveryBadge: { marginTop: 'auto', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(22,199,132,0.15)' },
+  discoveryBadgeText: { color: '#16C784', fontSize: 11, fontWeight: '900' },
   emptyCard: { alignItems: 'center', gap: 6, paddingVertical: 28, paddingHorizontal: Spacing.three, borderRadius: 18, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderStyle: 'dashed', backgroundColor: '#10161D' },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: '#F8FAFC' },
   emptyBody: { fontSize: 13, color: '#707B87', textAlign: 'center' },

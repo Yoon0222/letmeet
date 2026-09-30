@@ -156,6 +156,10 @@ function RootNavigator() {
             headerShadowVisible: false,
           }}
         />
+        <Stack.Screen
+          name="club/edit"
+          options={{ headerShown: true, title: '클럽 수정', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
         <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
         <Stack.Screen
           name="club/board"
