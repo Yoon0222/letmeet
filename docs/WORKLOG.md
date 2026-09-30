@@ -3,6 +3,9 @@
 피클볼 커뮤니티 슈퍼앱의 핵심 결정·작업 기록. 날짜 섹션(`## YYYY-MM-DD`)이 최신순으로 위에 오고, 같은 날짜 안에서는 최신 작업(`### 제목`)이 위로 온다.
 
 ## 열린 항목
+- [ ] **4.0.0** iOS 빌드(`01f08299`) 완료 확인 → App Store 제출. Android 4.0.0 빌드 여부 결정 (2026-09-30)
+- [ ] 4.0.0 스토어 출시 후 **버전 게이트(DB 최신 버전) 4.0.0 갱신** — 출시 전에 올리면 3.x 사용자에게 없는 버전 업데이트 안내가 뜸
+- [ ] `.easignore`에 `.env`·`outputs/`·`.codex-*` 추가 — **선행**: preview 빌드 Toss 테스트키를 eas.json/EAS env로 이관
 - [x] Supabase에 `0004_tournaments.sql` 실행 (대회 테이블) — 적용됨(테이블 200 확인)
 - [x] 권한(역할) 체계 코드 완료 (role + RLS + 트리거 + 관리자 웹 게이트 + 사용자관리)
 - [x] `0005_roles.sql` 실행 + super_admin 부트스트랩(`관리자`=ysshin93) — 완료
@@ -78,6 +81,18 @@
 - [ ] 상점 화면 (피클볼 용품 판매) — 로드맵 가장 마지막
 
 ---
+
+## 2026-09-30
+
+### 4.0.0 iOS 프로덕션 빌드 — 디자인 리프레시 + prod 설정 번들 검증
+- **결정**: 코덱스 디자인 리프레시(`a3ec355`, 20파일 + 클럽장 '클럽 수정' 화면 `club/edit.tsx`)를 메이저 **4.0.0**으로 출시. runtimeVersion(appVersion 정책)도 4.0.0 → 3.x OTA와 분리됨.
+- **검증**: 빌드 전 eas.json production env를 주입한 채 로컬 `expo export --platform ios` → 번들 grep. prod Supabase URL/anon·live Toss 전체 키만 포함, dev URL/anon·test 키 **0건**. 네이버 client_id=EAS production env, DUPR=`pinut.org/dupr-connect` 폴백.
+- **만든 것**: app.json 4.0.0(`e6ec7ae`), EAS iOS production 빌드 `01f08299`.
+- **메모/주의**: ⚠️ `.easignore`가 `.gitignore`를 대체하는데 `.env`(dev)·`outputs/`·`.codex-*`를 안 빼서 매 빌드에 업로드됨. 값은 eas.json 우선이라 현재 안전하지만, eas.json에서 키가 빠지면 dev 값이 prod에 샘. 고칠 땐 preview 빌드의 Toss 테스트키 출처(.env)부터 EAS env로 옮길 것.
+
+### DEV 테스트 코트 5곳 추가 (예약 가능)
+- DEV DB에 `auto_open_days` 14~30 코트 5곳 INSERT: 검단 실내(12,000)·청라 스포츠센터(15,000)·김포 한강 야외(8,000)·마곡 프리미엄(18,000)·하남 미사(무료). `owner_id` null(super_admin 관리).
+- 앱 "오늘 예약 가능" 필터·상세 시간대·예약 버튼까지 실기기 확인. **테스트 DB 리셋 시 재시딩 필요**(SQL은 레포 미커밋).
 
 ## 2026-09-23
 
