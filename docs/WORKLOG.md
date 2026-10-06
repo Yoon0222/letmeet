@@ -4,7 +4,7 @@
 
 ## 열린 항목
 - [ ] **4.0.0** iOS 빌드(`01f08299`) 완료 확인 → App Store 제출. Android 4.0.0 빌드 여부 결정 (2026-09-30)
-- [ ] 4.0.0 스토어 출시 후 **버전 게이트(DB 최신 버전) 4.0.0 갱신** — 출시 전에 올리면 3.x 사용자에게 없는 버전 업데이트 안내가 뜸
+- [x] ~~4.0.0 출시 후 DB 최신 버전 갱신~~ → **불필요**(2026-10-06 정정): 권장 안내는 `checkForUpdate()`(expo-in-app-updates)가 스토어 버전을 직접 읽어 자동. `app_config.latest_version`은 코드에서 미사용. 구버전 **차단**이 필요할 때만 `min_version`을 올림
 - [ ] `.easignore`에 `.env`·`outputs/`·`.codex-*` 추가 — **선행**: preview 빌드 Toss 테스트키를 eas.json/EAS env로 이관
 - [x] Supabase에 `0004_tournaments.sql` 실행 (대회 테이블) — 적용됨(테이블 200 확인)
 - [x] 권한(역할) 체계 코드 완료 (role + RLS + 트리거 + 관리자 웹 게이트 + 사용자관리)
