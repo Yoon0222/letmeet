@@ -73,7 +73,7 @@ export default function ClubDetail() {
         .order('session_date', { ascending: true })
         .limit(10),
     ]);
-    setClub(c ?? null);
+    let nextClub = c ?? null;
     setMembers((m as unknown as ClubMemberWithProfile[]) ?? []);
     setPosts((p as ClubPostWithAuthor[] | null) ?? []);
     const nextSessions = (sessionRows as ClubSession[] | null) ?? [];
@@ -90,10 +90,28 @@ export default function ClubDetail() {
         .select('id, club_id, owner_id, card_company, card_number_masked, amount, status, current_period_start, current_period_end, next_charge_at, last_charge_at, fail_count, canceled_at, created_at, updated_at')
         .eq('club_id', id)
         .maybeSingle();
-      setSub((s as ClubSubscription | null) ?? null);
+      const nextSub = (s as ClubSubscription | null) ?? null;
+      setSub(nextSub);
+
+      // 정기 만료 작업이 늦더라도 해지된 이용 기간이 끝났으면 즉시 Free로 동기화한다.
+      const canceledPeriodExpired =
+        nextSub?.status === 'canceled' &&
+        !!nextSub.current_period_end &&
+        new Date(nextSub.current_period_end).getTime() <= Date.now();
+      if (canceledPeriodExpired && (c.tier === 'premium' || c.premium_status !== 'canceled')) {
+        const { error: syncError } = await supabase
+          .from('clubs')
+          .update({ tier: 'free', premium_status: 'canceled' })
+          .eq('id', id)
+          .eq('owner_id', uid);
+        if (!syncError) {
+          nextClub = { ...c, tier: 'free', premium_status: 'canceled' };
+        }
+      }
     } else {
       setSub(null);
     }
+    setClub(nextClub);
     setLoading(false);
   }, [id, uid]);
 
@@ -108,7 +126,10 @@ export default function ClubDetail() {
   const isApprovedMember = myMembership?.status === 'approved';
   const isPending = myMembership?.status === 'pending';
   const isTrialing = club?.premium_status === 'trialing' && !!club.premium_trial_ends_at && new Date(club.premium_trial_ends_at).getTime() > nowMs;
-  const isPremiumUsable = club?.tier === 'premium' && (club.premium_status === 'active' || isTrialing);
+  const canceledPeriodExpired =
+    sub?.status === 'canceled' && !!sub.current_period_end && new Date(sub.current_period_end).getTime() <= nowMs;
+  const isPremiumUsable =
+    club?.tier === 'premium' && (club.premium_status === 'active' || isTrialing) && !canceledPeriodExpired;
   const trialDaysLeft = isTrialing && club?.premium_trial_ends_at
     ? Math.max(0, Math.ceil((new Date(club.premium_trial_ends_at).getTime() - nowMs) / 86400000))
     : null;
@@ -429,9 +450,11 @@ export default function ClubDetail() {
           <Text style={styles.premiumBody}>
             {isPremiumUsable
               ? '클럽 멤버끼리 진행한 경기 결과를 기록하고 히스토리로 확인할 수 있어요.'
-              : '프리미엄 클럽은 클럽 내부 경기 결과 기록을 사용할 수 있어요. 1개월 무료 체험 후 구독으로 전환됩니다.'}
+              : club?.premium_status === 'none'
+                ? '프리미엄 클럽은 클럽 내부 경기 결과 기록을 사용할 수 있어요. 1개월 무료 체험 후 구독으로 전환됩니다.'
+                : '프리미엄 기능을 다시 사용하려면 구독을 시작해 주세요.'}
           </Text>
-          {club?.premium_status === 'none' || club?.tier !== 'premium' ? (
+          {club?.premium_status === 'none' ? (
             <Button title="1개월 무료 체험 시작" onPress={startPremiumTrial} loading={acting} style={styles.premiumButton} />
           ) : CLUB_SUBSCRIPTION_ENABLED ? (
             sub && sub.status === 'active' ? (
