@@ -12,13 +12,26 @@ import { isBelow } from '@/lib/version';
 // 현재 앱(빌드) 버전. 스토어 배포본과 동일(app.json version).
 const CURRENT = Constants.expoConfig?.version ?? '0.0.0';
 
+// 스토어 링크 — app_config 값 우선, 비어 있으면 앱 설정(App Store ID / 패키지명)으로 만든다.
+// ios_url 이 비어 있으면 iOS 강제 업데이트 화면에 버튼이 없어 막다른 화면이 되던 문제 방지.
+function storeUrl(cfg: AppConfig): string {
+  if (Platform.OS === 'ios') {
+    if (cfg.ios_url) return cfg.ios_url;
+    const appStoreId = Constants.expoConfig?.ios?.infoPlist?.AppStoreID;
+    return appStoreId ? `https://apps.apple.com/app/id${appStoreId}` : '';
+  }
+  if (cfg.android_url) return cfg.android_url;
+  const pkg = Constants.expoConfig?.android?.package;
+  return pkg ? `https://play.google.com/store/apps/details?id=${pkg}` : '';
+}
+
 function openStore(cfg: AppConfig) {
-  const url = Platform.OS === 'ios' ? cfg.ios_url : cfg.android_url;
+  const url = storeUrl(cfg);
   if (url) Linking.openURL(url).catch(() => {});
 }
 
 // 앱 버전 게이트 — 실행 시 app_config 를 읽어 현재 버전과 비교.
-//   min_version 미만 = 강제(차단 화면), latest_version 미만 = 권장(1회 안내). 기본값이면 아무것도 안 함.
+//   min_version 미만 = 강제(차단 화면). 권장 안내는 스토어 체크(checkStoreUpdate)가 담당(latest_version 미사용).
 export function UpdateGate({ children }: { children: React.ReactNode }) {
   const [forced, setForced] = useState<AppConfig | null>(null);
   const checked = useRef(false);
@@ -49,7 +62,7 @@ export function UpdateGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (forced) {
-    const hasUrl = !!(Platform.OS === 'ios' ? forced.ios_url : forced.android_url);
+    const hasUrl = !!storeUrl(forced);
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
