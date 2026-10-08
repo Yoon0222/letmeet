@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -49,10 +49,13 @@ export default function TournamentDetail() {
   const [entries, setEntries] = useState<TournamentEntryWithProfile[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [courts, setCourts] = useState<TournamentCourt[]>([]);
+  const [clubNamesByUser, setClubNamesByUser] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [tab, setTab] = useState<'info' | 'players' | 'prelim' | 'final' | 'register' | 'bracket'>('info');
-  const [groupTab, setGroupTab] = useState<number | 'all'>('all');
+  const [groupTab, setGroupTab] = useState<number | null>(null);
+  const [groupScrollHasMore, setGroupScrollHasMore] = useState(true);
+  const initializedGroupTournamentRef = useRef<string | null>(null);
   const [search, setSearch] = useState('');
   const [coverIdx, setCoverIdx] = useState(0); // 대회 사진 갤러리: 크게 볼 사진 인덱스
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
@@ -85,10 +88,35 @@ export default function TournamentDetail() {
         .order('slot', { ascending: true }),
       supabase.from('tournament_courts').select('*').eq('tournament_id', id).order('sort', { ascending: true }),
     ]);
+    const entryRows = (ents as unknown as TournamentEntryWithProfile[]) ?? [];
     setT(tour ?? null);
-    setEntries((ents as unknown as TournamentEntryWithProfile[]) ?? []);
+    setEntries(entryRows);
     setMatches((ms as TournamentMatch[]) ?? []);
     setCourts((cs as TournamentCourt[]) ?? []);
+
+    const participantIds = [...new Set(entryRows.flatMap((entry) => [entry.user_id, entry.partner_id]).filter((value): value is string => !!value))];
+    if (participantIds.length > 0) {
+      const { data: memberships } = await supabase
+        .from('club_members')
+        .select('user_id, club_id')
+        .eq('status', 'approved')
+        .in('user_id', participantIds);
+      const membershipRows = memberships ?? [];
+      const clubIds = [...new Set(membershipRows.map((membership) => membership.club_id))];
+      const { data: clubRows } = clubIds.length > 0
+        ? await supabase.from('clubs').select('id, name').in('id', clubIds)
+        : { data: [] };
+      const clubNameById = new Map((clubRows ?? []).map((club) => [club.id, club.name]));
+      const nextClubNames: Record<string, string[]> = {};
+      membershipRows.forEach((membership) => {
+        const clubName = clubNameById.get(membership.club_id);
+        if (!clubName) return;
+        nextClubNames[membership.user_id] = [...(nextClubNames[membership.user_id] ?? []), clubName];
+      });
+      setClubNamesByUser(nextClubNames);
+    } else {
+      setClubNamesByUser({});
+    }
     setNowMs(Date.now());
     setLoading(false);
   }, [id]);
@@ -128,8 +156,7 @@ export default function TournamentDetail() {
     t?.status === 'finished' ||
     (!!drawRevealAt && nowMs >= drawRevealAt.getTime());
 
-  // 출전 신고: 대회 당일에만 가능
-  const isEventDay = !!t && nowMs > 0 && new Date(t.start_at).toDateString() === new Date(nowMs).toDateString();
+  // 출전 확인은 운영자가 처리하고 참가자는 결과만 확인한다.
   const checkedIn = !!myEntry?.checked_in_at;
 
   // 참가자 id → 표시 이름(복식은 파트너 포함)
@@ -155,6 +182,17 @@ export default function TournamentDetail() {
 
   // 내 현황 요약 — 조·전적·순위·다음 경기를 한눈에 (정보 탭 상단 카드)
   const myGroupNo = groupMatchesAll.find((m) => m.entry1_id === uid || m.entry2_id === uid)?.group_no ?? null;
+  const orderedGroupTabs = myGroupNo
+    ? [myGroupNo, ...groupNos.filter((g) => g !== myGroupNo)]
+    : groupNos;
+
+  useEffect(() => {
+    const firstGroup = myGroupNo ?? groupNos[0] ?? null;
+    if (!id || !firstGroup || initializedGroupTournamentRef.current === id) return;
+    initializedGroupTournamentRef.current = id;
+    setGroupTab(firstGroup);
+  }, [groupNos, id, myGroupNo]);
+
   const myDoneMatches = myMatches.filter((m) => m.status === 'done' && m.entry1_id && m.entry2_id);
   const myWins = myDoneMatches.filter((m) => m.winner_id === uid).length;
   const myNextMatch =
@@ -199,6 +237,8 @@ export default function TournamentDetail() {
       (e.profiles?.nickname ?? '').toLowerCase().includes(q) ||
       (e.partner?.nickname ?? e.partner_name ?? '').toLowerCase().includes(q),
   );
+  const clubLabelOf = (userId: string | null | undefined) =>
+    (userId ? clubNamesByUser[userId] : undefined)?.join(' · ') || '없음';
   // 대기열: 내 순번 / 정원이 찼는지
   const myWaitlistRank = entries.filter((e) => e.status === 'waitlist').findIndex((e) => e.user_id === uid) + 1;
   const slotsFull =
@@ -422,22 +462,6 @@ export default function TournamentDetail() {
     ]);
   }
 
-  async function checkIn() {
-    if (!uid || !id) return;
-    setActing(true);
-    const { error } = await supabase
-      .from('tournament_entries')
-      .update({ checked_in_at: new Date().toISOString() })
-      .eq('tournament_id', id)
-      .eq('user_id', uid);
-    setActing(false);
-    if (error) {
-      Alert.alert('출전 신고 실패', error.message);
-      return;
-    }
-    load();
-  }
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -456,22 +480,27 @@ export default function TournamentDetail() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.headerArea}>
-        <View style={styles.badgeRow}>
-          <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#2D6BD6" bg="rgba(56,132,255,0.14)" />
-          <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5A623" bg="rgba(245,166,35,0.16)" />
-          {t.dupr_certified ? <Badge label="DUPR 인증" color="#2D6BD6" bg="rgba(45,107,214,0.12)" /> : null}
-          {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#8B5CF6" bg="rgba(139,92,246,0.14)" /> : null}
-          {t.status === 'registration' ? (
-            <Badge label="접수중" />
-          ) : (
-            <Badge
-              label={t.status === 'ongoing' ? '진행중' : t.status === 'finished' ? '종료' : '취소됨'}
-              color="#60646C"
-              bg="rgba(136,135,128,0.14)"
-            />
-          )}
+        <View style={styles.heroCard}>
+          <View style={styles.badgeRow}>
+            <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#67A4FF" bg="rgba(56,132,255,0.14)" />
+            <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5B942" bg="rgba(245,166,35,0.16)" />
+            {t.dupr_certified ? <Badge label="DUPR 인증" color="#67A4FF" bg="rgba(45,107,214,0.12)" /> : null}
+            {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#A98BFF" bg="rgba(139,92,246,0.14)" /> : null}
+          </View>
+          <View style={styles.heroTitleRow}>
+            <Text style={styles.title}>{t.title}</Text>
+            <View style={[styles.heroStatus, t.status !== 'registration' && styles.heroStatusMuted]}>
+              <View style={[styles.heroStatusDot, t.status !== 'registration' && styles.heroStatusDotMuted]} />
+              <Text style={[styles.heroStatusText, t.status !== 'registration' && styles.heroStatusTextMuted]}>
+                {t.status === 'registration' ? '접수중' : t.status === 'ongoing' ? '진행중' : t.status === 'finished' ? '종료' : '취소됨'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.heroMetaList}>
+            <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
+            <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
+          </View>
         </View>
-        <Text style={styles.title}>{t.title}</Text>
       </View>
 
       {showTabBar && (
@@ -480,8 +509,9 @@ export default function TournamentDetail() {
             const active = tab === it.key;
             return (
               <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
-                <Text style={[styles.tabText, { color: active ? '#16C784' : '#AAB4C0' }]}>{it.label}</Text>
-                <View style={[styles.tabUnderline, { backgroundColor: active ? '#16C784' : 'transparent' }]} />
+                <View style={[styles.tabPill, active && styles.tabPillActive]}>
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{it.label}</Text>
+                </View>
               </Pressable>
             );
           })}
@@ -521,19 +551,63 @@ export default function TournamentDetail() {
                 ) : null}
               </View>
             ) : null}
-            <View style={styles.infoCard}>
-              <Info icon="time-outline" text={formatMeetupTime(t.start_at)} />
-              {t.registration_deadline ? (
-                <Info icon="hourglass-outline" text={`접수 마감 ${formatMeetupTime(t.registration_deadline)}`} />
-              ) : null}
-              <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} />
-              <Info icon="ribbon-outline" text={`실력 ${skillRangeLabel(t.skill_min, t.skill_max)}`} />
-              <Info icon="people-outline" text={`정원 ${t.approved_count + t.pending_count}/${t.max_participants}${isDoubles ? '팀' : '명'}`} />
-              <Info icon="cash-outline" text={t.fee > 0 ? `참가비 ${t.fee.toLocaleString()}원` : '참가비 무료'} />
+            <View style={styles.infoGrid}>
+              <InfoTile icon="ribbon-outline" label="참가 실력" value={skillRangeLabel(t.skill_min, t.skill_max)} />
+              <InfoTile
+                icon="people-outline"
+                label="참가 현황"
+                value={`${t.approved_count + t.pending_count}/${t.max_participants}${isDoubles ? '팀' : '명'}`}
+              />
+              <InfoTile icon="cash-outline" label="참가비" value={t.fee > 0 ? `${t.fee.toLocaleString()}원` : '무료'} />
+              <InfoTile
+                icon="hourglass-outline"
+                label="접수 마감"
+                value={t.registration_deadline ? formatMeetupTime(t.registration_deadline) : '별도 공지'}
+              />
             </View>
 
             {/* 내 현황 — 참가자 본인의 상태·조·전적·다음 경기를 한눈에 (0092 UX) */}
             {myEntry && !isTeam && (
+              myEntry.status === 'waitlist' ? (
+                <View style={styles.waitlistCard}>
+                  <View style={styles.waitlistHead}>
+                    <Text style={styles.waitlistEyebrow}>내 참가 상태</Text>
+                    <View style={styles.waitlistBadge}>
+                      <Text style={styles.waitlistBadgeText}>대기 중</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.waitlistRank}>
+                    현재 대기 <Text style={styles.waitlistRankAccent}>{myWaitlistRank}번</Text>
+                  </Text>
+                  <Text style={styles.waitlistAhead}>
+                    앞에 <Text style={styles.waitlistAheadAccent}>{Math.max(0, myWaitlistRank - 1)}명</Text>이 기다리고 있어요
+                  </Text>
+                  <Text style={styles.waitlistHint}>
+                    자리가 생기면 순서대로 자동 승인돼요{t.fee > 0 ? ' · 승인 후 24시간 안에 결제해 주세요' : ''}
+                  </Text>
+
+                  <View style={styles.waitlistFooter}>
+                    <View style={styles.waitlistNotice}>
+                      <Ionicons name="notifications-outline" size={19} color="#AAB4C0" />
+                      <Text style={styles.waitlistNoticeText}>순번이 바뀌면 알려드릴게요</Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="대기 규칙 보기"
+                      onPress={() =>
+                        Alert.alert(
+                          '대기 규칙',
+                          `참가가 취소되면 대기 순서대로 자동 승인돼요.${t.fee > 0 ? '\n승인 알림을 받은 뒤 24시간 안에 결제해야 참가가 확정돼요.' : ''}`,
+                        )
+                      }
+                      style={({ pressed }) => [styles.waitlistRuleButton, pressed && styles.waitlistRuleButtonPressed]}>
+                      <Text style={styles.waitlistRuleText}>대기 규칙</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#16C784" />
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
               <View style={styles.myCard}>
                 <View style={styles.myHead}>
                   <Text style={styles.myTitle}>내 현황</Text>
@@ -545,10 +619,6 @@ export default function TournamentDetail() {
                     <View style={[styles.myBadge, { backgroundColor: 'rgba(251,191,36,0.16)' }]}>
                       <Text style={[styles.myBadgeTxt, { color: '#FBBF24' }]}>결제 대기</Text>
                     </View>
-                  ) : myEntry.status === 'waitlist' ? (
-                    <View style={[styles.myBadge, { backgroundColor: 'rgba(96,165,250,0.16)' }]}>
-                      <Text style={[styles.myBadgeTxt, { color: '#60A5FA' }]}>대기 {myWaitlistRank}번</Text>
-                    </View>
                   ) : (
                     <View style={[styles.myBadge, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
                       <Text style={[styles.myBadgeTxt, { color: '#AAB4C0' }]}>{ENTRY_LABEL[myEntry.status]}</Text>
@@ -558,8 +628,6 @@ export default function TournamentDetail() {
 
                 {myEntry.status === 'pending' && t.fee > 0 && myEntry.payment_deadline ? (
                   <Text style={styles.myHint}>{formatMeetupTime(myEntry.payment_deadline)}까지 결제하면 참가가 확정돼요.</Text>
-                ) : myEntry.status === 'waitlist' ? (
-                  <Text style={styles.myHint}>자리가 나면 푸시로 알려드려요{t.fee > 0 ? ' (24시간 안에 결제 시 확정)' : ''}.</Text>
                 ) : myEntry.status === 'approved' && !drawGenerated ? (
                   <Text style={styles.myHint}>대진 발표를 기다리고 있어요. 대진이 나오면 여기에 내 경기가 표시돼요.</Text>
                 ) : null}
@@ -611,6 +679,7 @@ export default function TournamentDetail() {
                   </>
                 ) : null}
               </View>
+              )
             )}
 
             {/* 복식 파트너 — 신청 전엔 선택(선택 사항), 신청 후엔 대진 생성 전까지 등록·변경·해제 (0090) */}
@@ -767,36 +836,59 @@ export default function TournamentDetail() {
         {/* 참가자 탭 */}
         {!isTeam && tab === 'players' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              참가자 {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
-            </Text>
-            <View style={{ gap: 10, marginTop: 8 }}>
-              {approved.length === 0 ? (
-                <Text style={styles.mutedText}>아직 확정된 참가자가 없어요.</Text>
-              ) : approvedShown.length === 0 ? (
-                <Text style={styles.mutedText}>검색 결과가 없어요.</Text>
-              ) : (
-                approvedShown.map((e) => (
-                  <View key={e.user_id} style={styles.pRow}>
-                    <Avatar nickname={e.profiles?.nickname ?? '?'} uri={e.profiles?.avatar_url} size={40} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pName}>
-                        {e.profiles?.nickname ?? '알 수 없음'}
-                        {isDoubles && (e.partner?.nickname ?? e.partner_name)
-                          ? ` / ${e.partner?.nickname ?? e.partner_name}`
-                          : ''}
-                      </Text>
-                      <Text style={styles.pMeta}>{e.profiles?.region || '지역 미설정'}</Text>
-                    </View>
-                    {e.profiles ? (
-                      <Text style={styles.pSkill}>
-                        {e.profiles.skill_level.toFixed(1)} {skillLabel(e.profiles.skill_level)}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))
-              )}
+            <View style={styles.playerSectionHead}>
+              <View>
+                <Text style={styles.sectionTitle}>참가 팀</Text>
+                <Text style={styles.playerSectionSub}>팀명과 소속 클럽을 확인하세요</Text>
+              </View>
+              <View style={styles.playerCountBadge}>
+                <Text style={styles.playerCountText}>
+                  {q ? `${approvedShown.length}/${approved.length}` : approved.length}{isDoubles ? '팀' : '명'}
+                </Text>
+              </View>
             </View>
+            {approved.length === 0 ? (
+              <Text style={[styles.mutedText, styles.playerEmpty]}>아직 확정된 참가자가 없어요.</Text>
+            ) : approvedShown.length === 0 ? (
+              <Text style={[styles.mutedText, styles.playerEmpty]}>검색 결과가 없어요.</Text>
+            ) : (
+              <View style={styles.playerList}>
+                {approvedShown.map((e, index) => (
+                  <View key={e.user_id} style={styles.playerTeamCard}>
+                    <View style={styles.playerTeamNumberColumn}>
+                      <Text style={styles.playerIndex}>{String(index + 1).padStart(2, '0')}</Text>
+                    </View>
+                    <View style={styles.playerTeamMembers}>
+                      <View style={styles.playerMemberRow}>
+                        <Avatar nickname={e.profiles?.nickname ?? '?'} uri={e.profiles?.avatar_url} size={38} />
+                        <View style={styles.playerCopy}>
+                          <Text style={styles.playerTeamName} numberOfLines={1}>{e.profiles?.nickname ?? '알 수 없음'}</Text>
+                          <Text style={styles.playerClubName} numberOfLines={1}>{clubLabelOf(e.user_id)}</Text>
+                        </View>
+                      </View>
+                      {isDoubles ? (
+                        <>
+                          <View style={styles.playerMemberDivider} />
+                          <View style={styles.playerMemberRow}>
+                            <Avatar
+                              nickname={e.partner?.nickname ?? e.partner_name ?? '?'}
+                              uri={e.partner?.avatar_url}
+                              size={38}
+                            />
+                            <View style={styles.playerCopy}>
+                              <Text style={styles.playerTeamName} numberOfLines={1}>
+                                {e.partner?.nickname ?? e.partner_name ?? '파트너 미정'}
+                              </Text>
+                              <Text style={styles.playerClubName} numberOfLines={1}>{clubLabelOf(e.partner_id)}</Text>
+                            </View>
+                          </View>
+                        </>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -808,31 +900,58 @@ export default function TournamentDetail() {
         {/* 예선 (조별리그) */}
         {hasBracket && tab === 'prelim' && (
           <View style={styles.section}>
-            {groupNos.length > 1 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabRow}>
-                {(['all', ...groupNos] as (number | 'all')[]).map((g) => {
+            <View style={styles.groupSectionHead}>
+              <Text style={styles.groupSectionTitle}>조별 현황</Text>
+              {groupNos.length > 2 ? (
+                <View style={styles.groupScrollHint}>
+                  <Text style={styles.groupScrollHintText}>{groupNos.length}개 조 · 옆으로 보기</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#16C784" />
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.groupCarouselWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.groupCardRow}
+                snapToInterval={150}
+                decelerationRate="fast"
+                scrollEventThrottle={16}
+                onScroll={({ nativeEvent }) => {
+                  const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+                  setGroupScrollHasMore(contentOffset.x + layoutMeasurement.width < contentSize.width - 8);
+                }}>
+                {orderedGroupTabs.map((g) => {
                   const active = groupTab === g;
+                  const groupMatches = groupMatchesAll.filter((m) => (m.group_no ?? 1) === g);
+                  const teamCount = groupMembers(groupMatches).length;
+                  const doneCount = groupMatches.filter((m) => m.status === 'done').length;
                   return (
                     <Pressable
                       key={String(g)}
                       onPress={() => setGroupTab(g)}
-                      style={[styles.groupPill, active ? styles.groupPillActive : styles.groupPillIdle]}>
-                      <Text style={[styles.groupPillText, { color: active ? '#fff' : '#AAB4C0' }]}>
-                        {g === 'all' ? '전체' : `${g}조`}
-                      </Text>
+                      style={({ pressed }) => [styles.groupCard, active && styles.groupCardActive, pressed && styles.groupCardPressed]}>
+                      <Text style={[styles.groupCardTitle, active && styles.groupCardTitleActive]}>{g}조</Text>
+                      <Text style={styles.groupCardTeams}>{teamCount}{isDoubles ? '팀' : '명'}</Text>
+                      <Text style={styles.groupCardProgress}>{doneCount}/{groupMatches.length} 경기</Text>
                     </Pressable>
                   );
                 })}
               </ScrollView>
-            )}
-            {(q ? groupNos : groupTab === 'all' ? groupNos : groupNos.filter((g) => g === groupTab)).map((gno) => {
-              const gms = groupMatchesAll.filter((m) => (m.group_no ?? 1) === gno);
+              {groupNos.length > 2 && groupScrollHasMore ? (
+                <View pointerEvents="none" style={styles.groupMoreIndicator}>
+                  <Ionicons name="chevron-forward" size={20} color="#F8FAFC" />
+                </View>
+              ) : null}
+            </View>
+
+            {groupTab ? (() => {
+              const gms = groupMatchesAll.filter((m) => (m.group_no ?? 1) === groupTab);
               const table = standings(groupMembers(gms), gms);
               const shownGms = q ? gms.filter(matchHit) : gms;
-              if (q && shownGms.length === 0) return null;
               return (
-                <View key={`g${gno}`} style={{ marginTop: 14 }}>
-                  <Text style={styles.subLabel}>{gno}조 순위</Text>
+                <View style={styles.selectedGroupContent}>
+                  <Text style={styles.subLabel}>{groupTab}조 순위</Text>
                   <View style={styles.tableCard}>
                     {table.map((s, i) => (
                       <View key={s.id} style={[styles.standRow, i > 0 && styles.standRowDivider]}>
@@ -843,14 +962,14 @@ export default function TournamentDetail() {
                       </View>
                     ))}
                   </View>
-                  <View style={{ gap: 6, marginTop: 6 }}>
-                    {shownGms.map((m) => (
+                  <View style={styles.groupMatchList}>
+                    {shownGms.length > 0 ? shownGms.map((m) => (
                       <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
-                    ))}
+                    )) : <Text style={styles.mutedText}>일치하는 경기가 없어요.</Text>}
                   </View>
                 </View>
               );
-            })}
+            })() : null}
           </View>
         )}
 
@@ -864,7 +983,7 @@ export default function TournamentDetail() {
 
       </ScrollView>
 
-      {!isTeam && (
+      {!isTeam && tab === 'info' && (
       <View style={styles.actionBar}>
         {myEntry ? (
           <View style={{ gap: 8 }}>
@@ -895,17 +1014,12 @@ export default function TournamentDetail() {
                 <Button title={`참가비 결제하기 · ${(t?.fee ?? 0).toLocaleString()}원`} onPress={startFeePayment} loading={acting} />
               </>
             ) : null}
-            {/* 출전 신고 (승인 + 대회 당일) */}
-            {myEntry.status === 'approved' &&
-              isEventDay &&
-              (checkedIn ? (
-                <View style={styles.statusRow}>
-                  <Ionicons name="checkmark-done-circle" size={18} color="#16C784" />
-                  <Text style={[styles.statusText, { color: '#16C784' }]}>출전 신고 완료</Text>
-                </View>
-              ) : (
-                <Button title="출전 신고" onPress={checkIn} loading={acting} />
-              ))}
+            {myEntry.status === 'approved' && checkedIn ? (
+              <View style={styles.statusRow}>
+                <Ionicons name="checkmark-done-circle" size={18} color="#16C784" />
+                <Text style={[styles.statusText, { color: '#16C784' }]}>운영자 출전 확인 완료</Text>
+              </View>
+            ) : null}
             {myEntry.status !== 'rejected' &&
               (myEntry.status === 'approved' && drawGenerated ? (
                 // 조추첨 후에는 선수 스스로 취소 불가 — 대진이 깨지므로 운영자만 처리 (0091)
@@ -943,11 +1057,25 @@ export default function TournamentDetail() {
   );
 }
 
-function Info({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+function Info({ icon, text, compact = false }: { icon: keyof typeof Ionicons.glyphMap; text: string; compact?: boolean }) {
   return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color="#16C784" />
-      <Text style={styles.infoText}>{text}</Text>
+    <View style={[styles.infoRow, compact && styles.infoRowCompact]}>
+      <Ionicons name={icon} size={compact ? 16 : 18} color="#16C784" />
+      <Text style={[styles.infoText, compact && styles.infoTextCompact]}>{text}</Text>
+    </View>
+  );
+}
+
+function InfoTile({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+  return (
+    <View style={styles.infoTile}>
+      <View style={styles.infoTileIcon}>
+        <Ionicons name={icon} size={18} color="#16C784" />
+      </View>
+      <View style={styles.infoTileCopy}>
+        <Text style={styles.infoTileLabel}>{label}</Text>
+        <Text style={styles.infoTileValue} numberOfLines={2}>{value}</Text>
+      </View>
     </View>
   );
 }
@@ -1013,29 +1141,69 @@ const styles = StyleSheet.create({
   notFound: { color: '#AAB4C0', fontSize: 15 },
   mutedText: { color: '#AAB4C0', fontSize: 14 },
   content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
-  headerArea: { paddingHorizontal: Spacing.four, paddingTop: Spacing.four, paddingBottom: Spacing.three, gap: 10 },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)', paddingHorizontal: Spacing.four },
-  tabItem: { marginRight: 22, paddingTop: 8, alignItems: 'center' },
-  tabText: { fontSize: 15, fontWeight: '700' },
-  tabUnderline: { height: 2.5, alignSelf: 'stretch', marginTop: 8, borderRadius: 2 },
-  badgeRow: { flexDirection: 'row', gap: 6 },
-  title: { fontSize: 24, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.5 },
+  headerArea: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.three },
+  heroCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    gap: 13,
+  },
+  heroTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  heroStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 6 },
+  heroStatusMuted: { opacity: 0.7 },
+  heroStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#16C784' },
+  heroStatusDotMuted: { backgroundColor: '#AAB4C0' },
+  heroStatusText: { color: '#16C784', fontSize: 12, fontWeight: '800' },
+  heroStatusTextMuted: { color: '#AAB4C0' },
+  heroMetaList: { gap: 9, paddingTop: 2 },
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.four,
+    height: 46,
+    padding: 4,
+    borderRadius: 13,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+  },
+  tabItem: { flex: 1 },
+  tabPill: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderCurve: 'continuous' },
+  tabPillActive: { backgroundColor: 'rgba(22,199,132,0.16)' },
+  tabText: { color: '#AAB4C0', fontSize: 14, fontWeight: '700' },
+  tabTextActive: { color: '#16C784', fontWeight: '900' },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  title: { flex: 1, fontSize: 24, lineHeight: 32, fontWeight: '800', color: '#F8FAFC' },
   gallery: { marginBottom: Spacing.three, gap: 8 },
   cover: { width: '100%', height: 200, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#151D25' },
   thumbRow: { gap: 8, paddingVertical: 2 },
   thumb: { width: 64, height: 64, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#151D25', opacity: 0.6 },
   thumbActive: { opacity: 1, borderWidth: 2, borderColor: '#16C784' },
-  infoCard: {
-    backgroundColor: '#10161D',
-    borderRadius: 18,
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  infoTile: {
+    width: '48.5%',
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 15,
     borderCurve: 'continuous',
+    backgroundColor: '#10161D',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
-    padding: Spacing.three,
-    gap: 12,
   },
+  infoTileIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,199,132,0.11)' },
+  infoTileCopy: { flex: 1, gap: 3 },
+  infoTileLabel: { color: '#7F8B98', fontSize: 11.5, fontWeight: '700' },
+  infoTileValue: { color: '#F8FAFC', fontSize: 13.5, lineHeight: 18, fontWeight: '800' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: 15, fontWeight: '500', color: '#F8FAFC', flex: 1 },
+  infoRowCompact: { gap: 8 },
+  infoTextCompact: { color: '#AAB4C0', fontSize: 13.5, lineHeight: 19 },
   section: { marginTop: Spacing.two },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#F8FAFC' },
   desc: { fontSize: 15, lineHeight: 22, color: '#AAB4C0', marginTop: 6 },
@@ -1043,10 +1211,80 @@ const styles = StyleSheet.create({
   pName: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
   pMeta: { fontSize: 13, color: '#AAB4C0', marginTop: 1 },
   pSkill: { fontSize: 13, fontWeight: '700', color: '#16C784' },
+  playerSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  playerSectionSub: { marginTop: 3, fontSize: 12.5, lineHeight: 18, color: '#7F8B98' },
+  playerCountBadge: { minWidth: 54, height: 30, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(22,199,132,0.12)' },
+  playerCountText: { fontSize: 13, fontWeight: '900', color: '#16C784' },
+  playerList: { marginTop: 14, gap: 10 },
+  playerTeamCard: {
+    minHeight: 122,
+    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.11)',
+  },
+  playerTeamNumberColumn: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.11)',
+  },
+  playerIndex: { fontSize: 17, fontWeight: '900', color: '#AAB4C0', textAlign: 'center', fontVariant: ['tabular-nums'] },
+  playerTeamMembers: { flex: 1, paddingLeft: 12 },
+  playerMemberRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  playerMemberDivider: { height: 1, marginVertical: 3, marginLeft: 48, backgroundColor: 'rgba(255,255,255,0.09)' },
+  playerCopy: { flex: 1, minWidth: 0 },
+  playerTeamName: { fontSize: 14.5, lineHeight: 20, fontWeight: '800', color: '#F8FAFC' },
+  playerClubName: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: '#AAB4C0' },
+  playerEmpty: { marginTop: 18 },
   actionBar: { padding: Spacing.three, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)', backgroundColor: '#070A0D' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   statusText: { fontSize: 15, fontWeight: '700', color: '#F8FAFC' },
   payDeadline: { fontSize: 12.5, lineHeight: 18, fontWeight: '700', color: '#FBBF24' },
+  waitlistCard: {
+    marginTop: 12,
+    padding: Spacing.three,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(22,199,132,0.045)',
+    borderWidth: 1,
+    borderColor: 'rgba(22,199,132,0.38)',
+    gap: 8,
+  },
+  waitlistHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  waitlistEyebrow: { color: '#AAB4C0', fontSize: 13, fontWeight: '700' },
+  waitlistBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#16C784',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  waitlistBadgeText: { color: '#16C784', fontSize: 12, fontWeight: '900' },
+  waitlistRank: { color: '#F8FAFC', fontSize: 25, lineHeight: 34, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  waitlistRankAccent: { color: '#16C784' },
+  waitlistAhead: { color: '#F8FAFC', fontSize: 15, lineHeight: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  waitlistAheadAccent: { color: '#16C784' },
+  waitlistHint: { color: '#AAB4C0', fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
+  waitlistFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.09)',
+    paddingTop: 12,
+    marginTop: 6,
+  },
+  waitlistNotice: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  waitlistNoticeText: { flex: 1, color: '#AAB4C0', fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
+  waitlistRuleButton: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 6, paddingLeft: 8 },
+  waitlistRuleButtonPressed: { opacity: 0.65 },
+  waitlistRuleText: { color: '#16C784', fontSize: 13, fontWeight: '800' },
   // 내 현황 카드 (0092 UX)
   myCard: {
     marginTop: 12, padding: Spacing.three, borderRadius: 20, borderCurve: 'continuous',
@@ -1110,11 +1348,43 @@ const styles = StyleSheet.create({
   courtTagText: { fontSize: 12, fontWeight: '700' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, paddingHorizontal: 12, height: 44 },
   searchInput: { flex: 1, fontSize: 15, color: '#F8FAFC', paddingVertical: 0 },
-  groupTabRow: { gap: 8, paddingBottom: 4 },
-  groupPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
-  groupPillActive: { backgroundColor: '#16C784' },
-  groupPillIdle: { backgroundColor: '#151D25' },
-  groupPillText: { fontSize: 14, fontWeight: '700' },
+  groupSectionTitle: { fontSize: 18, lineHeight: 24, fontWeight: '900', color: '#F8FAFC' },
+  groupSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  groupScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  groupScrollHintText: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: '#16C784' },
+  groupCarouselWrap: { position: 'relative' },
+  groupCardRow: { gap: 8, paddingTop: 10, paddingRight: 18, paddingBottom: 4 },
+  groupCard: {
+    width: 142,
+    height: 92,
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+  },
+  groupCardActive: { borderColor: '#16C784', borderWidth: 2, backgroundColor: 'rgba(22,199,132,0.07)' },
+  groupCardPressed: { opacity: 0.72 },
+  groupCardTitle: { fontSize: 17, lineHeight: 21, fontWeight: '900', color: '#F8FAFC' },
+  groupCardTitleActive: { color: '#16C784' },
+  groupCardTeams: { fontSize: 14, lineHeight: 18, fontWeight: '700', color: '#F8FAFC' },
+  groupCardProgress: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: '#AAB4C0' },
+  groupMoreIndicator: {
+    position: 'absolute',
+    right: 4,
+    top: 38,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#27313B',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  groupMatchList: { gap: 7, marginTop: 8 },
+  selectedGroupContent: { marginTop: 14 },
   revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 14, marginTop: Spacing.two },
   revealText: { fontSize: 15, fontWeight: '600', color: '#F8FAFC', flex: 1 },
   subLabel: { fontSize: 14, fontWeight: '700', color: '#AAB4C0', marginTop: 2 },

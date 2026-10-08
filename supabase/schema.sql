@@ -1076,6 +1076,36 @@ create policy "entries_update_self_or_organizer" on public.tournament_entries
     auth.uid() = user_id
     or auth.uid() = (select t.organizer_id from public.tournaments t where t.id = tournament_id)
   );
+
+-- 출전 확인은 운영자만 변경한다. 참가자는 파트너 정보 등 기존 허용 필드만 수정 가능하다. (0094)
+create or replace function public.enforce_tournament_checkin_organizer()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_organizer_id uuid;
+begin
+  if new.checked_in_at is not distinct from old.checked_in_at then
+    return new;
+  end if;
+  if auth.uid() is null then
+    return new;
+  end if;
+  select organizer_id into v_organizer_id from public.tournaments where id = new.tournament_id;
+  if auth.uid() is distinct from v_organizer_id then
+    raise exception '출전 확인은 대회 운영자만 할 수 있어요.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tournament_checkin_organizer_only on public.tournament_entries;
+create trigger tournament_checkin_organizer_only
+before update of checked_in_at on public.tournament_entries
+for each row execute function public.enforce_tournament_checkin_organizer();
+
 drop policy if exists "entries_delete_self" on public.tournament_entries;
 create policy "entries_delete_self" on public.tournament_entries
   for delete using (auth.uid() = user_id);

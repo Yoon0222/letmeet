@@ -45,7 +45,7 @@ export default function TournamentsScreen() {
       .select('*')
       .is('club_id', null) // 클럽 월례대회는 공개 대회 탭에서 제외 — 해당 클럽 화면에서만
       .neq('status', 'cancelled')
-      .order('start_at', { ascending: true })
+      .order('start_at', { ascending: false })
       .limit(100);
     if (error) {
       console.warn('[tournaments] load error', error.message);
