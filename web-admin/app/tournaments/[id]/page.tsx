@@ -60,6 +60,15 @@ export default function EntriesTab() {
     reload();
   }
 
+  async function setEntryCheckIn(userId: string, checkedIn: boolean) {
+    await supabase
+      .from('tournament_entries')
+      .update({ checked_in_at: checkedIn ? new Date().toISOString() : null })
+      .eq('tournament_id', id)
+      .eq('user_id', userId);
+    reload();
+  }
+
   // 불참(노쇼) 처리: 이 선수의 예선 경기만 삭제 → 같은 조 나머지끼리 경기(대체 승격 없음)
   async function noShow(userId: string, nickname: string) {
     if (
@@ -149,6 +158,13 @@ export default function EntriesTab() {
                   {isOrganizer && (
                     <td className="px-4 py-2">
                       <div className="flex gap-2">
+                        {e.status === 'approved' && (
+                          <button
+                            onClick={() => setEntryCheckIn(e.user_id, !e.checked_in_at)}
+                            className={e.checked_in_at ? 'text-slate-500 hover:underline' : 'text-blue-600 hover:underline'}>
+                            {e.checked_in_at ? '출전 취소' : '출전 확인'}
+                          </button>
+                        )}
                         {e.status !== 'approved' && (
                           <button onClick={() => setEntryStatus(e.user_id, 'approved')} className="text-emerald-600 hover:underline">승인</button>
                         )}
