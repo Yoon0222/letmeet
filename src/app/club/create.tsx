@@ -6,10 +6,12 @@ import { AppAlert as Alert } from '@/lib/feedback';
 
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
+import { CLUB_DUES_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
 import { fetchClubPlans, PLAN_FEATURES, won } from '@/lib/club-plan';
+import { fetchDuesStatus } from '@/lib/dues';
 import { supabase } from '@/lib/supabase';
 import type { ClubPaidPlan, ClubPlanRow } from '@/lib/types';
 
@@ -61,6 +63,11 @@ export default function CreateClub() {
       return;
     }
     router.replace(`/club/${data.id}`);
+    // 플러스 클럽이고 회비 기능이 켜져 있으면 이어서 회비 설정을 연다(닫고 나중에 해도 된다)
+    if (plan === 'premium_plus' && CLUB_DUES_ENABLED) {
+      const st = await fetchDuesStatus(data.id);
+      if (st?.enabled && st.plus) router.push({ pathname: '/club/dues-settings', params: { clubId: data.id } });
+    }
   }
 
   return (

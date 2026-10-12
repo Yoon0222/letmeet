@@ -46,6 +46,8 @@ export function targetHref(
       return `/community/${targetId}`;
     case 'tournament':
       return `/tournament/${targetId}`;
+    case 'club_dues':
+      return `/club/dues?clubId=${targetId}`;
     case 'court':
       return `/court/${targetId}`;
     default:

@@ -186,6 +186,18 @@ function RootNavigator() {
           options={{ headerShown: true, title: '플랜 관리', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
         />
         <Stack.Screen
+          name="club/dues"
+          options={{ headerShown: true, title: '회비', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="club/dues-consent"
+          options={{ headerShown: true, title: '자동결제 동의', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="club/dues-settings"
+          options={{ headerShown: true, title: '회비 설정', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
+        <Stack.Screen
           name="club/tournament-create"
           options={{
             presentation: 'modal',
@@ -262,6 +274,7 @@ function RootNavigator() {
         <Stack.Screen name="court/[id]" options={{ headerShown: true, title: '코트' }} />
         <Stack.Screen name="payment/court" options={{ headerShown: false }} />
         <Stack.Screen name="payment/subscribe" options={{ headerShown: false }} />
+        <Stack.Screen name="payment/dues-card" options={{ headerShown: false }} />
         <Stack.Screen name="payment/callback" options={{ headerShown: true, title: '결제 확인' }} />
         <Stack.Screen name="notifications" options={{ headerShown: true, title: '알림' }} />
         <Stack.Screen name="support" options={{ headerShown: true, title: '고객지원' }} />

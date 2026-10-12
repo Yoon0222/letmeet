@@ -16,3 +16,8 @@ export const APPLE_LOGIN_ENABLED = true;
 // 이 값만 false 로 바꿔 즉시 구독 UI 차단(무료 체험은 유지). 실결제 전환 시
 // 한국 외부결제 권한(entitlement) 또는 IAP 로 정식 정리 검토.
 export const CLUB_SUBSCRIPTION_ENABLED: boolean = true;
+
+// 클럽 회비(카드 자동결제) 화면 노출 — 앱 쪽 킬스위치.
+// 실제 노출은 서버 스위치(platform_billing_settings.dues_enabled 또는 시범 클럽)까지 켜져 있어야 한다.
+// 운영은 출시 조건(토스 지급대행 계약 등)이 갖춰질 때까지 서버 쪽이 꺼져 있어, 이 값이 true 여도 보이지 않는다.
+export const CLUB_DUES_ENABLED: boolean = true;

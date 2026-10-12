@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-12 (Claude: 클럽 회비 3단계 — 자동결제 엔진 0098)
+Last updated: 2026-10-12 (Claude: 클럽 회비 4단계 — 회비 앱 화면)
 
 ## Purpose
 
@@ -22,6 +22,21 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-12, 클럽 회비 4단계 — 회비 앱 화면)
+
+- **What changed**:
+  - 새 화면(기능 위주, `club/plan.tsx` 와 같은 색·카드 규칙): `src/app/club/dues.tsx`(회비 — 회원/운영진), `src/app/club/dues-consent.tsx`(자동결제 동의), `src/app/club/dues-settings.tsx`(회비 설정 — 클럽장), `src/app/payment/dues-card.tsx`(카드 등록·교체).
+  - `src/components/toss-billing-webview.tsx`: 카드 등록 웹뷰와 안내 HTML(`billingAuthHtml`)을 공용으로 분리. `payment/subscribe.tsx` 도 이 컴포넌트를 쓰도록 옮김(동작·문구는 그대로).
+  - `src/lib/dues.ts`: 회비 표시 도우미(`periodLabel`·`planSummary`·`DUES_STATUS_LABEL` 등)와 서버 호출.
+  - 연결: `club/[id].tsx` 빠른 메뉴에 "회비" 버튼(플러스 클럽 + 서버 스위치가 켜졌을 때만), `contexts/notifications.tsx` 의 `club_dues` 이동, `club/create.tsx` 플러스 생성 후 회비 설정 열기, `_layout.tsx` 라우트 4개, `constants/features.ts` 의 `CLUB_DUES_ENABLED`.
+- **Why**: 클럽 회비(카드 자동결제) 기능의 화면. 서버는 0097·0098 과 `club-dues-*` 엣지함수.
+- **Validation**: 실기기(개발 빌드)에서 화면 표시와 지금 결제·현금 납부 확인·환불·동의 확인, `tsc`·`expo lint` 0.
+- **Codex 요청 (디자인)**:
+  - 위 화면 4개와 `toss-billing-webview.tsx` 의 안내 HTML 은 기능 위주로 만들었습니다 — **디자인 다듬기 부탁**. 색은 기존 클럽 화면의 고정 hex 를 그대로 썼으니 테마 토큰 정리도 같이.
+  - 건드리면 안 되는 것: 버튼의 `onPress` 로직과 분기 조건(상태별로 서버 동작과 맞춰 둔 것), `payDuesNow`·`refundDuesCharge`·`enrollDues` 호출부의 `retryable` 처리, `dues-card.tsx` 의 `busyRef`/`doneRef`/`retry` 흐름, `gestureEnabled`.
+  - `AppAlert.alert` 는 버튼 0~1개면 토스트로 지나갑니다. 결제 결과처럼 꼭 읽어야 하는 내용은 화면 안에 상태로 남겨 두었으니, 그 줄들은 지우지 말아 주세요.
+  - 금액·기간 표기는 `won()`·`periodLabel()`·`dayLabel()`·`planSummary()` 사용. 금액을 하드코딩하지 말 것.
 
 ### Claude -> Codex (2026-10-12, 클럽 회비 3단계 — 자동결제 엔진 0098)
 

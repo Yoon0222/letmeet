@@ -10,7 +10,9 @@ import { ReportBlock } from '@/components/report-block';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { CLUB_DUES_ENABLED } from '@/constants/features';
 import { effectiveClubPlan, PLAN_LABEL, PLAN_NAME, planAtLeast, trialDaysLeft as calcTrialDaysLeft } from '@/lib/club-plan';
+import { fetchDuesStatus } from '@/lib/dues';
 import { supabase } from '@/lib/supabase';
 import type { ClubMemberWithProfile, ClubPostWithAuthor, ClubSession, ClubWithCounts } from '@/lib/types';
 
@@ -38,6 +40,7 @@ export default function ClubDetail() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [duesVisible, setDuesVisible] = useState(false); // 회비 메뉴를 보여줄지(서버가 판단)
   const [nowMs] = useState(() => Date.now());
 
   const load = useCallback(async () => {
@@ -79,6 +82,13 @@ export default function ClubDetail() {
     // 플랜·구독(체험·결제·해지)은 플랜 관리 화면(club/plan)이 담당. 여기서는 서버 effective_plan 만 쓴다.
     setClub(nextClub);
     setLoading(false);
+    // 회비 메뉴: 플러스 클럽일 때만 서버에 물어본다(회비 기능이 켜져 있고, 받는 중이거나 내가 클럽장일 때 노출)
+    if (CLUB_DUES_ENABLED && nextClub && effectiveClubPlan(nextClub) === 'premium_plus') {
+      const st = await fetchDuesStatus(nextClub.id);
+      setDuesVisible(!!st && st.enabled && st.plus && (st.plan_active || st.is_owner));
+    } else {
+      setDuesVisible(false);
+    }
   }, [id]);
 
   useFocusEffect(
@@ -338,6 +348,12 @@ export default function ClubDetail() {
                 <Text style={styles.quickLabel}>{menu.label}</Text>
               </Pressable>
             ))}
+            {duesVisible ? (
+              <Pressable onPress={() => router.push({ pathname: '/club/dues', params: { clubId: club.id } })} style={styles.quickButton}>
+                <Ionicons name="card" size={18} color="#16C784" />
+                <Text style={styles.quickLabel}>회비</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
