@@ -123,7 +123,7 @@ type Props = {
   html: string;
   /** 카드 등록 성공 — 한 번만 불린다. customerKey 는 토스가 돌려준 값(없으면 빈 문자열). */
   onAuth: (authKey: string, customerKey: string) => void;
-  /** 카드 등록 취소·실패 */
+  /** 카드 등록 취소·실패 — 한 번만 불린다(이 뒤로는 이 웹뷰가 더 반응하지 않으니 화면을 닫을 것) */
   onFail: (message: string) => void;
   onLoadEnd?: () => void;
 };
@@ -138,10 +138,14 @@ export function TossBillingWebView({ html, onAuth, onFail, onLoadEnd }: Props) {
       if (u.startsWith(SUCCESS_URL) || hasBillingSuccess(u)) {
         handledRef.current = true;
         const q = getQuery(u);
-        onAuth(q.get('authKey') ?? '', q.get('customerKey') ?? '');
+        const authKey = q.get('authKey') ?? '';
+        // 카드 등록 정보(authKey) 없이 돌아오면 등록된 것이 아니다 — 성공으로 넘기지 않는다
+        if (!authKey) onFail('카드 등록 정보를 받지 못했어요. 다시 시도해주세요.');
+        else onAuth(authKey, q.get('customerKey') ?? '');
         return true;
       }
       if (u.startsWith(FAIL_URL) || hasFailure(u)) {
+        handledRef.current = true; // 실패 안내도 한 번만(같은 주소가 두 번 잡혀도 뒤로가기가 두 번 일어나지 않게)
         const q = getQuery(u);
         onFail(q.get('message') ? decodeURIComponent(q.get('message') ?? '') : '카드 등록이 취소되었어요.');
         return true;

@@ -82,14 +82,18 @@ export default function ClubDetail() {
     // 플랜·구독(체험·결제·해지)은 플랜 관리 화면(club/plan)이 담당. 여기서는 서버 effective_plan 만 쓴다.
     setClub(nextClub);
     setLoading(false);
-    // 회비 메뉴: 플러스 클럽일 때만 서버에 물어본다(회비 기능이 켜져 있고, 받는 중이거나 내가 클럽장일 때 노출)
-    if (CLUB_DUES_ENABLED && nextClub && effectiveClubPlan(nextClub) === 'premium_plus') {
+    // 회비 메뉴: 플러스 클럽이거나 내가 이 클럽 회원일 때만 서버에 물어본다.
+    //   · 회비 기능이 켜져 있고, 받는 중이거나 내가 클럽장일 때 노출
+    //   · 회비가 꺼졌거나 플러스가 아니게 됐어도 내 자동결제 동의·회비 기록·카드가 남아 있거나(해지·카드 삭제·기록 확인),
+    //     운영진이 볼 회비 기록이 남아 있으면(납부 명단·환불·정산 내역) 노출
+    const mine = ((m as { user_id: string; status: string }[] | null) ?? []).some((row) => row.user_id === uid && row.status === 'approved');
+    if (CLUB_DUES_ENABLED && nextClub && uid && (effectiveClubPlan(nextClub) === 'premium_plus' || mine)) {
       const st = await fetchDuesStatus(nextClub.id);
-      setDuesVisible(!!st && st.enabled && st.plus && (st.plan_active || st.is_owner));
+      setDuesVisible(!!st && ((st.enabled && st.plus && (st.plan_active || st.is_owner)) || st.has_mine === true || st.has_roster === true));
     } else {
       setDuesVisible(false);
     }
-  }, [id]);
+  }, [id, uid]);
 
   useFocusEffect(
     useCallback(() => {

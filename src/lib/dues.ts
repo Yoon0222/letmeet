@@ -5,7 +5,6 @@ import { won } from '@/lib/club-plan';
 import { supabase } from '@/lib/supabase';
 import type {
   ClubDues,
-  ClubDuesCharge,
   ClubDuesMandate,
   ClubDuesPeriodRow,
   ClubDuesPlan,
@@ -31,8 +30,6 @@ export const DUES_STATUS_LABEL: Record<DuesStatus, string> = {
 };
 
 const CARD_COLUMNS = 'user_id, card_company, card_number_masked, created_at, updated_at';
-const CHARGE_COLUMNS =
-  'id, dues_id, club_id, user_id, club_name, payer_name, period_key, amount, status, attempt_no, source, fail_reason, created_at, paid_at, refunded_at, refund_reason, settlement_id';
 const SETTLEMENT_COLUMNS =
   'id, club_id, club_name, period_month, gross_amount, refund_amount, fee_amount, net_amount, charge_count, status, confirmed_at, paid_at, created_at, updated_at';
 
@@ -95,6 +92,14 @@ export function buildConsentText(clubName: string, plan: ClubDuesPlan): string {
 }
 
 // ── 조회 ──────────
+// 조회에 실패하면 예외를 던진다. "없음"(카드 없음·회비 없음)과 "못 읽음"을 화면이 구분해야
+// 등록된 카드가 있는데 없다고 안내하는 일이 없다. 부르는 쪽은 try/catch 로 "불러오지 못했어요"를 보여줄 것.
+function read<T>(res: { data: T | null; error: { message: string } | null }): T | null {
+  if (res.error) throw new Error(`dues_load_failed: ${res.error.message}`);
+  return res.data;
+}
+
+/** 이 클럽의 회비 상태 요약. 이것만은 실패해도 던지지 않고 null 을 돌려준다(메뉴 노출 판단에 쓰여서). */
 export async function fetchDuesStatus(clubId: string): Promise<ClubDuesStatus | null> {
   const { data, error } = await supabase.rpc('club_dues_status', { p_club_id: clubId });
   if (error) return null;
@@ -102,67 +107,76 @@ export async function fetchDuesStatus(clubId: string): Promise<ClubDuesStatus | 
 }
 
 export async function fetchDuesPlan(clubId: string): Promise<ClubDuesPlan | null> {
-  const { data } = await supabase.from('club_dues_plans').select('*').eq('club_id', clubId).maybeSingle();
-  return (data as ClubDuesPlan | null) ?? null;
+  return read(await supabase.from('club_dues_plans').select('*').eq('club_id', clubId).maybeSingle()) as ClubDuesPlan | null;
 }
 
 export async function fetchMyDues(clubId: string, userId: string): Promise<ClubDues[]> {
-  const { data } = await supabase
-    .from('club_dues')
-    .select('*')
-    .eq('club_id', clubId)
-    .eq('user_id', userId)
-    .neq('status', 'void')
-    .order('period_start', { ascending: false })
-    .limit(24);
-  return (data as ClubDues[] | null) ?? [];
+  const rows = read(
+    await supabase
+      .from('club_dues')
+      .select('*')
+      .eq('club_id', clubId)
+      .eq('user_id', userId)
+      .neq('status', 'void')
+      .order('period_start', { ascending: false })
+      .limit(36),
+  );
+  return (rows as ClubDues[] | null) ?? [];
 }
 
 export async function fetchMyMandate(clubId: string, userId: string): Promise<ClubDuesMandate | null> {
-  const { data } = await supabase.from('club_dues_mandates').select('*').eq('club_id', clubId).eq('user_id', userId).maybeSingle();
-  return (data as ClubDuesMandate | null) ?? null;
+  return read(await supabase.from('club_dues_mandates').select('*').eq('club_id', clubId).eq('user_id', userId).maybeSingle()) as ClubDuesMandate | null;
 }
 
 export async function fetchMyCard(userId: string): Promise<MemberBillingCard | null> {
-  const { data } = await supabase.from('member_billing_cards').select(CARD_COLUMNS).eq('user_id', userId).maybeSingle();
-  return (data as MemberBillingCard | null) ?? null;
-}
-
-export async function fetchMyCharges(clubId: string, userId: string): Promise<ClubDuesCharge[]> {
-  const { data } = await supabase
-    .from('club_dues_charges')
-    .select(CHARGE_COLUMNS)
-    .eq('club_id', clubId)
-    .eq('user_id', userId)
-    .in('status', ['paid', 'refunded'])
-    .order('created_at', { ascending: false })
-    .limit(24);
-  return (data as ClubDuesCharge[] | null) ?? [];
+  return read(await supabase.from('member_billing_cards').select(CARD_COLUMNS).eq('user_id', userId).maybeSingle()) as MemberBillingCard | null;
 }
 
 export async function fetchDuesPeriods(clubId: string): Promise<ClubDuesPeriodRow[]> {
-  const { data } = await supabase.rpc('club_dues_periods', { p_club_id: clubId });
-  return (data as ClubDuesPeriodRow[] | null) ?? [];
+  return (read(await supabase.rpc('club_dues_periods', { p_club_id: clubId })) as ClubDuesPeriodRow[] | null) ?? [];
 }
 
 export async function fetchDuesRoster(clubId: string, periodKey: string): Promise<ClubDuesRosterRow[]> {
-  const { data } = await supabase.rpc('club_dues_roster', { p_club_id: clubId, p_period_key: periodKey });
-  return (data as ClubDuesRosterRow[] | null) ?? [];
+  return (read(await supabase.rpc('club_dues_roster', { p_club_id: clubId, p_period_key: periodKey })) as ClubDuesRosterRow[] | null) ?? [];
 }
 
 export async function fetchPayoutAccount(clubId: string): Promise<ClubPayoutAccountMasked | null> {
-  const { data } = await supabase.rpc('club_payout_account_get', { p_club_id: clubId });
-  return (data as ClubPayoutAccountMasked | null) ?? null;
+  return read(await supabase.rpc('club_payout_account_get', { p_club_id: clubId })) as ClubPayoutAccountMasked | null;
 }
 
 export async function fetchSettlements(clubId: string): Promise<ClubDuesSettlement[]> {
-  const { data } = await supabase
-    .from('club_dues_settlements')
-    .select(SETTLEMENT_COLUMNS)
-    .eq('club_id', clubId)
-    .order('period_month', { ascending: false })
-    .limit(24);
-  return (data as ClubDuesSettlement[] | null) ?? [];
+  const rows = read(
+    await supabase.from('club_dues_settlements').select(SETTLEMENT_COLUMNS).eq('club_id', clubId).order('period_month', { ascending: false }).limit(24),
+  );
+  return (rows as ClubDuesSettlement[] | null) ?? [];
+}
+
+/** 오늘(KST) 'YYYY-MM-DD' */
+export function todayKst(): string {
+  return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+}
+
+/**
+ * 자동결제를 등록하는 순간 바로 결제될 회비(납부 시각이 지난 이번 기간 미납분) — 서버 club-dues-enroll 과 같은 기준.
+ * 결제 중(processing)인 행도 돌려준다: 서버는 그 결과를 먼저 확인하고, 결제되지 않은 것으로 확인되면 바로 결제한다.
+ */
+export function dueNowOnEnroll(rows: ClubDues[], today = todayKst()): ClubDues | null {
+  const due = rows
+    .filter((d) => (d.status === 'open' || d.status === 'failed' || d.status === 'processing') && d.period_end > today && d.due_date <= today)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
+  if (!due || new Date(`${due.due_date}T10:00:00+09:00`).getTime() > Date.now()) return null;
+  return due;
+}
+
+/** 서버가 이 회비를 자동으로 청구할 조건(동의가 살아 있고, 주기가 같고, 동의한 금액 안이고, 카드가 있다)을 갖췄는가 */
+export function autopayCovers(
+  mandate: ClubDuesMandate | null,
+  plan: Pick<ClubDuesPlan, 'active' | 'cycle' | 'amount'> | null,
+  card: MemberBillingCard | null,
+  amount?: number,
+): boolean {
+  if (!mandate || mandate.status !== 'active' || !card || !plan || !plan.active) return false;
+  return mandate.consented_cycle === plan.cycle && mandate.consented_amount >= (amount ?? plan.amount);
 }
 
 // ── 서버 호출 결과 ──────────
@@ -213,6 +227,12 @@ function fail(code: string, fallback: string, extra?: string, retryable = false)
   return { ok: false, error: extra ? `${message}\n${extra}` : message, code, retryable: retryable || RETRYABLE.has(code) };
 }
 
+// RPC 실패: 서버에 닿지 못한 것(오류 코드가 없다)이면 연결 문제로 알린다
+function rpcFailure(error: { code?: string } | null, fallback: string): DuesFailure {
+  if (error && !error.code) return { ok: false, error: '서버 응답을 받지 못했어요. 네트워크를 확인해주세요.', code: 'network', retryable: true };
+  return fail('', fallback);
+}
+
 function safeJson(text: string): Record<string, unknown> | null {
   try {
     const v: unknown = JSON.parse(text);
@@ -241,6 +261,11 @@ async function edgeFailure(error: unknown, dataError: unknown, fallback: string)
   return fail(code, fallback, extra, status >= 500);
 }
 
+/** 안내 제목: 서버에 닿지 못한 것(연결 문제)과 서버가 거절한 것을 구분한다 */
+export function failureTitle(f: DuesFailure, fallback: string): string {
+  return f.code === 'network' ? '연결 확인' : fallback;
+}
+
 // ── 규칙·계좌 (클럽장) ──────────
 export async function setDuesPlan(args: {
   clubId: string;
@@ -258,14 +283,14 @@ export async function setDuesPlan(args: {
     p_start_month: args.startMonth,
     p_include_owner: args.includeOwner,
   });
-  if (error || !data) return fail('', '회비 설정을 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+  if (error || !data) return rpcFailure(error, '회비 설정을 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
   if (data !== 'ok') return fail(data, '회비 설정을 저장하지 못했어요.');
   return { ok: true };
 }
 
 export async function disableDuesPlan(clubId: string): Promise<Ok | DuesFailure> {
   const { data, error } = await supabase.rpc('club_dues_plan_disable', { p_club_id: clubId });
-  if (error || !data) return fail('', '회비를 끄지 못했어요. 잠시 후 다시 시도해주세요.');
+  if (error || !data) return rpcFailure(error, '회비를 끄지 못했어요. 잠시 후 다시 시도해주세요.');
   if (data !== 'ok') return fail(data, '회비를 끄지 못했어요.');
   return { ok: true };
 }
@@ -290,7 +315,7 @@ export async function setPayoutAccount(args: {
     p_contact_phone: args.contactPhone,
     p_contact_email: args.contactEmail,
   });
-  if (error || !data) return fail('', '정산 계좌를 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+  if (error || !data) return rpcFailure(error, '정산 계좌를 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
   if (data === 'invalid') {
     return fail('invalid', '', '예금주·은행 이름, 계좌번호(숫자 8~16자리), 연락처를 확인해주세요. 사업자는 사업자등록번호 10자리가 필요해요.');
   }
@@ -301,7 +326,9 @@ export async function setPayoutAccount(args: {
 // ── 납부 처리 (클럽장·임원) ──────────
 export async function markDues(duesId: string, action: 'cash_paid' | 'exempt' | 'revert', note = ''): Promise<Ok | DuesFailure> {
   const { data, error } = await supabase.rpc('club_dues_mark', { p_dues_id: duesId, p_action: action, p_note: note });
-  if (error || !data) return fail('', '처리하지 못했어요. 잠시 후 다시 시도해주세요.');
+  if (error || !data) return rpcFailure(error, '처리하지 못했어요. 잠시 후 다시 시도해주세요.');
+  // 여기서 invalid 는 입력 문제가 아니라 "그 사이 상태가 바뀌어 이 처리를 할 수 없다"는 뜻
+  if (data === 'invalid') return { ok: false, error: '그 사이 회비 상태가 바뀌어 이 처리를 할 수 없어요. 명단을 다시 확인해주세요.', code: 'invalid', retryable: false };
   if (data !== 'ok') return fail(data, '처리하지 못했어요.');
   return { ok: true };
 }
@@ -344,9 +371,16 @@ export async function payDuesNow(duesId: string): Promise<Ok<{ amount?: number }
   return { ok: true, amount: typeof data?.amount === 'number' ? data.amount : undefined };
 }
 
+/** 결과를 모르는 결제의 결과만 확인한다 — 새로 결제하지 않는다. unpaid = 결제되지 않은 것으로 확인됨. */
+export async function checkDuesPayment(duesId: string): Promise<Ok<{ status: 'paid' | 'unpaid'; amount?: number }> | DuesFailure> {
+  const { data, error } = await supabase.functions.invoke('club-dues-pay-now', { body: { duesId, checkOnly: true } });
+  if (error || data?.error) return edgeFailure(error, data?.error, '결제 결과를 확인하지 못했어요. 잠시 후 다시 시도해주세요.');
+  return { ok: true, status: data?.status === 'paid' ? 'paid' : 'unpaid', amount: typeof data?.amount === 'number' ? data.amount : undefined };
+}
+
 export async function revokeDuesMandate(clubId: string): Promise<Ok | DuesFailure> {
   const { data, error } = await supabase.rpc('club_dues_mandate_revoke', { p_club_id: clubId });
-  if (error || !data) return fail('', '자동결제를 해지하지 못했어요. 잠시 후 다시 시도해주세요.');
+  if (error || !data) return rpcFailure(error, '자동결제를 해지하지 못했어요. 잠시 후 다시 시도해주세요.');
   if (data !== 'ok' && data !== 'not_found') return fail(data, '자동결제를 해지하지 못했어요.');
   return { ok: true };
 }

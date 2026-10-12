@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,12 +13,14 @@ import {
   CYCLE_NAME,
   dayLabel,
   disableDuesPlan,
+  failureTitle,
   feePercent,
   fetchDuesPlan,
   fetchDuesStatus,
   fetchPayoutAccount,
   fetchSettlements,
   planSummary,
+  todayKst,
   setDuesPlan,
   setPayoutAccount,
 } from '@/lib/dues';
@@ -43,7 +45,9 @@ export default function DuesSettingsScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [today, setToday] = useState(''); // 오늘(KST)
-  const [formReady, setFormReady] = useState(false);
+  const formReady = useRef(false); // 입력란을 서버 값으로 채웠는가(상태로 두면 load 가 바뀌어 한 번 더 읽는다)
+  const [accountError, setAccountError] = useState<string | null>(null); // 계좌 저장 실패 사유 — 길어서 화면에 남긴다
+  const [planError, setPlanError] = useState<string | null>(null);
 
   // 회비 규칙 입력
   const [cycle, setCycle] = useState<DuesCycle>('monthly');
@@ -74,14 +78,24 @@ export default function DuesSettingsScreen() {
       Alert.alert('접근할 수 없어요', '클럽장만 회비를 설정할 수 있어요.', [{ text: '확인', onPress: () => router.back() }]);
       return;
     }
-    const [pl, acc, sets] = await Promise.all([fetchDuesPlan(clubId), fetchPayoutAccount(clubId), fetchSettlements(clubId)]);
-    setToday(new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10));
+    let pl: ClubDuesPlan | null;
+    let acc: ClubPayoutAccountMasked | null;
+    let sets: ClubDuesSettlement[];
+    try {
+      [pl, acc, sets] = await Promise.all([fetchDuesPlan(clubId), fetchPayoutAccount(clubId), fetchSettlements(clubId)]);
+    } catch {
+      // 못 읽은 것을 "계좌 없음"·"회비 꺼짐"으로 보여주면 잘못 덮어쓸 수 있다
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
+    setToday(todayKst());
     setStatus(st);
     setPlan(pl);
     setAccount(acc);
     setSettlements(sets);
     // 입력란은 처음 한 번만 서버 값으로 채운다(다시 포커스될 때 입력 중인 값을 덮어쓰지 않게)
-    if (!formReady) {
+    if (!formReady.current) {
       if (pl) {
         setCycle(pl.cycle);
         setAmountText(String(pl.next_amount ?? pl.amount));
@@ -89,11 +103,11 @@ export default function DuesSettingsScreen() {
         setStartMonthText(String(pl.start_month));
         setIncludeOwner(pl.include_owner);
       }
-      setFormReady(true);
+      formReady.current = true;
     }
     setLoadFailed(false);
     setLoading(false);
-  }, [clubId, router, formReady]);
+  }, [clubId, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -129,24 +143,26 @@ export default function DuesSettingsScreen() {
       </SafeAreaView>
     );
   }
-  if (!CLUB_DUES_ENABLED || !status.enabled || !status.plus) {
+  if (!CLUB_DUES_ENABLED) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <View style={styles.center}>
-          <Text style={styles.title}>{!status.plus && status.enabled ? '프리미엄 플러스 클럽에서 쓸 수 있어요' : '회비 기능은 아직 준비 중이에요'}</Text>
-          {status.enabled && !status.plus ? (
-            <Button title="플랜 관리" onPress={() => router.push({ pathname: '/club/plan', params: { clubId: clubId! } })} style={styles.wide} />
-          ) : null}
+          <Text style={styles.title}>회비 기능은 아직 준비 중이에요</Text>
         </View>
       </SafeAreaView>
     );
   }
+
+  // 회비를 받을 수 있는 상태(서버 스위치 + 플러스)가 아니어도, 이미 받은 회비의 정산 계좌·정산 내역은 볼 수 있어야 한다.
+  // 그때는 규칙·계좌를 고치는 부분만 숨긴다(서버도 그 상태에서는 저장을 받지 않는다).
+  const available = status.enabled && status.plus;
 
   const planActive = !!plan && plan.active;
   const busy = saving !== null;
   const showAccountForm = editingAccount || !account;
 
   async function saveAccount() {
+    setAccountError(null);
     setSaving('account');
     const res = await setPayoutAccount({
       clubId: clubId!,
@@ -160,7 +176,8 @@ export default function DuesSettingsScreen() {
     });
     setSaving(null);
     if (!res.ok) {
-      Alert.alert('저장 실패', res.error);
+      setAccountError(res.error);
+      Alert.alert(failureTitle(res, '저장 실패'), '입력란 아래 안내를 확인해주세요.');
       return;
     }
     setEditingAccount(false);
@@ -173,28 +190,31 @@ export default function DuesSettingsScreen() {
     const amount = Number(digits(amountText));
     const dueDay = Number(digits(dueDayText));
     const startMonth = Number(digits(startMonthText)) || 1;
-    if (!amount || amount < 1000 || amount % 100 !== 0) {
-      Alert.alert('입력 확인', '회비는 1,000원 이상, 100원 단위로 입력해주세요.');
+    setPlanError(null);
+    if (!amount || amount < 1000 || amount > 1000000 || amount % 100 !== 0) {
+      setPlanError('회비는 1,000원부터 1,000,000원까지, 100원 단위로 입력해주세요.');
       return;
     }
     if (!dueDay || dueDay < 1 || dueDay > 28) {
-      Alert.alert('입력 확인', '납부일은 1일부터 28일 사이로 입력해주세요.');
+      setPlanError('납부일은 1일부터 28일 사이로 입력해주세요.');
       return;
     }
     if (cycle === 'yearly' && (startMonth < 1 || startMonth > 12)) {
-      Alert.alert('입력 확인', '시작 월은 1월부터 12월 사이로 입력해주세요.');
+      setPlanError('시작 월은 1월부터 12월 사이로 입력해주세요.');
       return;
     }
     setSaving('plan');
     const res = await setDuesPlan({ clubId: clubId!, cycle, amount, dueDay, startMonth, includeOwner });
     setSaving(null);
     if (!res.ok) {
-      Alert.alert('저장 실패', res.error);
+      setPlanError(res.error);
+      Alert.alert(failureTitle(res, '저장 실패'), res.error);
       return;
     }
-    const next = await fetchDuesPlan(clubId!);
-    setPlan(next);
+    // 저장은 끝났다. 다시 읽기에 실패해도 저장 실패로 안내하지 않는다(아래 load 가 화면을 맞춘다).
+    const next = await fetchDuesPlan(clubId!).catch(() => null);
     if (next) {
+      setPlan(next);
       const scheduled = next.next_amount && next.next_amount_from ? `\n${dayLabel(next.next_amount_from)} 기간부터 ${won(next.next_amount)}으로 바뀌어요.` : '';
       Alert.alert(
         planActive ? '회비 설정 저장' : '회비를 켰어요',
@@ -202,6 +222,8 @@ export default function DuesSettingsScreen() {
           ? `${planSummary(next)}${scheduled}`
           : `${planSummary(next)}\n첫 납부 기간은 ${next.first_period_start.slice(0, 4)}년 ${dayLabel(next.first_period_start)}에 시작해요. 회원들에게 안내를 보냈어요.${scheduled}`,
       );
+    } else {
+      Alert.alert('회비 설정 저장', '저장했어요.');
     }
     load();
   }
@@ -214,9 +236,13 @@ export default function DuesSettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           setSaving('disable');
+          setPlanError(null);
           const res = await disableDuesPlan(clubId!);
           setSaving(null);
-          if (!res.ok) Alert.alert('실패', res.error);
+          if (!res.ok) {
+            setPlanError(res.error);
+            Alert.alert(failureTitle(res, '회비 끄기 실패'), res.error);
+          }
           load();
         },
       },
@@ -227,6 +253,19 @@ export default function DuesSettingsScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {!available ? (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>{status.enabled ? '지금은 회비를 받을 수 없어요' : '지금은 회비 기능을 쓸 수 없어요'}</Text>
+              <Text style={styles.sub}>
+                {status.enabled ? '프리미엄 플러스 클럽만 회비를 받을 수 있어요. ' : ''}
+                이미 받은 회비의 정산 내역은 아래에서 볼 수 있어요.
+              </Text>
+              {status.enabled ? (
+                <Button title="플랜 관리" variant="outline" onPress={() => router.push({ pathname: '/club/plan', params: { clubId: clubId! } })} />
+              ) : null}
+            </View>
+          ) : null}
+
           {/* 1) 정산 계좌 */}
           <View style={styles.card}>
             <View style={styles.rowBetween}>
@@ -243,7 +282,15 @@ export default function DuesSettingsScreen() {
               회원이 낸 회비는 피넛이 대신 받아 매월 이 계좌로 정산해요.
               {status.fee_bps !== null ? ` 수수료는 결제 금액의 ${feePercent(status.fee_bps)}(카드 수수료 포함)예요.` : ''}
             </Text>
-            {account && !showAccountForm ? (
+            {!available ? (
+              account ? (
+                <Text style={styles.line}>
+                  {account.bank_name} {account.account_masked} · {account.holder_name}
+                </Text>
+              ) : (
+                <Text style={styles.sub}>등록된 정산 계좌가 없어요.</Text>
+              )
+            ) : account && !showAccountForm ? (
               <>
                 <Text style={styles.line}>
                   {account.bank_name} {account.account_masked} · {account.holder_name}
@@ -283,13 +330,25 @@ export default function DuesSettingsScreen() {
                 ) : null}
                 <TextField label="연락처" value={contactPhone} onChangeText={setContactPhone} placeholder="정산 관련 연락을 받을 번호" keyboardType="phone-pad" maxLength={13} />
                 <TextField label="이메일 (선택)" value={contactEmail} onChangeText={setContactEmail} placeholder="정산 내역을 받을 이메일" keyboardType="email-address" autoCapitalize="none" maxLength={80} />
+                {accountError ? <Text style={styles.errorBox}>{accountError}</Text> : null}
                 <Button title="계좌 저장" onPress={saveAccount} loading={saving === 'account'} disabled={busy} />
-                {account ? <Button title="취소" variant="outline" onPress={() => setEditingAccount(false)} disabled={busy} /> : null}
+                {account ? (
+                  <Button
+                    title="취소"
+                    variant="outline"
+                    onPress={() => {
+                      setAccountError(null);
+                      setEditingAccount(false);
+                    }}
+                    disabled={busy}
+                  />
+                ) : null}
               </>
             )}
           </View>
 
-          {/* 2) 회비 규칙 */}
+          {/* 2) 회비 규칙 — 회비를 받을 수 있는 상태일 때만 */}
+          {available ? (
           <View style={styles.card}>
             <View style={styles.rowBetween}>
               <Text style={styles.sectionTitle}>회비 규칙</Text>
@@ -334,7 +393,7 @@ export default function DuesSettingsScreen() {
                   placeholder="예: 30000"
                   keyboardType="number-pad"
                   maxLength={7}
-                  hint={planActive ? '금액을 바꾸면 다음 기간부터 적용돼요. 올리면 회원이 다시 동의해야 자동결제가 이어져요.' : '100원 단위'}
+                  hint={planActive ? '금액을 바꾸면 다음 기간부터 적용돼요. 올리면 회원이 다시 동의해야 자동결제가 이어져요.' : '1,000원~1,000,000원, 100원 단위'}
                 />
                 {cycle === 'yearly' ? (
                   <TextField
@@ -361,6 +420,7 @@ export default function DuesSettingsScreen() {
                   <View style={[styles.checkbox, includeOwner && styles.checkboxOn]} />
                   <Text style={styles.line}>클럽장도 회비 대상에 포함</Text>
                 </Pressable>
+                {planError ? <Text style={styles.errorBox}>{planError}</Text> : null}
                 <Button title={planActive ? '변경사항 저장' : '회비 켜기'} onPress={savePlan} loading={saving === 'plan'} disabled={busy} />
                 {planActive ? <Button title="회비 끄기" variant="outline" onPress={confirmDisable} loading={saving === 'disable'} disabled={busy} /> : null}
                 <Text style={styles.footnote}>
@@ -369,6 +429,7 @@ export default function DuesSettingsScreen() {
               </>
             )}
           </View>
+          ) : null}
 
           {/* 3) 정산 내역 */}
           <View style={styles.card}>
@@ -419,6 +480,16 @@ const styles = StyleSheet.create({
   line: { color: '#F8FAFC', fontSize: 14, fontWeight: '800' },
   sub: { color: '#AAB4C0', fontSize: 13, lineHeight: 19, fontWeight: '600' },
   warn: { color: '#F5A623', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  errorBox: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,107,107,0.14)',
+    overflow: 'hidden',
+  },
   ok: { color: '#16C784' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },

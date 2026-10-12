@@ -3620,6 +3620,18 @@ begin
     'plan_active', exists (select 1 from public.club_dues_plans p where p.club_id = p_club_id and p.active),
     'is_owner', v_owner,
     'is_manager', v_manager,
+    'is_member', exists (select 1 from public.club_members m where m.club_id = p_club_id and m.user_id = auth.uid() and m.status = 'approved'),
+    -- 이 클럽에 내 자동결제 동의나 회비 기록이 남아 있는가 — 회비가 꺼져도 해지·카드 삭제·기록 확인으로 갈 길을 열어 둔다.
+    --   동의는 해지했지만 카드만 남은 회원도 포함(회비를 설정한 적 있는 클럽의 승인 회원이면 그 클럽 화면에서 카드를 지울 수 있게).
+    'has_mine', auth.uid() is not null and (
+      exists (select 1 from public.club_dues_mandates x where x.club_id = p_club_id and x.user_id = auth.uid() and x.status <> 'revoked')
+      or exists (select 1 from public.club_dues d where d.club_id = p_club_id and d.user_id = auth.uid() and d.status <> 'void')
+      or (exists (select 1 from public.member_billing_cards c where c.user_id = auth.uid())
+          and exists (select 1 from public.club_dues_plans p where p.club_id = p_club_id)
+          and exists (select 1 from public.club_members m where m.club_id = p_club_id and m.user_id = auth.uid() and m.status = 'approved'))),
+    -- 운영진이 볼 회비 기록이 이 클럽에 남아 있는가 — 회비가 꺼져도 납부 명단·환불·정산 내역으로 갈 길을 열어 둔다
+    --   (회비 대상이 아닌 클럽장·임원은 본인 기록이 없어 has_mine 으로는 들어올 수 없다)
+    'has_roster', v_manager and exists (select 1 from public.club_dues d where d.club_id = p_club_id),
     'fee_bps', case when v_manager then public.club_fee_bps(p_club_id) end,
     'payout_registered', case when v_owner then exists (select 1 from public.club_payout_accounts a where a.club_id = p_club_id) end,
     'payout_verified', case when v_owner then coalesce((select a.verified from public.club_payout_accounts a where a.club_id = p_club_id), false) end
@@ -3684,6 +3696,8 @@ begin
          where club_id = p_club_id and period_start >= pl.next_amount_from and status = 'open' and attempt_count = 0;
       end if;
       update public.club_dues_plans set next_amount = null, next_amount_from = null where club_id = p_club_id;
+    elsif pl.next_amount is not null and p_amount = pl.next_amount then
+      null;  -- 이미 같은 금액으로 예약돼 있다(다른 항목만 고쳐 저장한 경우) — 다시 예약하거나 회원에게 또 알리지 않는다
     elsif not exists (select 1 from public.club_dues d where d.club_id = p_club_id and d.period_start >= pl.first_period_start and d.status <> 'void') then
       -- 아직 한 번도 청구한 적이 없으면 바로 적용
       update public.club_dues_plans set amount = p_amount, next_amount = null, next_amount_from = null where club_id = p_club_id;

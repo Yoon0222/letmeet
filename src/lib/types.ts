@@ -382,6 +382,10 @@ export type ClubDuesStatus = {
   plan_active: boolean; // 회비 규칙이 켜져 있는가
   is_owner: boolean;
   is_manager: boolean;
+  // 아래 셋은 나중에 추가된 값 — 함수가 옛 버전인 서버에서는 내려오지 않는다(없으면 화면이 깨지지 않게 기본값으로 다룰 것)
+  is_member?: boolean; // 승인된 회원인가(클럽장 포함)
+  has_mine?: boolean; // 이 클럽에 내 자동결제 동의·회비 기록·카드가 남아 있는가(회비가 꺼져도 화면에 들어올 수 있게)
+  has_roster?: boolean; // 운영진이 볼 회비 기록이 남아 있는가(회비가 꺼져도 명단·환불·정산 내역으로 갈 수 있게)
   fee_bps: number | null;
   payout_registered: boolean | null;
   payout_verified: boolean | null;
