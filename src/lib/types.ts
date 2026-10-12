@@ -218,6 +218,9 @@ export type ClubTier = 'free' | 'premium';
 
 export type ClubPremiumStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'canceled';
 
+/** 지금 실제로 쓸 수 있는 플랜 — 서버 club_effective_plan 결과 (0095) */
+export type ClubPlan = 'free' | 'premium' | 'premium_plus';
+
 export type Club = {
   id: string;
   owner_id: string;
@@ -238,6 +241,7 @@ export type ClubWithCounts = Club & {
   owner_nickname: string;
   owner_avatar_url: string | null;
   member_count: number;
+  effective_plan: ClubPlan; // 서버가 계산한 사용 가능 플랜 (0095)
 };
 
 export type ClubMember = {
@@ -1157,6 +1161,10 @@ export interface Database {
         Args: { p_club_id: string; p_user_id: string; p_approve: boolean };
         Returns: undefined;
       };
+      club_effective_plan: { Args: { p_club_id: string }; Returns: ClubPlan };
+      club_plan_usable: { Args: { p_club_id: string; p_min?: ClubPlan }; Returns: boolean };
+      is_club_manager: { Args: { p_club_id: string }; Returns: boolean };
+      start_club_trial: { Args: { p_club_id: string }; Returns: 'ok' | 'not_found' | 'forbidden' | 'already_used' };
       is_club_session_manager: { Args: { p_session_id: string }; Returns: boolean };
       is_club_session_member: { Args: { p_session_id: string }; Returns: boolean };
       generate_due_club_sessions: { Args: { p_club_id?: string | null }; Returns: number };

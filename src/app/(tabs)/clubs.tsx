@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { effectiveClubPlan, PLAN_LABEL } from '@/lib/club-plan';
 import { getBlockedIds } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 import type { ClubSession, ClubWithCounts } from '@/lib/types';
@@ -44,6 +45,7 @@ function ClubListCard({ club, activity, membership, onPress }: {
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const plan = effectiveClubPlan(club);
   const upcoming = sessionLabel(activity?.nextSession ?? null);
   const detail = upcoming
     ? upcoming
@@ -79,7 +81,7 @@ function ClubListCard({ club, activity, membership, onPress }: {
       <View style={styles.clubBody}>
         <View style={styles.clubNameRow}>
           <Text style={styles.clubName} numberOfLines={1}>{club.name}</Text>
-          {club.tier === 'premium' ? <Badge label="Premium" style={styles.premiumBadge} /> : null}
+          {plan !== 'free' ? <Badge label={PLAN_LABEL[plan]} style={styles.premiumBadge} /> : null}
         </View>
         <Text style={styles.clubMeta} numberOfLines={1}>
           {club.region || '지역 미설정'} · 멤버 {club.member_count}명{membership === 'pending' ? ' · 신청 중' : ''}

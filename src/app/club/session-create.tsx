@@ -10,6 +10,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
+import { effectiveClubPlan, planAtLeast } from '@/lib/club-plan';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 
@@ -49,11 +50,16 @@ export default function CreateClubSession() {
   useEffect(() => {
     if (!clubId || !session?.user.id) return;
     (async () => {
-      const [{ data: club }, { data: mem }] = await Promise.all([
-        supabase.from('clubs').select('name, owner_id, tier, premium_status, premium_trial_ends_at').eq('id', clubId).maybeSingle(),
+      const [{ data: club, error: clubError }, { data: mem }] = await Promise.all([
+        supabase.from('clubs_with_counts').select('*').eq('id', clubId).maybeSingle(),
         supabase.from('club_members').select('role, status').eq('club_id', clubId).eq('user_id', session.user.id).maybeSingle(),
       ]);
-      if (!club) return;
+      // 클럽을 못 읽으면 권한·플랜을 확인할 수 없으므로 막는다(fail-closed)
+      if (clubError || !club) {
+        Alert.alert('클럽 정보를 불러오지 못했어요', '잠시 후 다시 시도해주세요.');
+        router.back();
+        return;
+      }
       setClubName(club.name);
       const isManager = club.owner_id === session.user.id || (mem?.role === 'officer' && mem?.status === 'approved');
       if (!isManager) {
@@ -61,9 +67,7 @@ export default function CreateClubSession() {
         router.back();
         return;
       }
-      const trialing = club.premium_status === 'trialing' && !!club.premium_trial_ends_at && new Date(club.premium_trial_ends_at).getTime() > Date.now();
-      const premiumUsable = club.tier === 'premium' && (club.premium_status === 'active' || trialing);
-      if (!premiumUsable) {
+      if (!planAtLeast(effectiveClubPlan(club), 'premium')) {
         Alert.alert('프리미엄 필요', '정기모임은 프리미엄 클럽에서만 개설할 수 있어요.');
         router.back();
       }

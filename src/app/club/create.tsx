@@ -30,8 +30,6 @@ export default function CreateClub() {
     if (!session?.user.id) return;
     setSaving(true);
     show();
-    const trialEnd = new Date();
-    trialEnd.setMonth(trialEnd.getMonth() + 1);
     const { data, error } = await supabase
       .from('clubs')
       .insert({
@@ -40,10 +38,8 @@ export default function CreateClub() {
         region: region.trim(),
         description: description.trim(),
         require_approval: true, // 클럽 가입은 항상 운영자 승인제
+        // 프리미엄을 고르면 서버(0095 트리거)가 1개월 무료 체험으로 설정한다
         tier: plan === 'premium' ? 'premium' : 'free',
-        premium_status: plan === 'premium' ? 'trialing' : 'none',
-        premium_started_at: plan === 'premium' ? new Date().toISOString() : null,
-        premium_trial_ends_at: plan === 'premium' ? trialEnd.toISOString() : null,
       })
       .select('id')
       .single();

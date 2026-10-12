@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-09-10 (Claude: v3.2.3 릴리스 — 토스 라이브 결제 개통)
+Last updated: 2026-10-08 (Claude: 클럽 회비 0단계 — 클럽 등급 보호·공용 등급 판정 0095)
 
 ## Purpose
 
@@ -22,6 +22,21 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-08, 클럽 회비 0단계 — 클럽 등급 보호·공용 등급 판정 0095)
+
+- **배경**: 사용자 승인 계획 — 클럽 회비 카드 자동결제 + 새 멤버십 "프리미엄 플러스"(월 9,900원). 계획서 `C:\Users\SEPC\.claude\plans\glittery-zooming-summit.md`. 0단계(보안 선행)만 완료, 1단계(플러스)부터 다음 세션.
+- **What changed**:
+  - DB `0095_club_plan_hardening.sql`(DEV 적용): ① `clubs.tier/premium_*` 보호 트리거 — 앱(authenticated/anon) 쓰기는 조용히 교정(생성 시 프리미엄=1개월 체험, 상세의 체험 시작 none→trialing만 허용, 날짜는 서버) ② `club_members` 셀프 가입은 `role='member' and status='pending'`만 + role/status CHECK ③ 함수 `club_effective_plan`·`club_plan_rank`·`club_plan_usable`·`is_club_manager`·`start_club_trial` ④ `clubs_with_counts.effective_plan`(서버 계산 사용 가능 플랜 — 체험 만료·해지 후 기간 종료 반영) ⑤ `club_sessions` insert·`tournaments` insert(클럽 분기)에 `club_plan_usable` — QA 지적: 무료 클럽도 API로 정기모임·월례대회 생성 가능했음.
+  - ⚠️ **배포 순서**: 운영 DB에 0095(`docs/PROD_APPLY_0095.sql`)를 **먼저** 적용한 뒤에 이 코드가 든 OTA/스토어 빌드를 낼 것(새 코드는 effective_plan 컬럼·start_club_trial 에 의존). 0095 자체는 스토어 4.0.0 앱과 호환.
+  - 앱: 새 `src/lib/club-plan.ts`(`effectiveClubPlan`·`planAtLeast`·`isTrialActive`·`trialDaysLeft`·`PLAN_LABEL`)로 등급 판정 6곳 통일(`use-club-access.ts`, `club/[id].tsx`, `session-create.tsx`, `tournament-create.tsx`, `club-card.tsx`, `(tabs)/clubs.tsx`). 앱의 등급 직접 쓰기 제거 — `create.tsx`는 tier만 보냄, 체험 시작은 `rpc('start_club_trial')`, `[id].tsx`의 구독 만료 동기화 블록 삭제(서버 effective_plan이 대체).
+- **Why**: 회비(돈)를 붙이기 전 필수 — 클럽장이 API로 무료 프리미엄 가능, 누구나 '승인된 임원' 셀프 가입 가능했음.
+- **Files touched**: `supabase/migrations/0095_club_plan_hardening.sql`, `supabase/schema.sql`, `docs/PROD_APPLY_0095.sql`, `src/lib/{club-plan,use-club-access,types}.ts`, `src/app/club/{[id],create,session-create,tournament-create}.tsx`, `src/components/club-card.tsx`, `src/app/(tabs)/clubs.tsx`.
+- **Validation**: DEV 권한 시험 19개 통과(역할 흉내 SQL, 전부 롤백) + qa-pickle QA PASS(보강 시험 21개·iOS 번들 export, 지적 6건 반영). `tsc`·`expo lint` 0. 실기기(dev-client) 홈·클럽 목록·클럽 상세 정상, 해지 만료 클럽이 Free로 표시.
+- **Codex 참고/요청**:
+  - 등급 배지·잠금 판단은 반드시 `club-plan.ts`(서버 `effective_plan`) 사용. **앱에서 `clubs.tier/premium_*`를 쓰지 말 것**(트리거가 무시). 배지 라벨은 `PLAN_LABEL`(Free/Premium/Premium+).
+  - 디자인 변경 없음. 1단계에서 `club/plan.tsx`(플랜 비교·구독·업그레이드), 2단계에서 회비 화면들(`club/dues*.tsx`)을 기능 위주로 추가할 예정 → 완성되면 디자인 다듬기 요청 예정.
+  - 참고: `(tabs)/clubs.tsx` 내 클럽 카드가 클럽장 본인 클럽에도 "가입 승인 후 활동할 수 있어요"를 보여줌(require_approval 분기) — 문구 확인 필요.
 
 ### Claude -> Codex (2026-09-10, v3.2.3 릴리스 — 토스 라이브 키 전환·실결제 개통)
 

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { CLUB_SUBSCRIPTION_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { effectiveClubPlan, isTrialActive, planAtLeast, trialDaysLeft as calcTrialDaysLeft } from '@/lib/club-plan';
 import { cancelClubSubscription } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import type { ClubMemberWithProfile, ClubPostWithAuthor, ClubSession, ClubSubscription, ClubWithCounts } from '@/lib/types';
@@ -73,7 +74,7 @@ export default function ClubDetail() {
         .order('session_date', { ascending: true })
         .limit(10),
     ]);
-    let nextClub = c ?? null;
+    const nextClub = c ?? null;
     setMembers((m as unknown as ClubMemberWithProfile[]) ?? []);
     setPosts((p as ClubPostWithAuthor[] | null) ?? []);
     const nextSessions = (sessionRows as ClubSession[] | null) ?? [];
@@ -90,24 +91,8 @@ export default function ClubDetail() {
         .select('id, club_id, owner_id, card_company, card_number_masked, amount, status, current_period_start, current_period_end, next_charge_at, last_charge_at, fail_count, canceled_at, created_at, updated_at')
         .eq('club_id', id)
         .maybeSingle();
-      const nextSub = (s as ClubSubscription | null) ?? null;
-      setSub(nextSub);
-
-      // 정기 만료 작업이 늦더라도 해지된 이용 기간이 끝났으면 즉시 Free로 동기화한다.
-      const canceledPeriodExpired =
-        nextSub?.status === 'canceled' &&
-        !!nextSub.current_period_end &&
-        new Date(nextSub.current_period_end).getTime() <= Date.now();
-      if (canceledPeriodExpired && (c.tier === 'premium' || c.premium_status !== 'canceled')) {
-        const { error: syncError } = await supabase
-          .from('clubs')
-          .update({ tier: 'free', premium_status: 'canceled' })
-          .eq('id', id)
-          .eq('owner_id', uid);
-        if (!syncError) {
-          nextClub = { ...c, tier: 'free', premium_status: 'canceled' };
-        }
-      }
+      // 해지 후 이용 기간이 끝난 클럽은 서버 effective_plan(0095)이 free 로 계산한다 — 앱에서 등급을 쓰지 않음.
+      setSub((s as ClubSubscription | null) ?? null);
     } else {
       setSub(null);
     }
@@ -125,14 +110,9 @@ export default function ClubDetail() {
   const myMembership = members.find((m) => m.user_id === uid);
   const isApprovedMember = myMembership?.status === 'approved';
   const isPending = myMembership?.status === 'pending';
-  const isTrialing = club?.premium_status === 'trialing' && !!club.premium_trial_ends_at && new Date(club.premium_trial_ends_at).getTime() > nowMs;
-  const canceledPeriodExpired =
-    sub?.status === 'canceled' && !!sub.current_period_end && new Date(sub.current_period_end).getTime() <= nowMs;
-  const isPremiumUsable =
-    club?.tier === 'premium' && (club.premium_status === 'active' || isTrialing) && !canceledPeriodExpired;
-  const trialDaysLeft = isTrialing && club?.premium_trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(club.premium_trial_ends_at).getTime() - nowMs) / 86400000))
-    : null;
+  const isTrialing = isTrialActive(club, nowMs);
+  const isPremiumUsable = planAtLeast(effectiveClubPlan(club, nowMs), 'premium');
+  const trialDaysLeft = calcTrialDaysLeft(club, nowMs);
 
   useEffect(() => {
     navigation.setOptions({
@@ -193,20 +173,20 @@ export default function ClubDetail() {
   async function startPremiumTrial() {
     if (!isOwner || !id) return;
     setActing(true);
-    const trialEnd = new Date();
-    trialEnd.setMonth(trialEnd.getMonth() + 1);
-    const { error } = await supabase
-      .from('clubs')
-      .update({
-        tier: 'premium',
-        premium_status: 'trialing',
-        premium_started_at: new Date().toISOString(),
-        premium_trial_ends_at: trialEnd.toISOString(),
-      })
-      .eq('id', id);
+    // 등급·체험 기간은 서버 함수가 정한다(0095 — 클럽당 1회, 서버 시각 기준 1개월)
+    const { data: result, error } = await supabase.rpc('start_club_trial', { p_club_id: id });
     setActing(false);
-    if (error) {
-      Alert.alert('업그레이드 실패', error.message);
+    if (error || result !== 'ok') {
+      const message =
+        result === 'already_used'
+          ? '이미 무료 체험을 사용한 클럽이에요.'
+          : result === 'forbidden'
+            ? '클럽장만 체험을 시작할 수 있어요.'
+            : result === 'not_found'
+              ? '클럽을 찾을 수 없어요.'
+              : '잠시 후 다시 시도해주세요.';
+      Alert.alert('체험 시작 실패', message);
+      load();
       return;
     }
     Alert.alert('무료 체험 시작', '프리미엄 클럽 기능을 1개월 동안 사용할 수 있어요.');

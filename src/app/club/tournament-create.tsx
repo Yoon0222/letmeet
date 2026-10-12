@@ -10,6 +10,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
+import { effectiveClubPlan, planAtLeast } from '@/lib/club-plan';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { Discipline, TournamentFormat } from '@/lib/types';
@@ -54,21 +55,24 @@ export default function CreateClubTournament() {
   useEffect(() => {
     if (!clubId || !session?.user.id) return;
     supabase
-      .from('clubs')
-      .select('name, owner_id, tier, premium_status, premium_trial_ends_at')
+      .from('clubs_with_counts')
+      .select('*')
       .eq('id', clubId)
       .maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
+      .then(({ data, error }) => {
+        // 클럽을 못 읽으면 권한·플랜을 확인할 수 없으므로 막는다(fail-closed)
+        if (error || !data) {
+          Alert.alert('클럽 정보를 불러오지 못했어요', '잠시 후 다시 시도해주세요.');
+          router.back();
+          return;
+        }
         setClubName(data.name);
         if (data.owner_id !== session.user.id) {
           Alert.alert('권한 없음', '클럽 월례대회는 클럽장만 개설할 수 있어요.');
           router.back();
           return;
         }
-        const trialing = data.premium_status === 'trialing' && !!data.premium_trial_ends_at && new Date(data.premium_trial_ends_at).getTime() > Date.now();
-        const premiumUsable = data.tier === 'premium' && (data.premium_status === 'active' || trialing);
-        if (!premiumUsable) {
+        if (!planAtLeast(effectiveClubPlan(data), 'premium')) {
           Alert.alert('프리미엄 필요', '월례대회는 프리미엄 클럽에서만 개설할 수 있어요.');
           router.back();
         }

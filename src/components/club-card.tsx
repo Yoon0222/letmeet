@@ -5,9 +5,11 @@ import { AppCard } from '@/components/ui/app-card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AppSpacing, Radius, Typography } from '@/theme';
+import { effectiveClubPlan, PLAN_LABEL } from '@/lib/club-plan';
 import type { ClubWithCounts } from '@/lib/types';
 
 export function ClubCard({ club, onPress }: { club: ClubWithCounts; onPress: () => void }) {
+  const plan = effectiveClubPlan(club);
   return (
     <AppCard onPress={onPress} style={styles.card}>
       {club.image_url ? (
@@ -20,7 +22,7 @@ export function ClubCard({ club, onPress }: { club: ClubWithCounts; onPress: () 
       <View style={styles.body}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
-          {club.tier === 'premium' ? <Badge label="Premium" style={styles.badge} /> : null}
+          {plan !== 'free' ? <Badge label={PLAN_LABEL[plan]} style={styles.badge} /> : null}
         </View>
         <Text style={styles.meta} numberOfLines={1}>
           {club.region || '지역 미설정'} · 멤버 {club.member_count}명

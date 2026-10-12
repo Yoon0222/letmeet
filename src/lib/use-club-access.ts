@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { useAuth } from '@/contexts/auth';
+import { effectiveClubPlan, isTrialActive, planAtLeast, trialDaysLeft as calcTrialDaysLeft } from '@/lib/club-plan';
 import { supabase } from '@/lib/supabase';
 import type { ClubRole, ClubWithCounts } from '@/lib/types';
 
@@ -42,17 +43,15 @@ export function useClubAccess(clubId?: string) {
   const isPending = myStatus === 'pending';
   const isOfficer = myRole === 'officer' && isApprovedMember;
   const canManage = isOwner || isOfficer;
-  const isTrialing =
-    club?.premium_status === 'trialing' && !!club.premium_trial_ends_at && new Date(club.premium_trial_ends_at).getTime() > nowMs;
-  const isPremiumUsable = club?.tier === 'premium' && (club.premium_status === 'active' || isTrialing);
-  const trialDaysLeft =
-    isTrialing && club?.premium_trial_ends_at
-      ? Math.max(0, Math.ceil((new Date(club.premium_trial_ends_at).getTime() - nowMs) / 86400000))
-      : null;
+  const plan = effectiveClubPlan(club, nowMs);
+  const isTrialing = isTrialActive(club, nowMs);
+  const isPremiumUsable = planAtLeast(plan, 'premium');
+  const trialDaysLeft = calcTrialDaysLeft(club, nowMs);
 
   return {
     club,
     uid,
+    plan,
     myRole,
     isOwner,
     isOfficer,
