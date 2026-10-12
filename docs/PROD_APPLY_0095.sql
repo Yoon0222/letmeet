@@ -21,7 +21,12 @@
 -- 실행: Supabase SQL Editor(운영 프로젝트)에 전체 붙여넣기 → Run
 --   또는 npx supabase db query -f docs/PROD_APPLY_0095.sql --linked --project-ref jbvtdthtmrlndduqiikj
 -- 재실행해도 안전(drop if exists / create or replace).
+-- 전체가 하나의 트랜잭션(begin…commit) — 중간에 하나라도 실패하면 아무것도 적용되지 않는다.
+-- 사전 점검(2026-10-12, 읽기 전용): CHECK 위반 데이터 0건, 임원 0명, 필요한 테이블·컬럼·함수 모두 존재,
+--   clubs_with_counts 에 의존하는 객체 없음, 0095 미적용 상태 확인.
 -- ============================================================================
+
+begin;
 
 -- 0095: 클럽 등급 보호 + 회원 셀프 가입 제한 + 공용 등급/권한 함수 (회비 기능 선행 보안)
 --   ① clubs.tier / premium_* 는 서버(서비스롤 Edge·security definer 함수·cron)만 바꾼다.
@@ -287,6 +292,8 @@ from public.clubs c
 join public.profiles p on p.id = c.owner_id;
 
 notify pgrst, 'reload schema';
+
+commit;
 
 -- ── 적용 후 확인 ─────────────────────────────────────────────────────────────
 -- 클럽별 등급·서버 계산 플랜(체험 중이면 premium, 만료면 free).

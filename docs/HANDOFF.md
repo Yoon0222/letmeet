@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-08 (Claude: 클럽 회비 0단계 — 클럽 등급 보호·공용 등급 판정 0095)
+Last updated: 2026-10-12 (Claude: 클럽 회비 1단계 — 프리미엄 플러스 플랜·플랜 관리 화면 0096)
 
 ## Purpose
 
@@ -22,6 +22,27 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-12, 클럽 회비 1단계 — 프리미엄 플러스 플랜·플랜 관리 화면 0096)
+
+- **What changed**:
+  - DB `0096_premium_plus.sql`(DEV 적용): 가격표 `club_plans`(프리미엄 5,500 / 프리미엄 플러스 9,900, `active` 로 판매 on/off — 운영은 플러스 off), `clubs.premium_plan`(tier 는 'premium' 유지), `club_subscriptions.plan/pending_plan/billing_anchor_day/first_charge_notified_at`, `club_subscription_charges.kind/plan` + 주문번호 유니크, `start_club_trial(club, plan)`, 보호 트리거·`club_effective_plan` 플랜 인식.
+  - 엣지함수(DEV 배포): 공용 `_shared/billing.ts`, `toss-billing-issue`(plan 인자·서버 가격·결제 기간 남으면 무과금 재개), `toss-billing-charge`(예약 플랜 적용·첫 결제 7일 전 안내·고정 주문번호+Idempotency-Key·기준일 방식 갱신), 신규 `toss-billing-change-plan`(업그레이드 차액·다운그레이드 예약·체험 중 전환·preview).
+  - 앱: 신규 `src/app/club/plan.tsx`(플랜 관리 — 현재 플랜·플랜 선택·체험·구독·업그레이드·다운그레이드·해지), `payment/subscribe.tsx`(plan·planName·amount 파라미터), `club/create.tsx`(플러스 카드 — 서버에서 판매 중일 때만 노출), `club/[id].tsx`(운영 카드를 요약 + "플랜 관리" 버튼으로 축소, 체험·구독·해지 로직은 plan.tsx 로 이동), `lib/club-plan.ts`(`PLAN_NAME`·`PLAN_FEATURES`·`won`·`fetchClubPlans`), `lib/payments.ts`(`changeClubPlan`, `startClubSubscription` plan 인자).
+- **Why**: 회비 기능을 담을 상위 멤버십. 가격·결제 판단을 서버로 모으고 구독 결제의 기존 결함(월말 결제일 밀림, 재시도 시 기간 밀림, 중복 실행 시 이중 결제 가능)도 함께 수정.
+- **Files touched**: 위 파일들 + `supabase/schema.sql`, `src/lib/types.ts`, `src/app/_layout.tsx`(club/plan 등록), `docs/PROD_APPLY_0096.sql`, `docs/WORKLOG.md`.
+- **Validation**: DEV 권한·규칙 시험 15개 통과. 토스 테스트 결제로 갱신·이중 결제 방지·예약 플랜·실패/재시도·첫 결제 안내 확인. `tsc`·`expo lint` 0. 실기기 UI 확인은 폰 미연결로 미완.
+- **Codex 요청**:
+  - `club/plan.tsx` 는 기능 위주로 만든 화면(기존 클럽 화면 색·카드 규칙 사용) — **디자인 다듬기 부탁**. 버튼 문구·분기 로직은 유지.
+  - `club/[id].tsx` 하단 "클럽 운영" 카드 문구·버튼이 바뀜(플랜 관리로 이동). 스타일(`premiumCard` 등)은 그대로 사용, 안 쓰게 된 `subInfo/subLine/subSub/subWarn` 스타일은 제거함.
+  - 플랜 이름·배지는 `PLAN_NAME`/`PLAN_LABEL`, 금액은 `club_plans` 값 + `won()` 사용. **화면에 가격을 하드코딩하지 말 것.**
+- **운영 적용 순서**: `docs/PROD_APPLY_0096.sql` → 엣지함수 3개 배포 → 앱. 플러스는 판매 중지 상태로 들어가므로 회비 출시 전까지 사용자에게 보이지 않음.
+- **QA 후속(같은 날, 구독 결제 안전장치)**:
+  - 서버: 0096에 미확정 주문 표 `club_billing_pending_orders` + 반영 함수 `club_billing_*` 5개 추가, 결제 함수 3개와 `_shared/billing.ts` 재작성(결과 모름은 상태 불변, 같은 주문 재시도·다른 주문 전환 모두 이중 결제 없음, 미반영 결제 자동 환불). 로직 전용 — 디자인 영향 없음.
+  - `src/lib/payments.ts`: `startClubSubscription`·`changeClubPlan`·`cancelClubSubscription` 실패 값이 `{ ok:false, error(한국어), code, retryable }` 로 바뀜. `changeClubPlan` 에 `expectedAmount` 추가.
+  - `src/app/club/plan.tsx`: 상태별 블록이 늘어남 — 해지("다시 구독하기"), 결제 실패(재시도 중/중지 + "카드 다시 등록"), 결제 중("결제 카드 변경"), 로드 실패 화면(`retryButton` 스타일 추가). 업그레이드는 누르면 서버에서 차액을 다시 계산해 확인창을 띄움. **분기 조건과 `change(p, 0)`·`change(p, diff)` 의 두 번째 인자는 금액 상한이라 지우면 안 됨.**
+  - `src/app/payment/subscribe.tsx`: 카드 등록 뒤 화면이 3가지로 갈림 — 확정 중(스피너) / "결제 결과를 확인하지 못했어요"(다시 확인 버튼) / "구독을 시작하지 못했어요"(돌아가기). `retryButton` 스타일 추가, 확정·재시도 중 iOS 스와이프 뒤로가기 차단.
+  - `plan.tsx` 의 hex 색상은 `club/[id].tsx` 와 같은 값 그대로 — 테마 토큰 정리는 디자인 다듬을 때 함께 부탁.
 
 ### Claude -> Codex (2026-10-08, 클럽 회비 0단계 — 클럽 등급 보호·공용 등급 판정 0095)
 

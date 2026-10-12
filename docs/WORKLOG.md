@@ -5,8 +5,12 @@
 ## 열린 항목
 - [x] **4.0.0** iOS 빌드·제출 → App Store 공개(2026-10-01). Android 4.0.0 빌드 완료(`a13c4543`, versionCode 33, 2026-10-07)
 - [ ] Android 4.0.0 AAB를 Play Console에 업로드 + **Play 공개 상태 확인**(공개 페이지 404, 2026-10-06 확인) — 사용자
-- [ ] **운영 DB에 0095 적용** — `docs/PROD_APPLY_0095.sql` (4.0.0 앱과 호환, 바로 적용 가능). ⚠️ **이 코드가 든 OTA/스토어 빌드보다 반드시 먼저**(새 코드는 effective_plan·start_club_trial 에 의존) — 사용자
-- [ ] 클럽 회비 + 프리미엄 플러스: 0단계 ✅ → 1단계 플러스 · 2단계 회비 DB · 3단계 자동결제 엔진 · 4단계 화면 · 5단계 관리자 정산 · 6단계 운영 반영 (계획서 `~/.claude/plans/glittery-zooming-summit.md`)
+- [x] **운영 DB에 0095 적용** — 2026-10-12 적용·검증 완료(`docs/PROD_APPLY_0095.sql`, 구조 24항목 통과·임원 0명). 이제 0095 코드가 든 OTA/스토어 빌드를 내도 됨
+- [ ] 운영 DB에 **0094(대회 출전확인 운영자 전용)** 미적용 — DEV만 적용된 상태(2026-10-12 확인). 검토 후 적용 필요
+- [ ] 클럽 회비 + 프리미엄 플러스: 0단계 ✅ · 1단계 플러스 ✅(실기기 확인만 남음) → 2단계 회비 DB · 3단계 자동결제 엔진 · 4단계 화면 · 5단계 관리자 정산 · 6단계 운영 반영 (계획서 `~/.claude/plans/glittery-zooming-summit.md`)
+- [ ] 1단계 실기기 확인(폰 연결 필요): 플랜 관리 화면, 업그레이드 차액 결제, 다운그레이드 예약·취소, 카드 등록(체험 중/신규), **체험 중 카드 등록 → 해지 → 다시 구독(결제되지 않아야 함)**, 결제 카드 변경
+- [ ] **운영에 0096 적용** — `docs/PROD_APPLY_0096.sql` → 엣지함수 3개 배포(`toss-billing-issue`·`toss-billing-change-plan`·`toss-billing-charge --no-verify-jwt`) → 앱 순서. 플러스는 판매 중지(active=false)로 들어감 — 사용자
+- [ ] 플러스 판매를 켤 때(`club_plans.active=true`) `app_config.min_version` 을 0096 코드가 든 버전으로 올리기 — 구버전 앱은 플러스 클럽 카드 등록 불가
 - [ ] 회비 운영 출시 조건(사용자): **토스 지급대행 계약**, 법률·세무 검토, 운영 토스 라이브 키 확정, 운영 pg_cron 등록
 - [x] ~~4.0.0 출시 후 DB 최신 버전 갱신~~ → **불필요**(2026-10-06 정정): 권장 안내는 `checkForUpdate()`(expo-in-app-updates)가 스토어 버전을 직접 읽어 자동. `app_config.latest_version`은 코드에서 미사용. 구버전 **차단**이 필요할 때만 `min_version`을 올림
 - [ ] `.easignore`에 `.env`·`outputs/`·`.codex-*` 추가 — **선행**: preview 빌드 Toss 테스트키를 eas.json/EAS env로 이관
@@ -85,6 +89,23 @@
 - [ ] 상점 화면 (피클볼 용품 판매) — 로드맵 가장 마지막
 
 ---
+
+## 2026-10-12
+
+### 1단계 QA 후속 — 구독 결제 이중 결제 방지 강화 (0096 보강)
+- **결정**: 과금 결과를 승인 / 확정 거절 / 결과 모름으로 나누고, 결과 모름은 상태를 바꾸지 않는다. 모든 과금은 한 길(`chargeWithIntent`): 이력 확인 → 남은 미확정 주문 확정(결제돼 있으면 환불) → 주문 기록 → 과금. 결제 뒤 반영은 SQL 함수 한 트랜잭션. 무료 체험 구간은 클럽 상태가 아니라 "체험 종료일 전 + 결제 이력 없음"으로 판단(체험 중 카드 등록 → 해지 → 재구독이 안내와 달리 즉시 결제되던 문제).
+- **만든 것**: 0096에 `club_billing_pending_orders`(미확정 주문, 서비스롤 전용) + `club_billing_commit_issue/renewal/failure/plan_change` · `club_billing_record_charge`, `club_subscription_charges.subscription_id` nullable. `_shared/billing.ts`(주문 조회·환불·`settlePendingOrder`·`refundUnapplied`·`rpcWithRetry`) + 결제 함수 3개 재작성. 앱: `lib/payments.ts`(오류 한국어·`retryable`), `club/plan.tsx`(다시 구독·카드 재등록·카드 변경 버튼, 유예/중지 구분, 차액은 누를 때 서버 재계산 + 금액 상한), `payment/subscribe.tsx`(같은 카드 등록으로 "다시 확인").
+- **검증**: qa-pickle 2회 FAIL → 수정 → 3차 PARTIAL(앞선 지적 전부 해결·머지 가능, 실기기 미확인이라 PARTIAL). 3차의 새 지적(같은 플랜 카드 변경·재구독이 가격표 변경을 조용히 적용, 기간 끝난 구독의 카드 변경 즉시 결제, 화면 시계 고정, 알림 누락)도 반영. DEV 실 DB에서 반영 함수 5개 직접 호출 시험 30항목 통과. 토스 테스트 키 정기결제 시나리오 12개 통과(정상 갱신 / 같은 주문 재실행 / 미반영 결제 자동 환불 / 환불 주문 재시도 / 실패 후 재시도 / 확정 거절 / 금액 불일치 / 남은 주문 정리 3종 / 예약 다운그레이드 / 운영자 알림). tsc·lint 0. **카드 등록·업그레이드 함수는 로그인+실카드 등록이 필요해 실기기 확인 전**.
+- **메모/주의**: 토스는 같은 Idempotency-Key 요청에 금액이 달라도 예전 승인 응답을 그대로 돌려준다(DEV 확인) → 환불한 주문번호는 이력에 '실패'로 닫아 다시 보내지 않는다. 정기결제 응답의 `unknown`·`mismatch`·`refunded`가 0이 아니면 super_admin에게 알림. 구버전 앱(4.0.0)은 플러스 클럽 카드 등록을 거부(화면 요금과 달라서) → **플러스 판매를 켤 때 `min_version` 올릴 것**.
+
+### 클럽 회비 1단계 — 프리미엄 플러스 플랜: 가격표·구독 확장·플랜 관리 화면 (0096)
+- **결정**: 등급은 `tier='premium'` 유지 + `clubs.premium_plan` 으로 구분(스토어 4.0.0 앱은 플러스도 프리미엄으로 인식 → 강제 업데이트 불필요). 가격의 기준은 서버 가격표 `club_plans`. 플러스 판매는 `club_plans.active` 로 켜며 **운영은 false**(회비 출시 때 on), DEV만 on. 업그레이드=남은 기간 차액 일할(10원 올림, 100원 미만 0), 다운그레이드=다음 결제일부터, 체험 중 전환은 무료.
+- **만든 것**: `0096_premium_plus.sql`, 엣지함수 `_shared/billing.ts` · `toss-billing-issue`(plan·결제 기간 남으면 무과금 재개) · `toss-billing-charge`(예약 플랜 적용·첫 결제 7일 전 안내·고정 주문번호+Idempotency-Key·기준일 방식 갱신) · 신규 `toss-billing-change-plan`(preview 지원), 앱 `club/plan.tsx`(플랜 관리) · `payment/subscribe.tsx` 플랜 파라미터 · `club/create.tsx` 플러스 카드 · `club/[id].tsx` 운영 카드를 요약+플랜 관리 이동으로 축소, `docs/PROD_APPLY_0096.sql`.
+- **검증**: DEV 권한·규칙 시험 15개 통과. 토스 테스트 결제로 갱신 성공 / 같은 예정 상태 재호출 시 이중 결제 없음 / 예약 플랜 적용 / 실패→재시도(주문번호 차수 증가) / 첫 결제 안내 1회만 확인. tsc·lint 0. **미완: 실기기에서 플랜 관리 화면·업그레이드 차액 결제·카드 등록 확인(폰 미연결)**.
+- **메모/주의**: 같이 고친 기존 결함 — 월말 결제일 밀림(`setMonth`), 재시도 성공 시 기간이 재시도일 기준으로 밀림, 갱신 작업 중복 실행 시 이중 결제 가능. DEV에 시험용 `CRON_SECRET` 을 새로 설정함(DEV는 pg_cron 미사용이라 영향 없음). 운영 적용 순서: 0096 SQL → 함수 3개 배포 → 앱.
+
+### 0단계 운영 적용 (0095)
+- 사용자가 `docs/PROD_APPLY_0095.sql` 실행(트랜잭션), 읽기 전용 검증 24항목 통과·임원 0명. 운영에서 클럽 등급 조작·임원 셀프 가입 차단됨.
 
 ## 2026-10-08
 

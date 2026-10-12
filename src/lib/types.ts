@@ -221,6 +221,20 @@ export type ClubPremiumStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'c
 /** 지금 실제로 쓸 수 있는 플랜 — 서버 club_effective_plan 결과 (0095) */
 export type ClubPlan = 'free' | 'premium' | 'premium_plus';
 
+/** 유료 플랜 (0096). clubs.tier 는 'premium' 으로 두고 premium_plan 으로 구분한다. */
+export type ClubPaidPlan = 'premium' | 'premium_plus';
+
+/** club_plans — 플랜 가격표. 가격의 기준은 서버 (0096) */
+export type ClubPlanRow = {
+  plan: ClubPaidPlan;
+  name: string;
+  monthly_price: number;
+  trial_months: number;
+  active: boolean; // false = 신규 체험·구독·업그레이드 중지
+  sort: number;
+  updated_at: string;
+};
+
 export type Club = {
   id: string;
   owner_id: string;
@@ -233,6 +247,7 @@ export type Club = {
   premium_status: ClubPremiumStatus;
   premium_trial_ends_at: string | null;
   premium_started_at: string | null;
+  premium_plan: ClubPaidPlan; // 유료 플랜 구분 — tier='premium' 일 때만 의미 (0096)
   created_at: string;
 };
 
@@ -342,6 +357,8 @@ export type ClubSubscription = {
   owner_id: string;
   card_company: string;
   card_number_masked: string;
+  plan: ClubPaidPlan; // 현재 결제 플랜 (0096)
+  pending_plan: ClubPaidPlan | null; // 다음 결제일부터 바뀔 플랜(다운그레이드 예약)
   amount: number;
   status: ClubSubscriptionStatus;
   current_period_start: string | null;
@@ -356,10 +373,12 @@ export type ClubSubscription = {
 
 export type ClubSubscriptionCharge = {
   id: string;
-  subscription_id: string;
+  subscription_id: string | null; // 구독 행이 없던 주문(첫 카드 등록 중 환불)은 null (0096)
   club_id: string;
   amount: number;
   status: 'paid' | 'failed';
+  kind: 'initial' | 'renewal' | 'upgrade'; // 첫 결제 / 갱신 / 업그레이드 차액 (0096)
+  plan: string | null;
   toss_payment_key: string | null;
   order_id: string | null;
   fail_reason: string | null;
@@ -933,6 +952,12 @@ export interface Database {
         Update: WriteDefaults<ClubSessionSchedule>;
         Relationships: [];
       };
+      club_plans: {
+        Row: ClubPlanRow;
+        Insert: WriteDefaults<ClubPlanRow>;
+        Update: WriteDefaults<ClubPlanRow>;
+        Relationships: [];
+      };
       club_subscriptions: {
         Row: ClubSubscription;
         Insert: WriteDefaults<ClubSubscription>;
@@ -1164,7 +1189,10 @@ export interface Database {
       club_effective_plan: { Args: { p_club_id: string }; Returns: ClubPlan };
       club_plan_usable: { Args: { p_club_id: string; p_min?: ClubPlan }; Returns: boolean };
       is_club_manager: { Args: { p_club_id: string }; Returns: boolean };
-      start_club_trial: { Args: { p_club_id: string }; Returns: 'ok' | 'not_found' | 'forbidden' | 'already_used' };
+      start_club_trial: {
+        Args: { p_club_id: string; p_plan?: ClubPaidPlan };
+        Returns: 'ok' | 'not_found' | 'forbidden' | 'already_used' | 'plan_unavailable' | 'no_trial';
+      };
       is_club_session_manager: { Args: { p_session_id: string }; Returns: boolean };
       is_club_session_member: { Args: { p_session_id: string }; Returns: boolean };
       generate_due_club_sessions: { Args: { p_club_id?: string | null }; Returns: number };

@@ -8,18 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge } from '@/components/ui/badge';
 import { ReportBlock } from '@/components/report-block';
 import { Button } from '@/components/ui/button';
-import { CLUB_SUBSCRIPTION_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { effectiveClubPlan, isTrialActive, planAtLeast, trialDaysLeft as calcTrialDaysLeft } from '@/lib/club-plan';
-import { cancelClubSubscription } from '@/lib/payments';
+import { effectiveClubPlan, PLAN_LABEL, PLAN_NAME, planAtLeast, trialDaysLeft as calcTrialDaysLeft } from '@/lib/club-plan';
 import { supabase } from '@/lib/supabase';
-import type { ClubMemberWithProfile, ClubPostWithAuthor, ClubSession, ClubSubscription, ClubWithCounts } from '@/lib/types';
-
-const fmtYmd = (iso: string) => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-};
+import type { ClubMemberWithProfile, ClubPostWithAuthor, ClubSession, ClubWithCounts } from '@/lib/types';
 
 type ClubMenu = { key: string; label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; path: '/club/board' | '/club/sessions' | '/club/tournaments' | '/club/members'; comingSoon?: boolean };
 // 경기 결과는 정기모임 상세의 대진/순위 탭으로 통합돼 별도 메뉴 제거 (2026-09-08)
@@ -45,7 +38,6 @@ export default function ClubDetail() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [sub, setSub] = useState<ClubSubscription | null>(null);
   const [nowMs] = useState(() => Date.now());
 
   const load = useCallback(async () => {
@@ -84,21 +76,10 @@ export default function ClubDetail() {
       .select('id', { count: 'exact', head: true })
       .eq('club_id', id);
     setMatchCount(count ?? 0);
-    // 구독 정보 — 클럽장 본인만 조회(안전 컬럼만, 빌링키 제외)
-    if (c && c.owner_id === uid) {
-      const { data: s } = await supabase
-        .from('club_subscriptions')
-        .select('id, club_id, owner_id, card_company, card_number_masked, amount, status, current_period_start, current_period_end, next_charge_at, last_charge_at, fail_count, canceled_at, created_at, updated_at')
-        .eq('club_id', id)
-        .maybeSingle();
-      // 해지 후 이용 기간이 끝난 클럽은 서버 effective_plan(0095)이 free 로 계산한다 — 앱에서 등급을 쓰지 않음.
-      setSub((s as ClubSubscription | null) ?? null);
-    } else {
-      setSub(null);
-    }
+    // 플랜·구독(체험·결제·해지)은 플랜 관리 화면(club/plan)이 담당. 여기서는 서버 effective_plan 만 쓴다.
     setClub(nextClub);
     setLoading(false);
-  }, [id, uid]);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -110,8 +91,8 @@ export default function ClubDetail() {
   const myMembership = members.find((m) => m.user_id === uid);
   const isApprovedMember = myMembership?.status === 'approved';
   const isPending = myMembership?.status === 'pending';
-  const isTrialing = isTrialActive(club, nowMs);
-  const isPremiumUsable = planAtLeast(effectiveClubPlan(club, nowMs), 'premium');
+  const plan = effectiveClubPlan(club, nowMs);
+  const isPremiumUsable = planAtLeast(plan, 'premium');
   const trialDaysLeft = calcTrialDaysLeft(club, nowMs);
 
   useEffect(() => {
@@ -168,56 +149,6 @@ export default function ClubDetail() {
       { text: '닫기', style: 'cancel' },
       { text: isPending ? '신청 취소' : '탈퇴', style: 'destructive', onPress: leave },
     ]);
-  }
-
-  async function startPremiumTrial() {
-    if (!isOwner || !id) return;
-    setActing(true);
-    // 등급·체험 기간은 서버 함수가 정한다(0095 — 클럽당 1회, 서버 시각 기준 1개월)
-    const { data: result, error } = await supabase.rpc('start_club_trial', { p_club_id: id });
-    setActing(false);
-    if (error || result !== 'ok') {
-      const message =
-        result === 'already_used'
-          ? '이미 무료 체험을 사용한 클럽이에요.'
-          : result === 'forbidden'
-            ? '클럽장만 체험을 시작할 수 있어요.'
-            : result === 'not_found'
-              ? '클럽을 찾을 수 없어요.'
-              : '잠시 후 다시 시도해주세요.';
-      Alert.alert('체험 시작 실패', message);
-      load();
-      return;
-    }
-    Alert.alert('무료 체험 시작', '프리미엄 클럽 기능을 1개월 동안 사용할 수 있어요.');
-    load();
-  }
-
-  function goSubscribe() {
-    if (!id) return;
-    router.push({ pathname: '/payment/subscribe', params: { clubId: id, clubName: club?.name ?? '' } });
-  }
-  async function cancelSub() {
-    if (!id) return;
-    setActing(true);
-    const res = await cancelClubSubscription(id);
-    setActing(false);
-    if (!res.ok) {
-      Alert.alert('해지 실패', res.error);
-      return;
-    }
-    Alert.alert('구독 해지', res.activeUntil ? `${fmtYmd(res.activeUntil)}까지 이용할 수 있어요. 이후 자동 결제가 멈춰요.` : '다음 결제가 취소됐어요.');
-    load();
-  }
-  function confirmCancelSub() {
-    Alert.alert(
-      '구독 해지',
-      sub?.current_period_end ? `해지해도 ${fmtYmd(sub.current_period_end)}까지 이용할 수 있어요. 이후 자동 결제가 멈춰요.` : '자동 결제를 멈출까요?',
-      [
-        { text: '닫기', style: 'cancel' },
-        { text: '구독 해지', style: 'destructive', onPress: cancelSub },
-      ],
-    );
   }
 
   // 운영자: 클럽 대표 사진 업로드/변경
@@ -319,7 +250,7 @@ export default function ClubDetail() {
             <Text style={styles.title} numberOfLines={1}>{club.name}</Text>
             <Text style={styles.meta}>{club.description || `${club.region || '지역 미설정'}에서 함께 즐기는 피클볼 클럽`}</Text>
           </View>
-          {isPremiumUsable ? <Badge label="PREMIUM" color="#16C784" bg="rgba(22,199,132,0.14)" /> : null}
+          {isPremiumUsable ? <Badge label={PLAN_LABEL[plan].toUpperCase()} color="#16C784" bg="rgba(22,199,132,0.14)" /> : null}
           </View>
 
           <View style={styles.statsRow}>
@@ -416,54 +347,33 @@ export default function ClubDetail() {
           <View style={styles.premiumCard}>
           <View style={styles.premiumTop}>
             <View>
-              <Text style={styles.premiumEyebrow}>{isPremiumUsable ? 'PREMIUM CLUB' : 'CLUB PLAN'}</Text>
+              <Text style={styles.premiumEyebrow}>CLUB PLAN</Text>
               <Text style={styles.premiumTitle}>
-                {isPremiumUsable ? '경기 결과 관리 사용 중' : '프리미엄 클럽으로 업그레이드'}
+                {isPremiumUsable ? `${PLAN_NAME[plan]} 사용 중` : '프리미엄 클럽으로 업그레이드'}
               </Text>
             </View>
             <Badge
-              label={isPremiumUsable ? (trialDaysLeft ? `체험 ${trialDaysLeft}일` : 'Premium') : 'Free'}
+              label={isPremiumUsable ? (trialDaysLeft ? `체험 ${trialDaysLeft}일` : PLAN_LABEL[plan]) : 'Free'}
               color={isPremiumUsable ? '#16C784' : '#AAB4C0'}
               bg={isPremiumUsable ? 'rgba(22,199,132,0.14)' : 'rgba(255,255,255,0.07)'}
             />
           </View>
           <Text style={styles.premiumBody}>
             {isPremiumUsable
-              ? '클럽 멤버끼리 진행한 경기 결과를 기록하고 히스토리로 확인할 수 있어요.'
+              ? '플랜 변경, 결제 카드 변경, 해지는 플랜 관리에서 할 수 있어요.'
               : club?.premium_status === 'none'
-                ? '프리미엄 클럽은 클럽 내부 경기 결과 기록을 사용할 수 있어요. 1개월 무료 체험 후 구독으로 전환됩니다.'
-                : '프리미엄 기능을 다시 사용하려면 구독을 시작해 주세요.'}
+                ? '정기모임 대진과 경기 기록을 무료 체험으로 먼저 써볼 수 있어요.'
+                : club?.premium_status === 'past_due'
+                  ? '결제가 실패해 유료 기능이 중지됐어요. 플랜 관리에서 카드를 다시 등록해주세요.'
+                  : '유료 기능을 다시 사용하려면 플랜 관리에서 구독을 시작해 주세요.'}
           </Text>
-          {club?.premium_status === 'none' ? (
-            <Button title="1개월 무료 체험 시작" onPress={startPremiumTrial} loading={acting} style={styles.premiumButton} />
-          ) : CLUB_SUBSCRIPTION_ENABLED ? (
-            sub && sub.status === 'active' ? (
-              <View style={styles.subInfo}>
-                <Text style={styles.subLine}>
-                  {sub.card_company ? `${sub.card_company} ` : ''}
-                  {sub.card_number_masked || '카드'} · 월 {sub.amount.toLocaleString('ko-KR')}원
-                </Text>
-                <Text style={styles.subSub}>다음 결제 {sub.next_charge_at ? fmtYmd(sub.next_charge_at) : '-'}</Text>
-                <Button title="구독 해지" variant="outline" onPress={confirmCancelSub} loading={acting} style={styles.premiumButton} />
-              </View>
-            ) : sub && sub.status === 'canceled' ? (
-              <View style={styles.subInfo}>
-                <Text style={styles.subSub}>{sub.current_period_end ? `${fmtYmd(sub.current_period_end)}까지 이용 · 자동결제 해지됨` : '자동결제 해지됨'}</Text>
-                <Button title="다시 구독하기" onPress={goSubscribe} loading={acting} style={styles.premiumButton} />
-              </View>
-            ) : (
-              <View style={styles.subInfo}>
-                {club?.premium_status === 'past_due' ? (
-                  <Text style={styles.subWarn}>결제가 실패해 프리미엄이 중지됐어요.</Text>
-                ) : isTrialing ? (
-                  <Text style={styles.subSub}>체험 종료 후 자동 결제하려면 카드를 등록하세요.</Text>
-                ) : null}
-                <Button title="구독하기 (월 5,500원)" onPress={goSubscribe} loading={acting} style={styles.premiumButton} />
-              </View>
-            )
-          ) : (
-            <Text style={styles.subSub}>구독 결제는 곧 지원될 예정이에요.</Text>
-          )}
+          {/* 체험 시작·구독·업그레이드·해지는 모두 플랜 관리 화면에서 */}
+          <Button
+            title="플랜 관리"
+            variant={isPremiumUsable ? 'outline' : 'primary'}
+            onPress={() => club && router.push({ pathname: '/club/plan', params: { clubId: club.id } })}
+            style={styles.premiumButton}
+          />
           </View>
         </View>
         ) : null}
@@ -554,10 +464,6 @@ const styles = StyleSheet.create({
   premiumTitle: { color: '#F8FAFC', fontSize: 18, fontWeight: '900', marginTop: 6 },
   premiumBody: { color: '#AAB4C0', fontSize: 14, lineHeight: 20, fontWeight: '600' },
   premiumButton: { marginTop: 2 },
-  subInfo: { gap: 8, marginTop: 4 },
-  subLine: { color: '#F8FAFC', fontSize: 14, fontWeight: '800' },
-  subSub: { color: '#AAB4C0', fontSize: 13, fontWeight: '600' },
-  subWarn: { color: '#F5A623', fontSize: 13, fontWeight: '700' },
   menuList: { marginTop: 10, gap: 10 },
   menuCard: {
     flexDirection: 'row',

@@ -182,6 +182,10 @@ function RootNavigator() {
           options={{ headerShown: true, title: '회원 관리', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
         />
         <Stack.Screen
+          name="club/plan"
+          options={{ headerShown: true, title: '플랜 관리', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
+        />
+        <Stack.Screen
           name="club/tournament-create"
           options={{
             presentation: 'modal',

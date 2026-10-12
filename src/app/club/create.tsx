@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
@@ -9,7 +9,9 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
+import { fetchClubPlans, PLAN_FEATURES, won } from '@/lib/club-plan';
 import { supabase } from '@/lib/supabase';
+import type { ClubPaidPlan, ClubPlanRow } from '@/lib/types';
 
 export default function CreateClub() {
   const router = useRouter();
@@ -19,8 +21,16 @@ export default function CreateClub() {
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
   const [description, setDescription] = useState('');
-  const [plan, setPlan] = useState<'free' | 'premium'>('free');
+  const [plan, setPlan] = useState<'free' | ClubPaidPlan>('free');
   const [saving, setSaving] = useState(false);
+  // 유료 플랜 가격표(서버 기준). 판매 중(active)인 플랜만 고를 수 있다 — 플러스는 서버에서 켜야 보인다.
+  const [planRows, setPlanRows] = useState<ClubPlanRow[]>([]);
+
+  useEffect(() => {
+    fetchClubPlans().then(setPlanRows);
+  }, []);
+  const plusRow = planRows.find((p) => p.plan === 'premium_plus' && p.active);
+  const premiumTrialMonths = planRows.find((p) => p.plan === 'premium')?.trial_months ?? 1;
 
   async function onSubmit() {
     if (!name.trim()) {
@@ -38,8 +48,9 @@ export default function CreateClub() {
         region: region.trim(),
         description: description.trim(),
         require_approval: true, // 클럽 가입은 항상 운영자 승인제
-        // 프리미엄을 고르면 서버(0095 트리거)가 1개월 무료 체험으로 설정한다
-        tier: plan === 'premium' ? 'premium' : 'free',
+        // 유료 플랜을 고르면 서버(0095·0096 트리거)가 무료 체험으로 설정한다
+        tier: plan === 'free' ? 'free' : 'premium',
+        premium_plan: plan === 'premium_plus' ? 'premium_plus' : 'premium',
       })
       .select('id')
       .single();
@@ -86,12 +97,31 @@ export default function CreateClub() {
             />
             <PlanCard
               title="프리미엄"
-              subtitle="1개월 무료 체험으로 경기 결과 관리를 사용해요."
+              subtitle={`${premiumTrialMonths}개월 무료 체험으로 경기 결과 관리를 사용해요.`}
               icon="sparkles-outline"
               selected={plan === 'premium'}
               onPress={() => setPlan('premium')}
             />
+            {plusRow ? (
+              <PlanCard
+                title={plusRow.name}
+                subtitle={`프리미엄 전체 기능에 회비 자동결제까지. 월 ${won(plusRow.monthly_price)}`}
+                icon="wallet-outline"
+                selected={plan === 'premium_plus'}
+                onPress={() => setPlan('premium_plus')}
+              />
+            ) : null}
           </View>
+          {plan === 'premium_plus' && plusRow ? (
+            <View style={styles.benefitBox}>
+              {PLAN_FEATURES.premium_plus.map((feature) => (
+                <Benefit key={feature} text={feature} />
+              ))}
+              <Text style={styles.benefitNote}>
+                첫 {plusRow.trial_months}개월은 무료 체험으로 시작돼요. 회비 기준은 클럽을 만든 뒤 설정할 수 있어요.
+              </Text>
+            </View>
+          ) : null}
           {plan === 'premium' ? (
             <View style={styles.benefitBox}>
               <Benefit text="클럽 모임 대진 짜기" />
@@ -99,7 +129,7 @@ export default function CreateClub() {
               <Benefit text="경기 결과 기록" />
               <Benefit text="월례대회 기능 제공" />
               <Text style={styles.benefitSubText}>토너먼트, 리그전 등 클럽 내부 대회를 운영할 수 있어요.</Text>
-              <Text style={styles.benefitNote}>첫 1개월은 무료 체험으로 시작돼요.</Text>
+              <Text style={styles.benefitNote}>첫 {premiumTrialMonths}개월은 무료 체험으로 시작돼요.</Text>
             </View>
           ) : null}
         </View>
