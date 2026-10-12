@@ -1,4 +1,4 @@
-// 클럽 구독 결제 공용 유틸 — toss-billing-issue / toss-billing-charge / toss-billing-change-plan 이 함께 쓴다.
+// 토스 빌링 결제 공용 유틸 — 클럽 구독(toss-billing-*)과 클럽 회비(club-dues-*, _shared/dues.ts)가 함께 쓴다.
 
 export const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +8,8 @@ export const CORS = {
 export function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
+
+const TOSS_TIMEOUT_MS = 20_000; // 토스 호출 한 번의 최대 대기 시간
 
 export function basicAuth(secret: string) {
   return `Basic ${btoa(`${secret}:`)}`;
@@ -31,7 +33,10 @@ export async function loadPlans(admin: any): Promise<Record<string, PlanRow>> {
 export async function tossPost(secret: string, path: string, body: unknown, idempotencyKey?: string) {
   const headers: Record<string, string> = { Authorization: basicAuth(secret), 'Content-Type': 'application/json' };
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey.slice(0, 300);
-  const res = await fetch(`https://api.tosspayments.com${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+  // 응답이 오래 없으면 끊는다(예외 → 호출한 쪽이 "결과 모름"으로 다룬다)
+  const res = await fetch(`https://api.tosspayments.com${path}`, {
+    method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(TOSS_TIMEOUT_MS),
+  });
   // deno-lint-ignore no-explicit-any
   const data: any = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
@@ -52,7 +57,7 @@ export type ChargeResult =
 const REPLAY_FRESH_MS = 2 * 60_000; // 승인 시각이 이보다 오래됐으면 예전 승인의 재응답으로 보고 현재 상태를 확인
 const PENDING_GRACE_MS = 2 * 60_000; // 이 시간 안에 보낸 주문은 아직 처리 중일 수 있다
 
-type OrderState = (
+export type OrderState = (
   | { state: 'paid'; paymentKey: string | null; amount: number }
   | { state: 'dead'; status: string; toss: unknown } // 결제되지 않고 끝난 주문(ABORTED·EXPIRED·CANCELED)
   | { state: 'none' } // 그런 주문 없음(404)
@@ -65,10 +70,11 @@ function paidAmount(value: unknown, fallback: number) {
 }
 
 // 주문번호로 결제 상태를 조회한다.
-async function lookupOrder(secret: string, orderId: string, requestedAmount: number): Promise<OrderState> {
+export async function lookupOrder(secret: string, orderId: string, requestedAmount: number): Promise<OrderState> {
   try {
     const res = await fetch(`https://api.tosspayments.com/v1/payments/orders/${encodeURIComponent(orderId)}`, {
       headers: { Authorization: basicAuth(secret) },
+      signal: AbortSignal.timeout(TOSS_TIMEOUT_MS),
     });
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json().catch(() => ({}));
@@ -138,9 +144,11 @@ export async function chargeBilling(
   return { kind: 'unknown', reason: netError || `${res?.status ?? 0} ${code || 'no_code'}`, trace };
 }
 
-async function refundPayment(secret: string, paymentKey: string, orderId: string, reason: string): Promise<boolean> {
+// 전액 취소. 멱등키는 쓰지 않는다 — 같은 키에는 예전 응답(실패 포함)이 되돌아올 수 있어 재시도가 막힌다.
+// 전액 취소는 두 번 보내도 두 번째가 '이미 취소됨'으로 끝나므로 키 없이도 한 번만 환불된다.
+export async function refundPayment(secret: string, paymentKey: string, _orderId: string, reason: string): Promise<boolean> {
   try {
-    const res = await tossPost(secret, `/v1/payments/${encodeURIComponent(paymentKey)}/cancel`, { cancelReason: reason }, `cancel-${orderId}`);
+    const res = await tossPost(secret, `/v1/payments/${encodeURIComponent(paymentKey)}/cancel`, { cancelReason: reason });
     return res.ok || res.data?.code === 'ALREADY_CANCELED_PAYMENT';
   } catch (_err) {
     return false;

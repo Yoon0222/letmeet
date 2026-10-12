@@ -168,12 +168,14 @@ as $$ select (p_due::timestamp + interval '10 hours') at time zone 'Asia/Seoul';
 
 -- 회비 행을 만들거나 되살릴 때의 자동결제 시각: 납부일 10시와 "다음 오전 10시" 중 늦은 쪽.
 --   납부일이 이미 지난 행이 생겨도 그 자리에서 바로 청구하지 않고, 일일 작업(9시)의 안내가 먼저 나간 뒤 청구한다.
+--   그래서 오늘 10시 자리는 오늘 9시(일일 작업) 전에 생긴 행만 쓴다. 9시 이후에 생긴 행은 내일 10시.
 create or replace function public.dues_next_slot(p_due date)
 returns timestamptz language sql stable
 as $$
   select greatest(
     public.dues_due_at(p_due),
-    public.dues_due_at(case when now() < public.dues_due_at(public.dues_today()) then public.dues_today() else public.dues_today() + 1 end));
+    public.dues_due_at(case when now() < public.dues_due_at(public.dues_today()) - interval '1 hour'
+                            then public.dues_today() else public.dues_today() + 1 end));
 $$;
 
 -- ── 3) 회비 규칙 (클럽당 1행) ──────────
@@ -1117,6 +1119,12 @@ begin
   if s.period_month >= to_char(public.dues_today(), 'YYYY-MM') then return 'month_not_finished'; end if;
   select * into a from public.club_payout_accounts where club_id = s.club_id;
   if not found or not a.verified then return 'payout_unverified'; end if;
+  -- 그 달의 결제 건을 먼저 잠근다 — 환불 준비(dues_refund_prepare)도 같은 행을 잠그므로,
+  -- "검사는 통과했는데 묶기 직전에 환불이 시작되는" 틈이 생기지 않는다(환불 쪽이 기다렸다가 '정산 확정됨'으로 거절된다).
+  perform 1 from public.club_dues_charges c
+    where c.club_id = s.club_id and c.status in ('paid', 'refunded')
+      and to_char(c.paid_at at time zone 'Asia/Seoul', 'YYYY-MM') = s.period_month
+    for update;
   -- 결과를 모르는 결제 시도나 진행 중인 환불이 있으면 금액이 아직 확정되지 않은 것
   if exists (select 1 from public.club_dues_charges c
               where c.club_id = s.club_id and c.status = 'pending'

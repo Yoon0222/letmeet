@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-12 (Claude: 클럽 회비 2단계 — 회비 데이터·규칙 0097)
+Last updated: 2026-10-12 (Claude: 클럽 회비 3단계 — 자동결제 엔진 0098)
 
 ## Purpose
 
@@ -22,6 +22,13 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-12, 클럽 회비 3단계 — 자동결제 엔진 0098)
+
+- **What changed**: 서버 전용 단계(화면 없음). `supabase/migrations/0098_club_dues_engine.sql`, 엣지함수 `supabase/functions/club-dues-{enroll,card,pay-now,refund,charge}`, `_shared/dues.ts`. `_shared/billing.ts` 는 토스 호출 시간 제한·환불 요청 방식만 바뀜(구독 결제 동작은 같음).
+- **Files touched**: 위 파일 + `supabase/migrations/0097_club_dues.sql`(보강 2곳), `supabase/schema.sql`, `docs/PROD_APPLY_0097.sql`, `docs/PROD_APPLY_0098.sql`, `docs/PROD_CRON_dues.sql`, `docs/WORKLOG.md`.
+- **Validation**: DEV 토스 테스트 키로 워커 시나리오·엔진 함수 시험 통과, qa-pickle 조건부 PASS 후 지적 반영.
+- **Codex 참고**: 디자인 영향 없음. 회비 화면은 다음 단계(4단계) 인계에서 요청.
 
 ### Claude -> Codex (2026-10-12, 클럽 회비 2단계 — 회비 데이터·규칙 0097)
 
