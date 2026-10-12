@@ -16,6 +16,7 @@ const ICON: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
   comment: 'chatbubble-ellipses-outline',
   match_turn: 'tennisball-outline',
   tie: 'people-outline',
+  dues: 'card-outline',
   system: 'megaphone-outline',
 };
 

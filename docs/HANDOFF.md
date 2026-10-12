@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-12 (Claude: 클럽 회비 1단계 — 프리미엄 플러스 플랜·플랜 관리 화면 0096)
+Last updated: 2026-10-12 (Claude: 클럽 회비 2단계 — 회비 데이터·규칙 0097)
 
 ## Purpose
 
@@ -22,6 +22,15 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-12, 클럽 회비 2단계 — 회비 데이터·규칙 0097)
+
+- **What changed**: DB 전용 단계. `supabase/migrations/0097_club_dues.sql`(DEV 적용) — 회비 규칙·정산 계좌·회원 카드·자동결제 동의·회비·결제 장부·정산 표와 서버 함수. 화면은 아직 없음(4단계에서 추가).
+- **Files touched**: `supabase/migrations/0097_club_dues.sql`, `supabase/schema.sql`(끝에 같은 내용), `docs/PROD_APPLY_0097.sql`, `src/lib/types.ts`(회비 타입·`ClubMember.approved_at`·알림 종류 `dues`/대상 `club_dues`), `src/app/notifications.tsx`(아이콘 표에 `dues: 'card-outline'` 한 줄), `docs/WORKLOG.md`.
+- **Validation**: DEV 역할별 호출 시험 3종 통과, `tsc`·`expo lint` 0, qa-pickle 재검수 통과.
+- **Codex 참고**:
+  - 회비 관련 화면은 4단계에서 `club/dues.tsx`·`club/dues-consent.tsx`·`club/dues-settings.tsx`·`payment/dues-card.tsx` 로 기능 위주로 만든 뒤 디자인 요청을 남길 예정.
+  - 회비 표를 직접 조회할 때 `member_billing_cards`·`club_dues_charges`·`club_dues_settlements` 는 `select('*')` 가 실패한다(일부 열이 앱에 내려오지 않음) — `types.ts` 의 타입에 있는 열만 명시해서 조회.
 
 ### Claude -> Codex (2026-10-12, 클럽 회비 1단계 — 프리미엄 플러스 플랜·플랜 관리 화면 0096)
 

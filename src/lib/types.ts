@@ -265,6 +265,171 @@ export type ClubMember = {
   role: ClubRole;
   status: ClubMemberStatus; // 'pending' | 'approved' (0032)
   joined_at: string;
+  approved_at: string | null; // 승인 시각 — 서버가 정한다 (0097)
+};
+
+// ---- 클럽 회비 (0097) — 프리미엄 플러스 전용. 쓰기는 모두 서버 함수(RPC·엣지함수) 경유 ----
+export type DuesCycle = 'monthly' | 'quarterly' | 'yearly';
+export type DuesStatus = 'open' | 'processing' | 'paid' | 'failed' | 'exempt' | 'refunded' | 'void';
+
+/** club_dues_plans — 클럽의 회비 규칙(클럽당 1행) */
+export type ClubDuesPlan = {
+  club_id: string;
+  active: boolean;
+  cycle: DuesCycle;
+  amount: number;
+  due_day: number; // 기간 첫 달의 납부일(1~28)
+  start_month: number; // 연 회비의 시작 월
+  include_owner: boolean;
+  first_period_start: string;
+  next_amount: number | null; // 다음 기간부터 바뀔 금액(예약)
+  next_amount_from: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** club_dues — 회원×기간 1행 */
+export type ClubDues = {
+  id: string;
+  club_id: string;
+  user_id: string;
+  period_key: string; // 'M2026-10' | 'Q2026-4' | 'Y2026-03'
+  period_start: string;
+  period_end: string; // 다음 기간의 시작일
+  due_date: string;
+  amount: number;
+  status: DuesStatus;
+  paid_via: 'card' | 'cash' | null;
+  paid_at: string | null;
+  marked_by: string | null;
+  note: string;
+  attempt_count: number;
+  next_attempt_at: string | null;
+  last_fail_reason: string | null;
+  notified_d3_at: string | null;
+  void_reason: 'plan_disabled' | 'left_club' | null; // 무효가 된 이유
+  created_at: string;
+  updated_at: string;
+};
+
+/** club_dues_charges — 결제 시도 장부. 앱에는 토스 결제 키와 수수료 열이 내려오지 않는다 → select('*') 대신 열을 명시할 것 */
+export type ClubDuesCharge = {
+  id: string;
+  dues_id: string | null;
+  club_id: string | null;
+  user_id: string | null;
+  club_name: string;
+  payer_name: string;
+  period_key: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  attempt_no: number;
+  source: 'auto' | 'manual';
+  fail_reason: string | null;
+  created_at: string;
+  paid_at: string | null;
+  refunded_at: string | null;
+  refund_reason: string | null;
+  settlement_id: string | null;
+};
+
+/** club_dues_mandates — 자동결제 동의(클럽×회원) */
+export type ClubDuesMandate = {
+  club_id: string;
+  user_id: string;
+  status: 'active' | 'needs_reconsent' | 'revoked';
+  consented_amount: number;
+  consented_cycle: DuesCycle;
+  consent_text: string;
+  consented_at: string;
+  revoked_at: string | null;
+  revoked_reason: string | null;
+  updated_at: string;
+};
+
+/** member_billing_cards — 회비 결제 카드(회원당 1장). 결제 키는 내려오지 않는다 → select('*') 대신 열을 명시할 것 */
+export type MemberBillingCard = {
+  user_id: string;
+  card_company: string;
+  card_number_masked: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** club_dues_settlements — 클럽×월 정산. 계좌 스냅샷은 내려오지 않는다 → select('*') 대신 열을 명시할 것 */
+export type ClubDuesSettlement = {
+  id: string;
+  club_id: string | null;
+  club_name: string;
+  period_month: string; // 'YYYY-MM'
+  gross_amount: number;
+  refund_amount: number;
+  fee_amount: number;
+  net_amount: number;
+  charge_count: number;
+  status: 'draft' | 'confirmed' | 'paid';
+  confirmed_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** club_dues_status() 결과 — 수수료율은 운영진에게만, 정산 계좌 상태는 클럽장에게만 값이 온다 */
+export type ClubDuesStatus = {
+  enabled: boolean; // 회비 기능이 이 클럽에 켜져 있는가(서버 스위치)
+  plus: boolean; // 프리미엄 플러스를 쓸 수 있는가
+  plan_active: boolean; // 회비 규칙이 켜져 있는가
+  is_owner: boolean;
+  is_manager: boolean;
+  fee_bps: number | null;
+  payout_registered: boolean | null;
+  payout_verified: boolean | null;
+};
+
+/** club_payout_account_get() 결과 — 계좌번호·사업자번호는 끝 4자리만 */
+export type ClubPayoutAccountMasked = {
+  holder_type: 'individual' | 'business';
+  holder_name: string;
+  bank_name: string;
+  account_masked: string;
+  business_masked: string | null;
+  contact_phone: string;
+  contact_email: string | null;
+  verified: boolean;
+  updated_at: string;
+};
+
+/** club_dues_roster() 한 줄 — 운영진용 납부 명단 */
+export type ClubDuesRosterRow = {
+  dues_id: string;
+  user_id: string;
+  nickname: string;
+  avatar_url: string | null;
+  member_role: ClubRole | 'left';
+  status: DuesStatus;
+  amount: number;
+  due_date: string;
+  paid_via: 'card' | 'cash' | null;
+  paid_at: string | null;
+  note: string;
+  attempt_count: number;
+  last_fail_reason: string | null;
+  autopay: boolean; // 자동결제 동의 + 카드 등록 여부
+  paid_charge_id: string | null; // 카드로 결제된 건(환불할 때 쓴다)
+  refundable: boolean; // 정산 확정 전이라 환불할 수 있는가
+};
+
+/** club_dues_periods() 한 줄 — 기간별 납부 요약 */
+export type ClubDuesPeriodRow = {
+  period_key: string;
+  period_start: string;
+  due_date: string;
+  total: number;
+  paid: number;
+  exempt: number;
+  unpaid: number;
+  collected: number;
 };
 
 /** 멤버 + 프로필 (조인 결과) */
@@ -807,6 +972,7 @@ export type NotificationType =
   | 'comment'
   | 'match_turn'
   | 'tie'
+  | 'dues' // 클럽 회비(0097)
   | 'system';
 
 // 대상 종류 — 탭했을 때 이동할 화면을 정한다.
@@ -816,6 +982,7 @@ export type NotificationTargetType =
   | 'club_session'
   | 'community_post'
   | 'tournament'
+  | 'club_dues' // 클럽 회비 화면(target_id = 클럽 id)
   | 'court';
 
 // DOM/expo 의 Notification 과 충돌을 피해 AppNotification 으로 명명.
@@ -968,6 +1135,43 @@ export interface Database {
         Row: ClubSubscriptionCharge;
         Insert: WriteDefaults<ClubSubscriptionCharge>;
         Update: WriteDefaults<ClubSubscriptionCharge>;
+        Relationships: [];
+      };
+      // 회비 표(0097)는 앱에서 조회만 한다 — 쓰기는 서버 함수 경유(RLS 에 쓰기 정책 없음)
+      club_dues_plans: {
+        Row: ClubDuesPlan;
+        Insert: WriteDefaults<ClubDuesPlan>;
+        Update: WriteDefaults<ClubDuesPlan>;
+        Relationships: [];
+      };
+      club_dues: {
+        Row: ClubDues;
+        Insert: WriteDefaults<ClubDues>;
+        Update: WriteDefaults<ClubDues>;
+        Relationships: [];
+      };
+      club_dues_charges: {
+        Row: ClubDuesCharge;
+        Insert: WriteDefaults<ClubDuesCharge>;
+        Update: WriteDefaults<ClubDuesCharge>;
+        Relationships: [];
+      };
+      club_dues_mandates: {
+        Row: ClubDuesMandate;
+        Insert: WriteDefaults<ClubDuesMandate>;
+        Update: WriteDefaults<ClubDuesMandate>;
+        Relationships: [];
+      };
+      member_billing_cards: {
+        Row: MemberBillingCard;
+        Insert: WriteDefaults<MemberBillingCard>;
+        Update: WriteDefaults<MemberBillingCard>;
+        Relationships: [];
+      };
+      club_dues_settlements: {
+        Row: ClubDuesSettlement;
+        Insert: WriteDefaults<ClubDuesSettlement>;
+        Update: WriteDefaults<ClubDuesSettlement>;
         Relationships: [];
       };
       app_config: {
@@ -1193,6 +1397,34 @@ export interface Database {
         Args: { p_club_id: string; p_plan?: ClubPaidPlan };
         Returns: 'ok' | 'not_found' | 'forbidden' | 'already_used' | 'plan_unavailable' | 'no_trial';
       };
+      // 클럽 회비 (0097)
+      club_dues_status: { Args: { p_club_id: string }; Returns: ClubDuesStatus };
+      club_dues_plan_set: {
+        Args: { p_club_id: string; p_cycle: DuesCycle; p_amount: number; p_due_day: number; p_start_month?: number; p_include_owner?: boolean };
+        Returns: 'ok' | 'not_found' | 'forbidden' | 'disabled' | 'plan_required' | 'payout_required' | 'invalid' | 'cycle_locked';
+      };
+      club_dues_plan_disable: { Args: { p_club_id: string }; Returns: 'ok' | 'not_found' | 'forbidden' };
+      club_payout_account_set: {
+        Args: {
+          p_club_id: string;
+          p_holder_type: 'individual' | 'business';
+          p_holder_name: string;
+          p_bank_name: string;
+          p_account_number: string;
+          p_business_number?: string | null;
+          p_contact_phone?: string;
+          p_contact_email?: string | null;
+        };
+        Returns: 'ok' | 'not_found' | 'forbidden' | 'disabled' | 'plan_required' | 'invalid';
+      };
+      club_payout_account_get: { Args: { p_club_id: string }; Returns: ClubPayoutAccountMasked | null };
+      club_dues_mark: {
+        Args: { p_dues_id: string; p_action: 'cash_paid' | 'exempt' | 'revert'; p_note?: string };
+        Returns: 'ok' | 'not_found' | 'forbidden' | 'self_not_allowed' | 'in_progress' | 'already_paid' | 'card_refund_only' | 'invalid';
+      };
+      club_dues_mandate_revoke: { Args: { p_club_id: string }; Returns: 'ok' | 'not_found' | 'forbidden' };
+      club_dues_roster: { Args: { p_club_id: string; p_period_key: string }; Returns: ClubDuesRosterRow[] };
+      club_dues_periods: { Args: { p_club_id: string }; Returns: ClubDuesPeriodRow[] };
       is_club_session_manager: { Args: { p_session_id: string }; Returns: boolean };
       is_club_session_member: { Args: { p_session_id: string }; Returns: boolean };
       generate_due_club_sessions: { Args: { p_club_id?: string | null }; Returns: number };
