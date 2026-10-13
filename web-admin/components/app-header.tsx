@@ -57,6 +57,11 @@ export function AppHeader() {
                 이벤트
               </Link>
             )}
+            {role === 'super_admin' && (
+              <Link href="/challenges" className="text-slate-600 hover:text-slate-900">
+                챌린지
+              </Link>
+            )}
             <Link href="/reports" className="text-slate-600 hover:text-slate-900">
               신고
             </Link>

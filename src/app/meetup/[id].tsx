@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
@@ -11,9 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { ATTENDANCE_LABEL, fetchMeetupAttendance, fetchMeetupCompletion } from '@/lib/challenge';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import type { MeetupWithCounts, ParticipantWithProfile } from '@/lib/types';
+import type { AttendanceStatus, MeetupCompletion, MeetupWithCounts, ParticipantWithProfile } from '@/lib/types';
+
+const ATTENDANCE_COLOR: Record<AttendanceStatus, { color: string; bg: string }> = {
+  present: { color: '#16C784', bg: 'rgba(22,199,132,0.14)' },
+  absent: { color: '#F87171', bg: 'rgba(248,113,113,0.14)' },
+  unknown: { color: '#AAB4C0', bg: 'rgba(255,255,255,0.07)' },
+};
 
 export default function MeetupDetail() {
   const router = useRouter();
@@ -31,17 +38,27 @@ export default function MeetupDetail() {
   const [courtImage, setCourtImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  // 모임 완료 기록(0099). null = 아직 완료 처리 전 / undefined = 조회 불가(완료 관련 화면을 보여주지 않는다)
+  const [completion, setCompletion] = useState<MeetupCompletion | null | undefined>(undefined);
+  // 출석: 서버가 내 것(호스트면 전원)만 돌려준다
+  const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
+  const [nowMs, setNowMs] = useState(0);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [{ data: m }, { data: p }] = await Promise.all([
+    const [{ data: m }, { data: p }, done, att] = await Promise.all([
       supabase.from('meetups_with_counts').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('meetup_participants')
         .select('*, profiles(id, nickname, skill_level, avatar_url, region, dupr_rating, dupr_verified)')
         .eq('meetup_id', id)
         .order('joined_at', { ascending: true }),
+      fetchMeetupCompletion(id),
+      fetchMeetupAttendance(id),
     ]);
+    setCompletion(done);
+    setAttendance(Object.fromEntries(att.map((a) => [a.user_id, a.status])));
+    setNowMs(Date.now());
     setMeetup(m ?? null);
     if (m?.court_id) {
       const { data: court } = await supabase.from('courts').select('images, image_url').eq('id', m.court_id).maybeSingle();
@@ -66,11 +83,12 @@ export default function MeetupDetail() {
     setLoading(false);
   }, [id]);
 
-  useEffect(() => {
-    // load 는 비동기로 await 이후 setState 를 호출하므로 동기 cascading 렌더가 아니다.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+  // 화면에 들어올 때마다 새로 읽는다(완료 처리 화면에서 돌아오면 완료 상태가 바로 보이게)
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   const isHost = meetup?.host_id === uid;
   const approved = participants.filter((p) => p.status === 'approved');
@@ -79,9 +97,17 @@ export default function MeetupDetail() {
   const isApproved = myPart?.status === 'approved';
   const isPending = myPart?.status === 'pending';
   const full = !!meetup && meetup.participant_count >= meetup.max_players;
-  const closed = meetup?.status !== 'open';
+  // 모집이 끝났거나(마감·취소), 호스트가 완료 처리를 마친 번개 — 더 참가 신청·취소를 받지 않는다
+  const closed = meetup?.status !== 'open' || completion?.status === 'completed';
   const participantProgress = meetup ? Math.min(100, Math.max(0, (meetup.participant_count / meetup.max_players) * 100)) : 0;
   const remainingSpots = meetup ? Math.max(0, meetup.max_players - meetup.participant_count) : 0;
+  // 모임 완료 처리: 시작 시간이 지난, 취소되지 않은 모임을 호스트가 한 번만 할 수 있다(마감 여부와는 무관)
+  const started = !!meetup && new Date(meetup.start_time).getTime() <= nowMs;
+  const completed = completion?.status === 'completed';
+  const voided = completion?.status === 'voided';
+  const canComplete = isHost && completion === null && !!meetup && meetup.status !== 'cancelled' && started;
+  const myAttendance = uid ? attendance[uid] : undefined;
+  const presentCount = completion?.present_count ?? 0;
 
   useEffect(() => {
     navigation.setOptions({
@@ -207,7 +233,13 @@ export default function MeetupDetail() {
         style: 'destructive',
         onPress: async () => {
           if (!id) return;
-          await supabase.from('meetups').update({ status: 'cancelled' }).eq('id', id);
+          const { error } = await supabase.from('meetups').update({ status: 'cancelled' }).eq('id', id);
+          if (error) {
+            // 서버가 막는 경우(완료 처리된 모임 등)를 조용히 넘기지 않는다
+            Alert.alert('모임 취소 실패', error.message);
+            load();
+            return;
+          }
           router.back();
         },
       },
@@ -257,6 +289,28 @@ export default function MeetupDetail() {
           <View style={styles.capacityTop}><Text style={styles.capacityTitle}>참가 {meetup.participant_count} / {meetup.max_players}명</Text><Text style={styles.remaining}>{full ? '정원이 마감됐어요' : `${remainingSpots}자리 남았어요`}</Text></View>
           <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${participantProgress}%` }]} /></View>
         </View>
+
+        {/* 모임 완료 상태 — 호스트가 참석자를 확정한 뒤에 보인다 */}
+        {completed || voided ? (
+          <View style={styles.doneBanner}>
+            <Ionicons name={completed ? 'checkmark-done-circle' : 'alert-circle-outline'} size={20} color={completed ? '#16C784' : '#F5A623'} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.doneTitle}>
+                {completed ? `완료된 모임 · 참석 ${presentCount}명` : '운영자가 완료를 취소한 모임'}
+              </Text>
+              {completed && myAttendance ? (
+                <Text style={styles.doneSub}>
+                  {myAttendance === 'present'
+                    ? '참석으로 확인됐어요.'
+                    : myAttendance === 'absent'
+                      ? '불참으로 처리됐어요. 사실과 다르면 고객지원으로 문의해주세요.'
+                      : '호스트가 참석 여부를 확인하지 않았어요. 참석했다면 고객지원으로 문의해주세요.'}
+                </Text>
+              ) : null}
+              {voided ? <Text style={styles.doneSub}>이 모임은 참여 기록에 반영되지 않아요.</Text> : null}
+            </View>
+          </View>
+        ) : null}
 
         {/* DUPR 인증 번개 안내 + (호스트) 경기 기록 진입 */}
         {meetup.dupr_certified ? (
@@ -334,9 +388,18 @@ export default function MeetupDetail() {
                   </View>
                   <Text style={styles.pMeta}>{p.profiles?.region || '지역 미설정'}</Text>
                 </View>
-                <Text style={styles.pSkill}>
-                  {p.profiles ? `${p.profiles.skill_level.toFixed(1)} ${skillLabel(p.profiles.skill_level)}` : ''}
-                </Text>
+                {/* 호스트에게는 확정한 출석이 보인다(참가자 본인은 위 배너에서 자기 것만) */}
+                {isHost && completed && attendance[p.user_id] ? (
+                  <Badge
+                    label={ATTENDANCE_LABEL[attendance[p.user_id]]}
+                    color={ATTENDANCE_COLOR[attendance[p.user_id]].color}
+                    bg={ATTENDANCE_COLOR[attendance[p.user_id]].bg}
+                  />
+                ) : (
+                  <Text style={styles.pSkill}>
+                    {p.profiles ? `${p.profiles.skill_level.toFixed(1)} ${skillLabel(p.profiles.skill_level)}` : ''}
+                  </Text>
+                )}
               </Pressable>
             ))}
           </View>
@@ -351,7 +414,14 @@ export default function MeetupDetail() {
           </View>
         ) : null}
         {isHost ? (
-          !closed ? (
+          completed ? (
+            <Button title="완료 처리된 모임입니다" variant="secondary" disabled onPress={() => {}} />
+          ) : canComplete ? (
+            <>
+              <Button title="모임 완료 처리" icon="checkmark-done" onPress={() => router.push(`/meetup/complete/${meetup.id}` as never)} />
+              {!closed ? <Button title="모임 취소하기" variant="danger" onPress={confirmCancelMeetup} /> : null}
+            </>
+          ) : !closed ? (
             <Button title="모임 취소하기" variant="danger" onPress={confirmCancelMeetup} />
           ) : (
             <Button title="종료된 모임입니다" variant="secondary" disabled onPress={() => {}} />
@@ -413,6 +483,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(45,107,214,0.18)',
   },
+  doneBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: Spacing.three,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+  },
+  doneTitle: { fontSize: 15, fontWeight: '800', color: '#F8FAFC' },
+  doneSub: { fontSize: 13, color: '#AAB4C0', marginTop: 3, lineHeight: 18 },
   duprBannerTitle: { fontSize: 15, fontWeight: '800', color: '#2D6BD6' },
   duprBannerSub: { fontSize: 12.5, color: '#AAB4C0', marginTop: 2, lineHeight: 17 },
   infoCard: {

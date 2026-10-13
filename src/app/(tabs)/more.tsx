@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,6 +8,8 @@ import { BusinessFooter } from '@/components/business-footer';
 import { Avatar } from '@/components/ui/avatar';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
+import { fetchActiveChallenges } from '@/lib/challenge';
+import type { Challenge } from '@/lib/types';
 
 const dark = {
   background: '#070A0D',
@@ -34,6 +37,14 @@ const secondaryItems = [
 export default function MoreScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  // 진행 중인 이벤트(챌린지) — 켜진 것이 없으면 메뉴 자체가 보이지 않는다
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchActiveChallenges().then(setChallenges);
+    }, []),
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -73,6 +84,26 @@ export default function MoreScreen() {
             </Pressable>
           ))}
         </View>
+
+        {challenges.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>이벤트</Text>
+            <View style={styles.listCard}>
+              {challenges.map((c, index) => (
+                <Pressable
+                  key={c.id}
+                  style={[styles.row, index < challenges.length - 1 && styles.rowBorder]}
+                  onPress={() => router.push(`/challenge/${c.id}` as never)}>
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="flash-outline" size={18} color={dark.textSecondary} />
+                  </View>
+                  <Text style={styles.rowTitle}>{c.title}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>계정과 설정</Text>

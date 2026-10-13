@@ -134,6 +134,130 @@ export type MeetupMatch = {
   created_at: string;
 };
 
+// ---- 번개 완료·출석 + 챌린지 (0099) — 쓰기는 모두 서버 함수 경유(앱이 표에 직접 쓸 수 없다) ----
+export type AttendanceStatus = 'present' | 'absent' | 'unknown'; // 참석 / 불참 / 미확인
+
+/**
+ * meetup_completions — 번개 완료 기록(번개당 1행). 행이 없으면 아직 완료 처리 전. voided = 운영자가 무효 처리.
+ * 번개가 지워져도(호스트 탈퇴 등) 이 행은 남는다 → meetup_id 가 null 이 되고, 제목·장소·시작 시각은 완료 시점의 값이다.
+ */
+export type MeetupCompletion = {
+  id: string;
+  meetup_id: string | null;
+  host_id: string | null;
+  meetup_title: string;
+  location_name: string;
+  meetup_start_time: string;
+  present_count: number; // 참석으로 확정된 인원
+  status: 'completed' | 'voided';
+  completed_at: string; // 완료 처리 시각(챌린지 인정 날짜의 기준)
+  completed_by: string | null;
+  voided_at: string | null; // 무효 사유·처리자는 감사로그에 남는다
+  updated_at: string;
+};
+
+/** meetup_attendance — 출석(완료 기록 × 회원). 본인·그 번개의 호스트·운영자만 조회된다 */
+export type MeetupAttendance = {
+  completion_id: string;
+  user_id: string;
+  meetup_id: string | null; // 번개가 지워지면 null
+  status: AttendanceStatus;
+  marked_by: string | null;
+  marked_at: string;
+  updated_at: string;
+};
+
+/** challenges — 챌린지(이벤트) 설정. 일반 사용자에게는 켜진(active) 것만 조회된다 */
+export type Challenge = {
+  id: string;
+  kind: 'meetup_attendance'; // 실적을 세는 방식(지금은 번개 참석 하나)
+  title: string;
+  description: string;
+  starts_at: string;
+  ends_at: string;
+  goal_count: number;
+  daily_limit: number; // 하루 최대 인정 횟수 — 완료 처리한 날·번개가 열린 날 둘 다에 적용(한국 날짜)
+  active: boolean;
+  completion_grace_days: number; // 종료 뒤 며칠까지의 완료 처리를 인정할지(번개는 종료 전에 열린 것만)
+  visible_days_after_end: number; // 종료 뒤 며칠 동안 앱에 카드·메뉴를 보여줄지
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** challenge_enrollments — 참여 신청(인스타그램 아이디 등록). 본인 것만 조회된다(운영자는 전부). 쓰기는 challenge_join / challenge_leave 로만 */
+export type ChallengeEnrollment = {
+  challenge_id: string;
+  user_id: string;
+  instagram_id: string; // '@' 없이, 소문자
+  enrolled_at: string; // 이 시각 이후에 완료 처리된 참석만 인정된다
+  updated_at: string;
+};
+
+/** 인정되지 않은 이유: 완료 무효 / 번개 취소 / 불참 / 미확인 / 참석자 2명 미만 / 참여 신청 전 / 하루 한도 초과 */
+export type ChallengeEntryReason = 'voided' | 'cancelled' | 'absent' | 'unknown' | 'too_few' | 'before_join' | 'daily_limit';
+
+export type ChallengeJoinResult = 'ok' | 'updated' | 'forbidden' | 'not_found' | 'ended' | 'invalid_instagram' | 'instagram_taken';
+
+/** challenge_entries() 한 줄 — 기간 안에 완료 처리된 번개의 출석 기록 + 인정 여부 */
+export type ChallengeEntry = {
+  user_id: string;
+  completion_id: string;
+  meetup_id: string | null; // 번개가 지워졌으면 null(기록은 남는다)
+  meetup_title: string;
+  location_name: string;
+  meetup_start_time: string;
+  completed_at: string;
+  credit_date: string; // 인정 날짜 = 완료 처리 시각의 한국 날짜('YYYY-MM-DD')
+  attendance: AttendanceStatus;
+  counted: boolean; // 실제 참석으로 치는가
+  credited: boolean; // 챌린지 실적으로 인정되는가
+  reason: ChallengeEntryReason | null;
+  credit_no: number | null; // 몇 번째 인정 건인가
+};
+
+/** challenge_progress() 한 줄. progress = min(credited_count, goal_count). 참여 신청 전이면 enrolled = false, 횟수 0 */
+export type ChallengeProgress = {
+  challenge_id: string;
+  user_id: string;
+  enrolled: boolean;
+  enrolled_at: string | null;
+  instagram_id: string | null;
+  actual_count: number; // 실제 참석 횟수(참여 신청한 뒤의 것만)
+  credited_count: number; // 하루 한도를 적용한 인정 횟수
+  goal_count: number;
+  progress: number;
+  achieved: boolean;
+  achieved_at: string | null;
+};
+
+/** challenge_participants() 한 줄(운영자 전용) */
+export type ChallengeParticipantRow = {
+  user_id: string;
+  nickname: string;
+  email: string | null;
+  actual_count: number;
+  credited_count: number;
+  goal_count: number;
+  progress: number;
+  achieved: boolean;
+  achieved_at: string | null;
+  last_credited_at: string | null;
+  enrolled_at: string;
+  instagram_id: string;
+};
+
+export type MeetupCompleteResult =
+  | 'ok'
+  | 'not_found'
+  | 'forbidden'
+  | 'cancelled'
+  | 'not_started'
+  | 'already_completed'
+  | 'voided'
+  | 'invalid_member'
+  | 'need_two';
+
 // ---- 이벤트 팝업 (0047) — 관리자 웹에서 등록/올리기·내리기/기간 설정 ----
 export type EventPopupRow = {
   id: string;
@@ -1074,6 +1198,31 @@ export interface Database {
         Update: WriteDefaults<EventPopupRow>;
         Relationships: [];
       };
+      // 번개 완료·출석 + 챌린지 (0099) — 완료·출석은 서버 함수로만 기록된다(직접 쓰기는 서버가 거절)
+      meetup_completions: {
+        Row: MeetupCompletion;
+        Insert: WriteDefaults<MeetupCompletion>;
+        Update: WriteDefaults<MeetupCompletion>;
+        Relationships: [];
+      };
+      meetup_attendance: {
+        Row: MeetupAttendance;
+        Insert: WriteDefaults<MeetupAttendance>;
+        Update: WriteDefaults<MeetupAttendance>;
+        Relationships: [];
+      };
+      challenges: {
+        Row: Challenge;
+        Insert: WriteDefaults<Challenge> & { title: string; starts_at: string; ends_at: string; goal_count: number };
+        Update: WriteDefaults<Challenge>;
+        Relationships: [];
+      };
+      challenge_enrollments: {
+        Row: ChallengeEnrollment;
+        Insert: WriteDefaults<ChallengeEnrollment>;
+        Update: WriteDefaults<ChallengeEnrollment>;
+        Relationships: [];
+      };
       clubs: {
         Row: Club;
         Insert: WriteDefaults<Club> & { owner_id: string; name: string };
@@ -1401,6 +1550,29 @@ export interface Database {
         Args: { p_club_id: string; p_plan?: ClubPaidPlan };
         Returns: 'ok' | 'not_found' | 'forbidden' | 'already_used' | 'plan_unavailable' | 'no_trial';
       };
+      // 번개 완료·출석 + 챌린지 (0099)
+      meetup_complete: { Args: { p_meetup_id: string; p_present: string[]; p_absent?: string[] }; Returns: MeetupCompleteResult };
+      meetup_attendance_admin_set: {
+        Args: { p_completion_id: string; p_user_id: string; p_status: AttendanceStatus; p_note?: string };
+        Returns: 'ok' | 'forbidden' | 'invalid' | 'not_found' | 'invalid_member';
+      };
+      meetup_completion_admin_set: {
+        Args: { p_completion_id: string; p_status: 'voided' | 'completed'; p_reason?: string };
+        Returns: 'ok' | 'forbidden' | 'invalid' | 'not_found' | 'cancelled';
+      };
+      meetup_completion_admin_set_time: {
+        Args: { p_completion_id: string; p_completed_at: string; p_note?: string };
+        Returns: 'ok' | 'forbidden' | 'invalid' | 'not_found';
+      };
+      challenge_join: { Args: { p_challenge_id: string; p_instagram_id: string }; Returns: ChallengeJoinResult };
+      challenge_leave: { Args: { p_challenge_id: string }; Returns: 'ok' | 'forbidden' | 'not_found' | 'ended' };
+      challenge_enrollment_admin_set: {
+        Args: { p_challenge_id: string; p_user_id: string; p_enrolled_at?: string | null; p_instagram_id?: string | null; p_note?: string };
+        Returns: 'ok' | 'forbidden' | 'not_found' | 'invalid' | 'invalid_instagram' | 'instagram_taken';
+      };
+      challenge_entries: { Args: { p_challenge_id: string; p_user_id?: string }; Returns: ChallengeEntry[] };
+      challenge_progress: { Args: { p_challenge_id: string; p_user_id?: string }; Returns: ChallengeProgress[] };
+      challenge_participants: { Args: { p_challenge_id: string }; Returns: ChallengeParticipantRow[] };
       // 클럽 회비 (0097)
       club_dues_status: { Args: { p_club_id: string }; Returns: ClubDuesStatus };
       club_dues_plan_set: {

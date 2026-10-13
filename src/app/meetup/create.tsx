@@ -150,6 +150,11 @@ export default function CreateMeetup() {
       Alert.alert('실력 범위', '최소 실력이 최대 실력보다 클 수 없습니다.');
       return;
     }
+    // 이미 지난 시간으로는 서버가 모임을 만들어주지 않는다(10분 여유) — 보내기 전에 알려준다
+    if (start.getTime() < Date.now() - 10 * 60 * 1000) {
+      Alert.alert('시간 확인', '이미 지난 시간이에요. 모임 시작 시간을 다시 골라주세요.');
+      return;
+    }
     if (!session?.user.id) return;
     setSaving(true);
     show();

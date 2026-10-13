@@ -135,6 +135,8 @@ function RootNavigator() {
         />
         <Stack.Screen name="meetup/[id]" options={{ headerShown: true, title: '모임 상세' }} />
         <Stack.Screen name="meetup/record/[id]" options={{ headerShown: true, title: '경기 기록' }} />
+        <Stack.Screen name="meetup/complete/[id]" options={{ headerShown: true, title: '모임 완료 처리' }} />
+        <Stack.Screen name="challenge/[id]" options={{ headerShown: true, title: '이벤트' }} />
         <Stack.Screen
           name="club/create"
           options={{

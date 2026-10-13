@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ClubCard } from '@/components/club-card';
 import { EventPopup } from '@/components/event-popup';
+import { HomeChallengeCard } from '@/components/home-challenge-card';
 import { HomeSessionVote } from '@/components/home-session-vote';
 import { TournamentCard } from '@/components/tournament-card';
 import { AppCard } from '@/components/ui/app-card';
@@ -261,6 +262,9 @@ export default function HomeScreen() {
             <NotificationBell size={22} color="#F8FAFC" />
           </View>
         </View>
+
+        {/* 진행 중인 챌린지(이벤트) — 켜진 것이 없으면 아무것도 그리지 않는다 */}
+        <HomeChallengeCard />
 
         <SectionHeader title="다가오는 내 일정" onMore={() => router.push('/court/reservations')} icon="calendar-outline" color="#9BE137" bg="rgba(155,225,55,0.14)" />
         {upcoming.length > 0 ? (
