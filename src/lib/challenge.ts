@@ -49,9 +49,19 @@ export function challengeRemainingLabel(c: Pick<Challenge, 'ends_at'>, nowMs: nu
   return days <= 0 ? '오늘 마감' : `${days}일 남음`;
 }
 
+/** 완료 처리가 인정되는 마지막 시각(종료 + 유예 일수) */
+export function challengeGraceEndMs(c: Pick<Challenge, 'ends_at' | 'completion_grace_days'>): number {
+  return new Date(c.ends_at).getTime() + (c.completion_grace_days ?? 3) * 86400000;
+}
+
 /** 지금 완료 처리하면 인정되는 기간인가(종료 + 유예 일수까지) */
 export function challengeAcceptsCompletion(c: Pick<Challenge, 'starts_at' | 'ends_at' | 'completion_grace_days'>, nowMs: number): boolean {
-  return nowMs >= new Date(c.starts_at).getTime() && nowMs <= new Date(c.ends_at).getTime() + c.completion_grace_days * 86400000;
+  return nowMs >= new Date(c.starts_at).getTime() && nowMs <= challengeGraceEndMs(c);
+}
+
+/** 앱에 보여줄 기간인가: 끝난 뒤에는 visible_days_after_end 일 동안만 '종료'로 보이고 그 뒤에는 저절로 사라진다 */
+export function isChallengeVisible(c: Pick<Challenge, 'ends_at' | 'visible_days_after_end'>, nowMs: number): boolean {
+  return nowMs <= new Date(c.ends_at).getTime() + (c.visible_days_after_end ?? 7) * 86400000;
 }
 
 /** 하루 인정 한도 안내: '하루 최대 1회 인정' */
@@ -63,7 +73,8 @@ export function dailyLimitLabel(c: Pick<Challenge, 'daily_limit'>): string {
 export function entryReasonLabel(reason: ChallengeEntryReason, dailyLimit: number): string {
   switch (reason) {
     case 'daily_limit':
-      return dailyLimit === 1 ? '같은 날 이미 1회가 인정됐어요' : `같은 날 이미 ${dailyLimit}회가 인정됐어요`;
+      // 한도는 완료 처리한 날과 모임이 열린 날 둘 다에 걸린다 — 어느 쪽이든 이미 찼으면 인정되지 않는다
+      return `하루 한도 ${dailyLimit}회를 이미 채운 날이에요 (모임 날짜·완료 처리 날짜 기준)`;
     case 'absent':
       return '불참으로 처리됐어요';
     case 'unknown':
@@ -120,12 +131,11 @@ export async function completeMeetup(meetupId: string, present: string[], absent
 
 // ── 챌린지 ──────────
 /**
- * 지금 보여줄 챌린지: 켜져 있고 이미 시작한 것. 끝난 뒤에는 visible_days_after_end 일 동안만 '종료'로 보이고 그 뒤에는
- * 저절로 사라진다(운영자가 따로 끄지 않아도 된다).
+ * 켜져 있고 이미 시작한 챌린지(최근 시작 순). 끝난 것도 들어 있다 — 앱에 보여줄지는 isChallengeVisible,
+ * 완료 처리가 아직 인정되는지는 challengeAcceptsCompletion 으로 따로 가른다(노출 기간과 유예 기간은 서로 독립이다).
  * 실패하면(서버에 기능이 아직 없을 때 포함) 빈 배열 → 카드·메뉴가 보이지 않을 뿐이다.
  */
-export async function fetchActiveChallenges(): Promise<Challenge[]> {
-  const nowMs = Date.now();
+export async function fetchLiveChallenges(nowMs: number): Promise<Challenge[]> {
   const { data, error } = await supabase
     .from('challenges')
     .select('*')
@@ -134,9 +144,18 @@ export async function fetchActiveChallenges(): Promise<Challenge[]> {
     .order('starts_at', { ascending: false })
     .limit(10);
   if (error) return [];
-  return ((data as Challenge[] | null) ?? [])
-    .filter((c) => nowMs <= new Date(c.ends_at).getTime() + (c.visible_days_after_end ?? 7) * 86400000)
-    .slice(0, 3);
+  return (data as Challenge[] | null) ?? [];
+}
+
+/** 그중 앱에 보여줄 것(최대 3개). 노출 기간이 지나면 저절로 빠진다(운영자가 따로 끄지 않아도 된다). */
+export function visibleChallenges(live: Challenge[], nowMs: number): Challenge[] {
+  return live.filter((c) => isChallengeVisible(c, nowMs)).slice(0, 3);
+}
+
+/** 지금 보여줄 챌린지 */
+export async function fetchActiveChallenges(): Promise<Challenge[]> {
+  const nowMs = Date.now();
+  return visibleChallenges(await fetchLiveChallenges(nowMs), nowMs);
 }
 
 /** 챌린지 한 건. 없으면(꺼짐 포함) null, 조회에 실패하면 undefined — "없음"과 "못 읽음"을 구분해서 보여줄 것. */
@@ -148,29 +167,59 @@ export async function fetchChallenge(challengeId: string): Promise<Challenge | n
 
 export type PendingCompletion = { id: string; title: string; start_time: string };
 
+const PENDING_PAGE = 20;
+const PENDING_MAX_PAGES = 5;
+
 /**
- * 내가 호스트인데 아직 완료 처리하지 않은 번개(시작 시간이 지난 것, 취소 아님). 최근 것부터.
+ * 내가 호스트인데 아직 완료 처리하지 않은 번개. 최근 것부터.
+ *   · 주어진 챌린지 기간에 열린 것만(시작 전·종료 뒤에 연 번개는 완료 처리해도 인정되지 않는다)
+ *   · 승인된 참가자가 2명 이상인 것만(혼자뿐인 번개는 서버가 완료 처리를 받지 않아, 목록에 두면 영영 남는다)
+ *   · 시작 시간이 지났고 취소되지 않은 것
  * 시작하고 몇 시간이 지난 번개는 목록 화면에서 사라지므로, 호스트가 완료 처리 화면으로 가는 길을 따로 준다.
+ * 조회에 실패하면 빈 배열 — 완료 여부를 모르는 채로 "완료 처리할 모임"이라고 안내하지 않는다.
  */
-export async function fetchPendingCompletions(hostId: string, sinceIso: string): Promise<PendingCompletion[]> {
-  const { data: rows, error } = await supabase
-    .from('meetups')
-    .select('id, title, start_time')
-    .eq('host_id', hostId)
-    .neq('status', 'cancelled')
-    .gte('start_time', sinceIso)
-    .lte('start_time', new Date().toISOString())
-    .order('start_time', { ascending: false })
-    .limit(20);
-  if (error || !rows || rows.length === 0) return [];
-  const list = rows as PendingCompletion[];
-  const { data: done, error: doneError } = await supabase
-    .from('meetup_completions')
-    .select('meetup_id')
-    .in('meetup_id', list.map((m) => m.id));
-  if (doneError) return []; // 완료 여부를 모르면 "완료 처리할 모임"이라고 안내하지 않는다
-  const completed = new Set(((done as { meetup_id: string | null }[] | null) ?? []).map((d) => d.meetup_id));
-  return list.filter((m) => !completed.has(m.id));
+export async function fetchPendingCompletions(
+  hostId: string,
+  challenges: Pick<Challenge, 'starts_at' | 'ends_at'>[],
+  nowMs: number,
+): Promise<PendingCompletion[]> {
+  if (challenges.length === 0) return [];
+  const ranges = challenges.map((c) => ({ from: new Date(c.starts_at).getTime(), to: new Date(c.ends_at).getTime() }));
+  const since = Math.min(...ranges.map((r) => r.from));
+  const until = Math.min(nowMs, Math.max(...ranges.map((r) => r.to)));
+  if (until < since) return [];
+
+  const pending: PendingCompletion[] = [];
+  // 이미 완료 처리한 번개가 앞쪽을 채우고 있어도 그 뒤의 미완료가 묻히지 않게, 쪽을 넘기며 찾는다
+  for (let page = 0; page < PENDING_MAX_PAGES; page += 1) {
+    const { data: rows, error } = await supabase
+      .from('meetups_with_counts')
+      .select('id, title, start_time')
+      .eq('host_id', hostId)
+      .neq('status', 'cancelled')
+      .gte('participant_count', 2)
+      .gte('start_time', new Date(since).toISOString())
+      .lte('start_time', new Date(until).toISOString())
+      .order('start_time', { ascending: false })
+      .order('id', { ascending: false })
+      .range(page * PENDING_PAGE, (page + 1) * PENDING_PAGE - 1);
+    if (error) return [];
+    const list = (rows as PendingCompletion[] | null) ?? [];
+    if (list.length === 0) break;
+    const { data: done, error: doneError } = await supabase
+      .from('meetup_completions')
+      .select('meetup_id')
+      .in('meetup_id', list.map((m) => m.id));
+    if (doneError) return [];
+    const completed = new Set(((done as { meetup_id: string | null }[] | null) ?? []).map((d) => d.meetup_id));
+    for (const m of list) {
+      const t = new Date(m.start_time).getTime();
+      // 챌린지가 여럿이면 기간 사이의 빈 날에 연 번개가 섞일 수 있어, 어느 한 챌린지의 기간에 드는지 다시 본다
+      if (!completed.has(m.id) && ranges.some((r) => t >= r.from && t <= r.to)) pending.push(m);
+    }
+    if (list.length < PENDING_PAGE) break;
+  }
+  return pending;
 }
 
 /** 내 진행률(서버 계산) + 참여 신청 여부·내 인스타그램 아이디. 신청 전이어도 enrolled=false 로 온다. 못 읽으면 null. */
@@ -196,15 +245,17 @@ export function normalizeInstagramId(input: string): string | null {
   const v = input
     .trim()
     .toLowerCase()
-    .replace(/^(https?:\/\/)?(www\.|m\.)?instagram\.com\//, '') // 프로필 주소(앞의 http·www 는 없어도 된다)
+    .replace(/^(https?:\/\/)?(www\.|m\.)?instagram\.com\/(_u\/)?/, '') // 프로필 주소(앞의 http·www 는 없어도 된다. _u/ 는 앱으로 여는 주소)
     .replace(/[/?#].*$/, '')
     .replace(/^@+/, '');
   if (!/^[a-z0-9._]{1,30}$/.test(v)) return null;
-  // 게시물·릴스 주소 등을 붙여 넣었을 때 남는 경로 이름은 아이디가 아니다
+  // 게시물·릴스·공유 주소 등을 붙여 넣었을 때 남는 경로 이름은 아이디가 아니다
   if (INSTAGRAM_NOT_AN_ID.has(v)) return null;
+  // 주소만 넣었거나 다른 하위 도메인(business. 등)을 넣었을 때 남는 도메인도 아이디가 아니다
+  if (/(^|\.)instagram\.com$/.test(v)) return null;
   return v;
 }
-const INSTAGRAM_NOT_AN_ID = new Set(['p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'instagram.com', 'www.instagram.com']);
+const INSTAGRAM_NOT_AN_ID = new Set(['p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'share', '_u']);
 
 const JOIN_ERRORS: Record<string, string> = {
   forbidden: '로그인한 뒤 다시 시도해주세요.',

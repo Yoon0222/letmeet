@@ -62,16 +62,29 @@ const ENROLL_ERRORS: Record<string, string> = {
   instagram_taken: '다른 사람이 이미 등록한 인스타그램 아이디예요.',
 };
 
-// 목록을 끝까지 읽는다(서버가 한 번에 주는 행 수에 제한이 있어, 나눠 받지 않으면 표시 없이 잘린다)
+// 목록을 끝까지 읽는다(서버가 한 번에 주는 행 수에 제한이 있어, 나눠 받지 않으면 표시 없이 잘린다).
+//   서버의 한 번 한도가 PAGE 보다 작을 수도 있으니 "덜 왔으면 끝"이 아니라 빈 쪽이 올 때까지 받은 만큼씩 넘긴다.
+//   읽는 사이에 목록이 바뀌어 같은 행이 두 쪽에 걸쳐 와도 한 번만 담는다.
 const PAGE = 1000;
-async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<{ rows: T[]; error: string }> {
+async function readAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  keyOf: (row: T) => string,
+): Promise<{ rows: T[]; error: string }> {
   const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
+  const seen = new Set<string>();
+  for (let from = 0; ; ) {
     const { data, error } = await page(from, from + PAGE - 1);
     if (error) return { rows, error: error.message };
     const chunk = (data as T[] | null) ?? [];
-    rows.push(...chunk);
-    if (chunk.length < PAGE) return { rows, error: '' };
+    if (chunk.length === 0) return { rows, error: '' };
+    for (const row of chunk) {
+      const key = keyOf(row);
+      if (!seen.has(key)) {
+        seen.add(key);
+        rows.push(row);
+      }
+    }
+    from += chunk.length;
   }
 }
 const chunks = <T,>(list: T[], size: number): T[][] => Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size));
@@ -188,6 +201,10 @@ function ChallengesInner() {
     const daily = Number(form.daily);
     const grace = Number(form.grace);
     const visibleDays = Number(form.visibleDays);
+    // 빈 칸은 Number('') 가 0 이라 그대로 두면 "0일"로 저장된다 — 먼저 거른다
+    if ([form.goal, form.daily, form.grace, form.visibleDays].some((v) => String(v).trim() === '')) {
+      return setError('목표 횟수·하루 한도·유예·노출 기간을 모두 입력해주세요. (유예·노출을 두지 않으려면 0)');
+    }
     if (!title) return setError('이벤트명을 입력해주세요.');
     if (title.length > 60) return setError('이벤트명은 60자까지 쓸 수 있어요.');
     if (!starts || !ends) return setError('시작일과 종료일을 입력해주세요.');
@@ -303,7 +320,10 @@ function ChallengesInner() {
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">종료 후 앱 노출 (일)</span>
               <input type="number" min={0} max={365} className={inputCls} value={form.visibleDays} onChange={(e) => set('visibleDays', e.target.value)} />
-              <span className="mt-1 block text-xs text-slate-400">종료 뒤 이 기간이 지나면 앱의 카드·메뉴가 저절로 사라져요(따로 끄지 않아도 돼요).</span>
+              <span className="mt-1 block text-xs text-slate-400">
+                종료 뒤 이 기간이 지나면 앱의 카드·메뉴가 저절로 사라져요(따로 끄지 않아도 돼요). 유예보다 짧게 두면 유예 중에 인정된 횟수를 참가자가 앱에서
+                확인할 수 없어요(호스트의 완료 처리 안내는 유예가 끝날 때까지 보여요).
+              </span>
             </label>
           </div>
           <p className="text-xs text-slate-400">
@@ -405,15 +425,21 @@ function ParticipantsPanel({ challenge }: { challenge: Challenge }) {
   const load = useCallback(async () => {
     setLoading(true);
     // 참여 신청자가 1000명을 넘어도 끝까지 읽는다(전체 인원·CSV 가 잘리지 않게)
-    const all = await readAll<ChallengeParticipantRow>((from, to) => supabase.rpc('challenge_participants', { p_challenge_id: challenge.id }).range(from, to));
+    const all = await readAll<ChallengeParticipantRow>(
+      (from, to) => supabase.rpc('challenge_participants', { p_challenge_id: challenge.id }).range(from, to),
+      (row) => row.user_id,
+    );
     setError(all.error);
     setRows(all.rows);
 
-    // 완료 처리된 번개(정정하러 들어갈 목록): 유예 기간에 처리된 것까지, 최근 것부터 일부만
+    // 완료 처리된 번개(정정하러 들어갈 목록): 이 이벤트에 집계되는 것과 같은 범위 —
+    //   이벤트 기간에 열렸고, 유예 기간까지 완료 처리된 것. 최근 것부터 일부만.
     const until = new Date(new Date(challenge.ends_at).getTime() + challenge.completion_grace_days * 86400000).toISOString();
     const { data: done, error: doneErr, count } = await supabase
       .from('meetup_completions')
       .select('*', { count: 'exact' })
+      .gte('meetup_start_time', challenge.starts_at)
+      .lte('meetup_start_time', challenge.ends_at)
       .gte('completed_at', challenge.starts_at)
       .lte('completed_at', until)
       .order('completed_at', { ascending: false })
@@ -584,7 +610,7 @@ function ParticipantsPanel({ challenge }: { challenge: Challenge }) {
         </div>
       )}
 
-      <h3 className="mt-10 text-base font-semibold text-slate-800">기간 안에 완료 처리된 번개 {meetupTotal}건</h3>
+      <h3 className="mt-10 text-base font-semibold text-slate-800">이벤트 기간에 열려 완료 처리된 번개 {meetupTotal}건</h3>
       <p className="mt-1 text-sm text-slate-500">
         잘못된 완료·출석은 여기서 정정합니다. 정정하면 참여 현황에 바로 반영돼요.
         {meetupTotal > meetups.length ? ` 최근 ${meetups.length}건만 보여요 — 더 오래된 것은 참여자의 '내역 보기'에서 정정할 수 있어요.` : ''}

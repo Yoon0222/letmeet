@@ -9,6 +9,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import {
+  challengeGraceEndMs,
   challengePeriodLabel,
   challengeRemainingLabel,
   dailyLimitLabel,
@@ -17,6 +18,7 @@ import {
   fetchChallengeEntries,
   fetchChallengeProgress,
   joinChallenge,
+  kstDate,
   kstDayLabel,
   leaveChallenge,
   normalizeInstagramId,
@@ -121,6 +123,9 @@ export default function ChallengeDetailScreen() {
   const goal = progress.goal_count;
   const ratio = goal > 0 ? Math.min(1, progress.progress / goal) : 0;
   const ended = nowMs > new Date(challenge.ends_at).getTime();
+  // 끝났지만 아직 완료 처리가 인정되는 기간(유예) — 이때는 횟수가 더 오를 수 있어 확정처럼 말하지 않는다
+  const graceEndMs = challengeGraceEndMs(challenge);
+  const inGrace = ended && nowMs <= graceEndMs;
   const left = Math.max(0, goal - progress.progress);
   const limit = challenge.daily_limit;
   const enrolled = progress.enrolled;
@@ -233,6 +238,11 @@ export default function ChallengeDetailScreen() {
                       {goal}회를 모두 채웠어요!
                     </Text>
                   </View>
+                ) : inGrace ? (
+                  <Text style={styles.sub}>
+                    이벤트가 끝났어요. 지금까지 {progress.progress}회가 인정됐어요. 끝나기 전에 열린 모임은{' '}
+                    {kstDayLabel(new Date(graceEndMs).toISOString())}까지 완료 처리되면 더 반영돼요.
+                  </Text>
                 ) : ended ? (
                   <Text style={styles.sub}>이벤트가 끝났어요. {progress.progress}회가 인정됐어요.</Text>
                 ) : (
@@ -335,7 +345,9 @@ export default function ChallengeDetailScreen() {
             {challenge.description ? <Text style={styles.sub}>{challenge.description}</Text> : null}
             <Rule text="인스타그램 아이디를 등록해 참여 신청을 해주세요. 신청한 뒤에 완료 처리된 참석부터 인정돼요." />
             <Rule text={`기간 안에 번개 모임에 ${goal}회 참석하면 달성이에요.`} />
-            <Rule text={`하루에 여러 번 참석해도 ${limit}회까지만 인정돼요. 같은 날 참석한 모임을 다른 날에 완료 처리해도 마찬가지예요.`} />
+            <Rule
+              text={`하루 ${limit}회까지만 인정돼요. 모임이 열린 날과 완료 처리된 날 둘 다에 적용돼서, 같은 날 여러 번 참석했거나 여러 날의 모임이 하루에 몰아서 완료 처리되면 ${limit}회만 인정돼요.`}
+            />
             <Rule text="모임이 끝나고 호스트가 '모임 완료 처리'에서 참석으로 확인한 모임만 인정돼요. 호스트도 본인을 참석으로 체크해야 해요." />
             <Rule text="참석자가 2명 이상인 모임만 인정돼요. 취소된 모임, 불참·미확인은 제외돼요." />
             <Rule
@@ -365,7 +377,12 @@ export default function ChallengeDetailScreen() {
                     disabled={!e.meetup_id}
                     style={styles.entryRow}>
                     <View style={styles.flex}>
-                      <Text style={styles.entryDate}>{kstDayLabel(e.credit_date)}</Text>
+                      {/* 인정 날짜는 완료 처리한 날 — 모임이 다른 날에 열렸으면 그 날짜도 보여준다(하루 한도는 둘 다에 걸린다) */}
+                      <Text style={styles.entryDate}>
+                        {kstDate(new Date(e.meetup_start_time).getTime()) === e.credit_date
+                          ? kstDayLabel(e.credit_date)
+                          : `${kstDayLabel(e.credit_date)} 완료 · ${kstDayLabel(e.meetup_start_time)} 모임`}
+                      </Text>
                       <Text style={styles.entryTitle} numberOfLines={1}>
                         {e.meetup_title}
                       </Text>

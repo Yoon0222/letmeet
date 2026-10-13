@@ -250,12 +250,14 @@ as $$
 declare
   v text := lower(btrim(coalesce(p, ''), E' \t\n\r'));
 begin
-  v := regexp_replace(v, '^(https?://)?(www\.|m\.)?instagram\.com/', '');   -- 프로필 주소(앞의 http·www 는 없어도 된다)
+  v := regexp_replace(v, '^(https?://)?(www\.|m\.)?instagram\.com/(_u/)?', '');   -- 프로필 주소(앞의 http·www 는 없어도 된다. _u/ 는 앱으로 여는 주소)
   v := regexp_replace(v, '[/?#].*$', '');
   v := regexp_replace(v, '^@+', '');
   if v !~ '^[a-z0-9._]{1,30}$' then return null; end if;
-  -- 게시물·릴스 주소 등을 붙여 넣었을 때 남는 경로 이름은 아이디가 아니다
-  if v in ('p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'instagram.com', 'www.instagram.com') then return null; end if;
+  -- 게시물·릴스·공유 주소 등을 붙여 넣었을 때 남는 경로 이름은 아이디가 아니다
+  if v in ('p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'share', '_u') then return null; end if;
+  -- 주소만 넣었거나 다른 하위 도메인(business. 등)을 넣었을 때 남는 도메인도 아이디가 아니다
+  if v ~ '(^|\.)instagram\.com$' then return null; end if;
   return v;
 end;
 $$;
@@ -691,6 +693,7 @@ as $$
 $$;
 
 -- 참여 현황(운영자): 참여 신청한 모든 사람의 요약(기록이 아직 없는 사람 포함). 인정 횟수 많은 순, 같으면 먼저 달성한 순.
+--   마지막 정렬 기준은 회원 id — 닉네임은 겹칠 수 있어, 나눠 읽을 때 순서가 흔들리지 않게 한다.
 create or replace function public.challenge_participants(p_challenge_id uuid)
 returns table (
   user_id uuid, nickname text, email text, actual_count int, credited_count int, goal_count int,
@@ -719,7 +722,7 @@ as $$
     ) s on s.user_id = e.user_id
    where ch.id = p_challenge_id
      and public.my_role() = 'super_admin'
-   order by 5 desc, 9 asc nulls last, 2;
+   order by 5 desc, 9 asc nulls last, 2, 1;
 $$;
 
 -- ── 9) 실행 권한 ──────────

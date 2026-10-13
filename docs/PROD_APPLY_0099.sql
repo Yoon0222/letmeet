@@ -8,7 +8,8 @@
 --   · 함수: meetup_complete(호스트 완료 처리),
 --           meetup_attendance_admin_set / meetup_completion_admin_set / meetup_completion_admin_set_time(운영자 정정),
 --           challenge_join / challenge_leave(회원의 참여 신청·취소), challenge_enrollment_admin_set(운영자의 신청 정정),
---           challenge_entries / challenge_progress(내 내역·진행률), challenge_participants(운영자 참여 현황), challenge_ledger(내부용)
+--           challenge_entries / challenge_progress(내 내역·진행률), challenge_participants(운영자 참여 현황), challenge_ledger(내부용),
+--           normalize_instagram_id(입력한 아이디 다듬기), meetup_is_completed(완료 여부 — 삭제 제한 정책이 쓴다)
 --   · 기존 번개 표에 붙는 것(열은 바꾸지 않는다):
 --       - 트리거 meetup_participants_guard: 참가자 행의 번개·회원 변경 금지, 승인제 번개에 남이 스스로 넣는 행은 '승인 대기'로
 --       - 트리거 meetups_guard: 로그인 사용자가 지난 시각으로 번개를 만들거나 이미 시작한 번개의 시각을 바꾸는 것 금지,
@@ -23,6 +24,8 @@
 --     "승인 대기로 넣기"는 로그인 사용자가 넣는 행에만 적용된다.
 --   · 챌린지 규칙: 참여 신청(인스타그램 아이디 등록)한 사람만, 신청한 뒤에 완료 처리된 참석만 인정. 하루 한도는
 --     완료 처리한 날·번개가 열린 날 둘 다에 적용. 종료 뒤 completion_grace_days 일(기본 3)까지의 완료 처리를 인정.
+--     종료 뒤 visible_days_after_end 일(기본 7)이 지나면 앱의 카드·메뉴가 저절로 사라진다(서버 설정만으로, 앱 업데이트 없이).
+--   · 참여 신청자가 있는 챌린지는 삭제할 수 없다(신청자·인스타그램 아이디가 함께 사라지지 않게). 숨기려면 끈다.
 --   · 기존 번개는 "완료 미확정" 그대로다. 과거 번개를 자동으로 완료 처리하지 않는다.
 --
 -- 안전성:
@@ -288,12 +291,14 @@ as $$
 declare
   v text := lower(btrim(coalesce(p, ''), E' \t\n\r'));
 begin
-  v := regexp_replace(v, '^(https?://)?(www\.|m\.)?instagram\.com/', '');   -- 프로필 주소(앞의 http·www 는 없어도 된다)
+  v := regexp_replace(v, '^(https?://)?(www\.|m\.)?instagram\.com/(_u/)?', '');   -- 프로필 주소(앞의 http·www 는 없어도 된다. _u/ 는 앱으로 여는 주소)
   v := regexp_replace(v, '[/?#].*$', '');
   v := regexp_replace(v, '^@+', '');
   if v !~ '^[a-z0-9._]{1,30}$' then return null; end if;
-  -- 게시물·릴스 주소 등을 붙여 넣었을 때 남는 경로 이름은 아이디가 아니다
-  if v in ('p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'instagram.com', 'www.instagram.com') then return null; end if;
+  -- 게시물·릴스·공유 주소 등을 붙여 넣었을 때 남는 경로 이름은 아이디가 아니다
+  if v in ('p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'share', '_u') then return null; end if;
+  -- 주소만 넣었거나 다른 하위 도메인(business. 등)을 넣었을 때 남는 도메인도 아이디가 아니다
+  if v ~ '(^|\.)instagram\.com$' then return null; end if;
   return v;
 end;
 $$;
@@ -729,6 +734,7 @@ as $$
 $$;
 
 -- 참여 현황(운영자): 참여 신청한 모든 사람의 요약(기록이 아직 없는 사람 포함). 인정 횟수 많은 순, 같으면 먼저 달성한 순.
+--   마지막 정렬 기준은 회원 id — 닉네임은 겹칠 수 있어, 나눠 읽을 때 순서가 흔들리지 않게 한다.
 create or replace function public.challenge_participants(p_challenge_id uuid)
 returns table (
   user_id uuid, nickname text, email text, actual_count int, credited_count int, goal_count int,
@@ -757,7 +763,7 @@ as $$
     ) s on s.user_id = e.user_id
    where ch.id = p_challenge_id
      and public.my_role() = 'super_admin'
-   order by 5 desc, 9 asc nulls last, 2;
+   order by 5 desc, 9 asc nulls last, 2, 1;
 $$;
 
 -- ── 9) 실행 권한 ──────────

@@ -9,12 +9,13 @@ import {
   challengeAcceptsCompletion,
   challengeRemainingLabel,
   dailyLimitLabel,
-  fetchActiveChallenges,
   fetchChallengeProgress,
+  fetchLiveChallenges,
   fetchPendingCompletions,
   hideChallengeCard,
   isChallengeCardHidden,
   type PendingCompletion,
+  visibleChallenges,
 } from '@/lib/challenge';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { formatMeetupTime } from '@/lib/format';
@@ -28,7 +29,8 @@ type Item = { challenge: Challenge; progress: ChallengeProgress; hidden: boolean
 //   아직 신청하지 않은 사람: 참여 안내 카드(참여하기 / 다시 보지 않기). 끝난 이벤트는 보여주지 않는다.
 //   켜진 챌린지가 없거나 진행률을 읽지 못하면 아무것도 그리지 않는다(신청 여부를 모르는 채로 안내하지 않는다).
 //   호스트에게는 "완료 처리할 모임"도 함께 보여준다 — 시작하고 몇 시간이 지난 번개는 목록 화면에서 사라져서,
-//   완료 처리 화면으로 가는 길이 여기뿐이다. 완료 처리가 인정되는 기간(종료 + 유예)에만 보인다.
+//   완료 처리 화면으로 가는 길이 여기뿐이다. 완료 처리가 인정되는 기간(종료 + 유예)에만, 이벤트 기간에 열렸고
+//   참가자가 2명 이상인 번개만 보인다(카드 노출 기간과는 무관하다).
 export function HomeChallengeCard() {
   const router = useRouter();
   const { session } = useAuth();
@@ -43,11 +45,12 @@ export function HomeChallengeCard() {
       setPending([]);
       return;
     }
-    const list = await fetchActiveChallenges();
     const now = Date.now();
-    // 완료 처리가 아직 인정되는 챌린지가 있을 때만, 그 시작 이후에 연 내 번개 중 완료 처리 안 한 것을 찾는다
-    const accepting = list.filter((c) => challengeAcceptsCompletion(c, now));
-    const since = accepting.map((c) => c.starts_at).sort()[0];
+    const live = await fetchLiveChallenges(now);
+    const list = visibleChallenges(live, now);
+    // 완료 처리가 아직 인정되는 챌린지가 있을 때만, 그 기간에 연 내 번개 중 완료 처리 안 한 것을 찾는다.
+    // 카드 노출 기간이 유예보다 짧아 카드가 먼저 사라졌어도, 유예 중이면 호스트에게는 계속 알려준다.
+    const accepting = live.filter((c) => challengeAcceptsCompletion(c, now));
     const [loaded, todo] = await Promise.all([
       Promise.all(
         list.map(async (challenge) => {
@@ -55,7 +58,7 @@ export function HomeChallengeCard() {
           return progress ? { challenge, progress, hidden } : null;
         }),
       ),
-      since ? fetchPendingCompletions(uid, since) : Promise.resolve([]),
+      fetchPendingCompletions(uid, accepting, now),
     ]);
     setNowMs(now);
     setItems(loaded.filter((x): x is Item => x !== null));

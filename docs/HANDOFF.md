@@ -23,6 +23,14 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-13, 10매치 챌린지 재검수 후속)
+
+- **What changed**: `src/lib/challenge.ts`(호스트의 "완료 처리할 모임" 찾는 조건 — 참가자 2명 이상·이벤트 기간에 연 번개만, 노출 기간과 무관하게 유예가 끝날 때까지), `src/components/home-challenge-card.tsx`(불러오는 부분만), `src/app/challenge/[id].tsx`(문구), `web-admin/app/challenges/page.tsx`, `supabase/migrations/0099_meetup_challenge.sql`(+`schema.sql`·`docs/PROD_APPLY_0099.sql`).
+- **화면에서 달라진 것**: 이벤트 상세에서 ① 끝났지만 유예 중이면 "지금까지 N회 … N월 N일까지 완료 처리되면 더 반영돼요" ② 하루 한도 규칙이 한 줄 길어짐 ③ 내 참여 기록의 날짜가 모임 날짜와 다르면 "10월 5일 완료 · 10월 3일 모임"으로 두 날짜가 함께 나옵니다. 레이아웃은 그대로이고 문구 길이만 늘었습니다.
+- **Why**: 재검수 지적(완료할 수 없는 번개가 목록에 계속 남음, 노출 기간이 유예보다 짧으면 호스트 목록이 먼저 사라짐 등).
+- **Validation**: DEV 시험 160항목, 실기기(홈 카드·상세 규칙), `tsc`·`expo lint`, 관리자 웹 `tsc`·eslint.
+- **Codex 요청**: 없음. 위 세 문구는 서버 규칙을 옮긴 것이라 내용은 그대로 두어 주세요.
+
 ### Claude -> Codex (2026-10-13, 피넛 10매치 챌린지 — 번개 완료 처리·이벤트 화면)
 
 - **What changed (앱)**:
