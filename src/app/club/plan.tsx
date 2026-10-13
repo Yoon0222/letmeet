@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CLUB_SUBSCRIPTION_ENABLED } from '@/constants/features';
+import { CLUB_PLUS_ENABLED, CLUB_SUBSCRIPTION_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { effectiveClubPlan, fetchClubPlans, isTrialActive, PLAN_FEATURES, PLAN_NAME, trialDaysLeft, won } from '@/lib/club-plan';
@@ -14,6 +14,9 @@ import { AppAlert as Alert } from '@/lib/feedback';
 import { cancelClubSubscription, changeClubPlan } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import type { ClubPaidPlan, ClubPlanRow, ClubSubscription, ClubWithCounts } from '@/lib/types';
+
+// 새로 고를 수 있는 플랜인가 — 서버에서 판매 중이고, 플러스는 앱 스위치까지 켜져 있어야 한다
+const offered = (p: ClubPlanRow) => p.active && (p.plan !== 'premium_plus' || CLUB_PLUS_ENABLED);
 
 const fmtYmd = (iso: string) => {
   const d = new Date(iso);
@@ -82,7 +85,7 @@ export default function ClubPlanScreen() {
     const diffs: Partial<Record<ClubPaidPlan, number>> = {};
     if (nextSub?.status === 'active' && nextSub.last_charge_at) {
       for (const p of planRows) {
-        if (!p.active || p.monthly_price <= nextSub.amount) continue;
+        if (!offered(p) || p.monthly_price <= nextSub.amount) continue;
         const res = await changeClubPlan({ clubId, plan: p.plan, preview: true });
         if (res.ok && res.action === 'upgraded') diffs[p.plan] = res.chargeAmount;
       }
@@ -287,8 +290,8 @@ export default function ClubPlanScreen() {
   }
 
   const currentRow = plans.find((p) => p.plan === plan);
-  // 판매 중인 플랜 + 지금 쓰고 있는 플랜만 보여준다(판매 중지된 플랜은 숨김)
-  const visiblePlans = plans.filter((p) => p.active || p.plan === plan || p.plan === sub?.plan);
+  // 새로 고를 수 있는 플랜 + 지금 쓰고 있는 플랜만 보여준다(판매 중지·숨김 플랜은 쓰고 있는 클럽에만 보인다)
+  const visiblePlans = plans.filter((p) => offered(p) || p.plan === plan || p.plan === sub?.plan);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>

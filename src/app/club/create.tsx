@@ -6,7 +6,7 @@ import { AppAlert as Alert } from '@/lib/feedback';
 
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
-import { CLUB_DUES_ENABLED } from '@/constants/features';
+import { CLUB_DUES_ENABLED, CLUB_PLUS_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { useLoading } from '@/contexts/loading';
@@ -25,13 +25,13 @@ export default function CreateClub() {
   const [description, setDescription] = useState('');
   const [plan, setPlan] = useState<'free' | ClubPaidPlan>('free');
   const [saving, setSaving] = useState(false);
-  // 유료 플랜 가격표(서버 기준). 판매 중(active)인 플랜만 고를 수 있다 — 플러스는 서버에서 켜야 보인다.
+  // 유료 플랜 가격표(서버 기준). 판매 중(active)인 플랜만 고를 수 있다 — 플러스는 앱 스위치와 서버가 둘 다 켜져야 보인다.
   const [planRows, setPlanRows] = useState<ClubPlanRow[]>([]);
 
   useEffect(() => {
     fetchClubPlans().then(setPlanRows);
   }, []);
-  const plusRow = planRows.find((p) => p.plan === 'premium_plus' && p.active);
+  const plusRow = CLUB_PLUS_ENABLED ? planRows.find((p) => p.plan === 'premium_plus' && p.active) : undefined;
   const premiumTrialMonths = planRows.find((p) => p.plan === 'premium')?.trial_months ?? 1;
 
   async function onSubmit() {

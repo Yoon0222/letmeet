@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
+import { CLUB_DUES_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { won } from '@/lib/club-plan';
@@ -52,7 +53,7 @@ export default function DuesConsentScreen() {
   const [failure, setFailure] = useState<string | null>(null); // 등록 실패 사유 — 토스트가 사라져도 화면에 남긴다
 
   const load = useCallback(async () => {
-    if (!clubId || !uid) return;
+    if (!CLUB_DUES_ENABLED || !clubId || !uid) return;
     try {
       const [clubRes, p, c, mine] = await Promise.all([
         supabase.from('clubs').select('name').eq('id', clubId).maybeSingle(),
@@ -79,6 +80,17 @@ export default function DuesConsentScreen() {
     }, [load]),
   );
 
+  // 앱 스위치가 꺼져 있으면 주소로 직접 들어와도 열지 않는다
+  if (!CLUB_DUES_ENABLED) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <View style={styles.center}>
+          <Text style={styles.title}>회비 기능은 아직 준비 중이에요</Text>
+          <Button title="돌아가기" variant="outline" onPress={() => router.back()} style={styles.wide} />
+        </View>
+      </SafeAreaView>
+    );
+  }
   if (loadFailed) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>

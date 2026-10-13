@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { billingAuthHtml, TossBillingWebView } from '@/components/toss-billing-webview';
 import { Button } from '@/components/ui/button';
+import { CLUB_DUES_ENABLED } from '@/constants/features';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { won } from '@/lib/club-plan';
@@ -58,7 +59,7 @@ export default function DuesCardRoute() {
 
   // 등록 모드: 지금 규칙이 직전 화면에서 동의한 내용과 같은지 확인한다
   useEffect(() => {
-    if (mode !== 'enroll' || !clubId) return;
+    if (!CLUB_DUES_ENABLED || mode !== 'enroll' || !clubId) return;
     let alive = true;
     Promise.all([fetchDuesPlan(clubId), customerKey ? fetchMyDues(clubId, customerKey) : Promise.resolve([])])
       .then(([p, mine]) => {
@@ -80,7 +81,8 @@ export default function DuesCardRoute() {
     };
   }, [mode, clubId, customerKey, agreedAmount, agreedCycle]);
 
-  const valid = isTossConfigured && !!customerKey && (mode === 'replace' || !!clubId);
+  // 앱 스위치가 꺼져 있으면 주소로 직접 들어와도 카드 등록 창을 띄우지 않는다
+  const valid = CLUB_DUES_ENABLED && isTossConfigured && !!customerKey && (mode === 'replace' || !!clubId);
 
   const html = useMemo(
     () =>
@@ -207,7 +209,7 @@ export default function DuesCardRoute() {
   );
 
   const confirmLeave = useCallback(() => {
-    if (doneRef.current || failure) return router.back();
+    if (doneRef.current || failure || !valid) return router.back();
     if (retry) {
       Alert.alert('나가기', '등록 결과를 아직 확인하지 못했어요. 나가도 이중으로 결제되지는 않아요.\n등록됐는지는 회비 화면에서 확인할 수 있어요.', [
         { text: '계속 확인', style: 'cancel' },
@@ -223,7 +225,7 @@ export default function DuesCardRoute() {
       { text: '계속 등록', style: 'cancel' },
       { text: '나가기', style: 'destructive', onPress: () => router.back() },
     ]);
-  }, [router, retry, failure]);
+  }, [router, retry, failure, valid]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {

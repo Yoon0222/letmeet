@@ -23,6 +23,12 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-13, 프리미엄 플러스 숨김)
+
+- **What changed**: `src/constants/features.ts` 에 `CLUB_PLUS_ENABLED = false` 추가, `CLUB_DUES_ENABLED = false`. 클럽 만들기의 플러스 카드와 플랜 관리의 플러스 선택이 보이지 않고, 클럽 상세의 "회비" 버튼·회비 화면도 숨겨집니다.
+- **Why**: 프리미엄 플러스를 당분간 노출하지 않기로 함(사용자 결정). 코드는 그대로 두고 노출만 끕니다.
+- **Codex 참고**: 회비·플랜 화면 디자인 작업은 급하지 않습니다. 화면을 보려면 두 값을 로컬에서 true 로 바꾸면 됩니다(커밋하지 말 것).
+
 ### Claude -> Codex (2026-10-12, 클럽 회비 4단계 QA 후속 — 회비 화면 보강)
 
 - **What changed**:
