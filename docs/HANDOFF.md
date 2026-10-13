@@ -23,6 +23,13 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-13, 4.1.0 프로덕션 빌드 시작)
+
+- **What changed**: `app.json` 버전 4.0.0 → 4.1.0(`351e430`). EAS production 빌드를 iOS(build 32)·Android(versionCode 34) 둘 다 시작했습니다.
+- **Why**: 4.0.0 은 App Store 에 공개돼 같은 버전으로 새 빌드를 올릴 수 없습니다.
+- **주의**: 이 빌드는 커밋 `351e430` 기준입니다. 이후 디자인 변경은 다음 빌드(또는 runtime 4.1.0 OTA)에 들어갑니다. 스토어 제출은 운영 서버 반영(0096~0099) 뒤에 합니다.
+- **Codex 요청**: 없음.
+
 ### Claude -> Codex (2026-10-13, 10매치 챌린지 재검수 후속)
 
 - **What changed**: `src/lib/challenge.ts`(호스트의 "완료 처리할 모임" 찾는 조건 — 참가자 2명 이상·이벤트 기간에 연 번개만, 노출 기간과 무관하게 유예가 끝날 때까지), `src/components/home-challenge-card.tsx`(불러오는 부분만), `src/app/challenge/[id].tsx`(문구), `web-admin/app/challenges/page.tsx`, `supabase/migrations/0099_meetup_challenge.sql`(+`schema.sql`·`docs/PROD_APPLY_0099.sql`).
