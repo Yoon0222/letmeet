@@ -1831,7 +1831,8 @@ security definer
 set search_path = public
 as $$
 declare
-  v_actor uuid := auth.uid();
+  -- 회원 탈퇴로 연쇄 삭제될 때는 프로필이 이미 지워져 있다 → 그때는 행위자를 비워 둔다(외래키 오류 방지, 0100)
+  v_actor uuid := (select p.id from public.profiles p where p.id = auth.uid());
   v_row   jsonb := case when TG_OP = 'DELETE' then to_jsonb(OLD) else to_jsonb(NEW) end;
   v_entity text;
 begin
@@ -1913,8 +1914,10 @@ create policy "court_images_delete" on storage.objects
   for delete to authenticated using (bucket_id = 'court-images' and public.my_role() in ('court_manager', 'super_admin'));
 
 -- ============================================================
--- 회원 탈퇴 (계정 삭제) — 0012
+-- 회원 탈퇴 (계정 삭제) — 0012, 0100
 -- SECURITY DEFINER RPC 로 본인 auth.users 삭제 → profiles 등 연쇄 정리.
+-- 탈퇴 자체를 감사 기록에 한 줄 남긴다(account.delete, 0100). 연쇄 삭제된 행들의 기록은 행위자가 비어 있지만
+-- 같은 시각의 이 줄로 누구의 탈퇴 때문인지 알 수 있다. 닉네임·이메일 같은 개인정보는 남기지 않는다.
 -- ============================================================
 create or replace function public.delete_account()
 returns void
@@ -1922,11 +1925,18 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_uid  uuid := auth.uid();
+  v_role text;
 begin
-  if auth.uid() is null then
+  if v_uid is null then
     raise exception 'not authenticated';
   end if;
-  delete from auth.users where id = auth.uid();
+  select role into v_role from public.profiles where id = v_uid;
+  delete from auth.users where id = v_uid;
+  -- 탈퇴 기록: 개인정보 없이 회원 식별자와 당시 역할만. 행위자는 비운다(프로필이 이미 없다).
+  insert into public.audit_logs (actor_id, actor_role, action, entity_type, entity_id)
+  values (null, v_role, 'account.delete', 'profiles', v_uid::text);
 end;
 $$;
 revoke all on function public.delete_account() from public;

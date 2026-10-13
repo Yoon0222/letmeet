@@ -54,6 +54,8 @@ function actionLabel(log: AuditLogWithActor): string {
     case 'profiles.UPDATE':
       if ((o?.role as string) !== (n?.role as string)) return '권한 변경';
       return '프로필 변경';
+    case 'account.delete':
+      return '회원 탈퇴';
     default:
       return log.action;
   }
@@ -92,6 +94,9 @@ function detailText(log: AuditLogWithActor): string {
       if (or !== nr) return `${ROLE_LABEL[or ?? ''] ?? or} → ${ROLE_LABEL[nr ?? ''] ?? nr}`;
       return '';
     }
+    case 'account.delete':
+      // 탈퇴한 회원의 대회·참가·경기 기록이 함께 정리된다 — 그 기록들은 행위자가 '시스템'으로 남는다
+      return `회원 ID ${String(log.entity_id ?? '').slice(0, 8)}… · 같은 시각의 '시스템' 기록은 이 탈퇴로 정리된 것`;
     default:
       return '';
   }
@@ -111,6 +116,7 @@ const ACTION_OPTIONS: { value: string; label: string }[] = [
   { value: 'tournament_matches.UPDATE', label: '경기 결과 입력' },
   { value: 'tournament_matches.DELETE', label: '대진 삭제' },
   { value: 'profiles.UPDATE', label: '프로필/권한 변경' },
+  { value: 'account.delete', label: '회원 탈퇴' },
 ];
 
 function AuditInner() {

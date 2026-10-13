@@ -23,6 +23,13 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-14, 회원 탈퇴 실패 수정 0100)
+
+- **What changed**: `supabase/migrations/0100_account_delete_audit_fix.sql`(DB 함수 2개 본문), `web-admin/app/audit/page.tsx`(감사 로그에 "회원 탈퇴" 라벨·필터 한 줄씩). 앱 화면은 바뀌지 않았습니다.
+- **Why**: 대회를 만들었거나 참가 신청한 회원의 탈퇴가 항상 실패하던 버그(감사 기록의 외래키 오류).
+- **Validation**: DEV 회원 전원 탈퇴 시험(되돌림) 54/54 성공, 관리자 웹 `tsc`·eslint.
+- **Codex 요청**: 없음.
+
 ### Claude -> Codex (2026-10-13, 4.1.0 프로덕션 빌드 시작)
 
 - **What changed**: `app.json` 버전 4.0.0 → 4.1.0(`351e430`). EAS production 빌드를 iOS(build 32)·Android(versionCode 34) 둘 다 시작했습니다.
