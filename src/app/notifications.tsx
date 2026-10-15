@@ -44,7 +44,8 @@ export default function NotificationsScreen() {
         data={items}
         keyExtractor={(n) => n.id}
         contentContainerStyle={items.length === 0 ? styles.emptyWrap : styles.listContent}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={AppColors.primary} colors={[AppColors.primary]} />}
+        // tintColor 는 iOS 전용. 안드로이드 colors 는 넣지 않는다 — 새 아키텍처에서 빈 색 목록으로 넘어가 앱이 죽는다(실기기 확인)
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={AppColors.primary} />}
         ItemSeparatorComponent={() => (
           <View style={[styles.sep, { backgroundColor: theme.border }]} />
         )}
