@@ -167,12 +167,25 @@ export default function TeamBracketTab() {
   async function generateKnockout() {
     if (koTies.length > 0 || busy) return;
     const gc = t!.group_count ?? 0;
-    const seeds: string[] = [];
+    // 조별 진출: 2팀 조는 둘 다, 3팀 이상은 꼴찌만 빼고(advanceCountForGroupSize)
+    const byGroup: ReturnType<typeof teamStandings>[] = [];
     for (let g = 1; g <= gc; g++) {
       const gt = groupTies.filter((x) => (x.group_no ?? 1) === g);
       const teamIds = [...new Set(gt.flatMap((x) => [x.team1_id, x.team2_id]).filter(Boolean) as string[])];
       const st = teamStandings(teamIds, gt, subs);
-      seeds.push(...st.slice(0, advanceCountForGroupSize(teamIds.length)).map((s) => s.teamId));
+      byGroup.push(st.slice(0, advanceCountForGroupSize(teamIds.length)));
+    }
+    // 시드: 각 조 1위 전부 → 각 조 2위 … 순(개인전 seedQualifiersBySize 와 같은 방식). 같은 순위끼리는 성적순
+    //   (승 → 득실 → 득점, 같으면 조 번호순). 조 번호순으로만 넣으면 앞 조의 2위가 뒤 조의 1위보다 먼저 부전승을 받는다.
+    //   같은 조 1·2위는 대진표에서 서로 먼 자리에 놓인다.
+    const seeds: string[] = [];
+    const maxAdv = Math.max(0, ...byGroup.map((x) => x.length));
+    for (let rank = 0; rank < maxAdv; rank++) {
+      byGroup
+        .map((x) => x[rank])
+        .filter((s): s is NonNullable<typeof s> => !!s)
+        .sort((a, b) => b.wins - a.wins || b.diff - a.diff || b.pf - a.pf)
+        .forEach((s) => seeds.push(s.teamId));
     }
     if (seeds.length < 2) {
       alert('진출 팀이 2팀 이상이어야 본선을 만들 수 있어요.');
