@@ -3,10 +3,10 @@
 import type { TieMatch, TournamentTie } from '@/lib/types';
 
 // 단체전 본선 대진표(트리) — 라운드를 왼쪽→오른쪽 열로, 대결을 카드로 그린다(개인전 본선 대진표와 같은 모양).
-//   부전승이 섞인 앞 라운드(예: 68팀 → 128칸의 128강)는 건너뛰고, 부전승이 없는 첫 라운드부터 그린다.
-//   그 라운드에서 앞 라운드 승자를 기다리는 자리는 "A / B 승자"로 보여 준다. 카드를 누르면 그 라운드 목록(점수 입력)으로 간다.
-const ROW_H = 104; // 첫 열 카드 한 칸의 높이
-const CARD_H = 84;
+//   첫 라운드부터 모두 그린다. 부전승 자리도 한 줄짜리 카드("팀명 · 부전승")로 보여 준다(어느 팀이 부전승인지 보이게).
+//   앞 라운드 승자를 기다리는 자리는 "A / B 승자"로 보여 준다. 카드를 누르면 그 라운드 목록(점수 입력)으로 간다.
+const ROW_H = 72; // 첫 열 카드 한 칸의 높이(칸이 많은 대진표도 덜 길게)
+const CARD_H = 60;
 
 export function TeamKnockoutTree({
   ties,
@@ -28,8 +28,7 @@ export function TeamKnockoutTree({
   const rounds = [...new Set(ties.map((x) => x.round_order ?? 1))].sort((a, b) => a - b);
   const inRound = (r: number) => ties.filter((x) => (x.round_order ?? 1) === r).sort((a, b) => a.slot - b.slot);
   const isBye = (x: TournamentTie) => x.status === 'done' && (!x.team1_id || !x.team2_id);
-  const startIdx = Math.max(0, rounds.findIndex((r) => !inRound(r).some(isBye)));
-  const shown = rounds.slice(startIdx);
+  const shown = rounds;
   if (shown.length === 0) return null;
   const firstCount = inRound(shown[0]).length;
 
@@ -57,7 +56,9 @@ export function TeamKnockoutTree({
             <section key={r} className="w-60 shrink-0">
               <div className="sticky top-0 z-10 mb-3 flex h-9 items-center justify-between border-b border-slate-200 bg-slate-50 px-1">
                 <h3 className="font-semibold text-slate-900">{list[0]?.round_name ?? `${r}라운드`}</h3>
-                <span className="text-xs text-slate-400">{list.filter((x) => !isBye(x)).length}경기</span>
+                <span className="text-xs text-slate-400">
+                  {list.filter((x) => !isBye(x)).length}경기{list.some(isBye) ? ` · 부전승 ${list.filter(isBye).length}` : ''}
+                </span>
               </div>
               <div className="relative" style={{ height: `${height}px` }}>
                 {list.map((tie) => {
@@ -70,8 +71,8 @@ export function TeamKnockoutTree({
                   const side = (teamId: string | null, wins: number, idx: 1 | 2) => {
                     const won = done && !!teamId && tie.winner_team_id === teamId;
                     return (
-                      <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 ${idx === 2 ? 'border-t border-slate-100' : ''}`}>
-                        <span className={`truncate text-sm ${teamId ? (won ? 'font-semibold text-emerald-700' : 'text-slate-800') : 'text-xs text-slate-400'}`}>
+                      <div className={`flex items-center justify-between gap-2 px-2.5 py-1 ${idx === 2 ? 'border-t border-slate-100' : ''}`}>
+                        <span className={`truncate text-[13px] ${teamId ? (won ? 'font-semibold text-emerald-700' : 'text-slate-800') : 'text-xs text-slate-400'}`}>
                           {teamId ? nameOf(teamId) : isBye(tie) ? '부전승' : waitingLabel(tie, idx)}
                         </span>
                         {teamId && (done || live) ? <span className={`text-sm tabular-nums ${won ? 'font-semibold text-emerald-700' : 'text-slate-500'}`}>{wins}</span> : null}
@@ -90,6 +91,17 @@ export function TeamKnockoutTree({
                         </>
                       ) : null}
                       {k < shown.length - 1 ? <span className="pointer-events-none absolute left-full top-1/2 w-5 border-t border-slate-300" /> : null}
+                      {isBye(tie) ? (
+                        // 부전승: 한 줄 카드 — 올라가는 팀 이름과 '부전승'
+                        <div
+                          className={`flex w-56 items-center justify-between gap-2 rounded-lg border border-dashed border-slate-300 bg-white/70 px-2.5 py-1.5 ${
+                            highlight?.(tie) ? 'ring-2 ring-sky-400' : ''
+                          }`}
+                          style={{ marginTop: `${(CARD_H - 34) / 2}px` }}>
+                          <span className="truncate text-[13px] text-slate-700">{nameOf(tie.team1_id ?? tie.team2_id)}</span>
+                          <span className="shrink-0 rounded-full bg-amber-100 px-1.5 text-[11px] font-medium text-amber-700">부전승</span>
+                        </div>
+                      ) : (
                       <button
                         onClick={() => onOpenRound(r)}
                         title="이 라운드 목록에서 점수 입력"
@@ -101,6 +113,7 @@ export function TeamKnockoutTree({
                         {side(tie.team2_id, w2, 2)}
                         {court ? <div className="border-t border-slate-100 px-2.5 py-0.5 text-[11px] text-slate-500">🏟 {court}</div> : null}
                       </button>
+                      )}
                     </div>
                   );
                 })}
