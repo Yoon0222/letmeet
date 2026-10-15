@@ -1,4 +1,5 @@
-// 단체전 타이 차례 알림 — 대회 주최자/슈퍼관리자가 타이(팀 대 팀)의 양 팀 선수들에게 푸시 발송.
+// 단체전 타이 차례 알림 — 대회 주최자/슈퍼관리자가 타이(팀 대 팀)의 양 팀 주장에게 푸시 발송.
+// 팀원 전원이 아니라 주장에게만 보낸다(주장이 팀원들을 코트로 데려온다 — 2026-10-16 사용자 결정).
 // 배포:  supabase functions deploy notify-tie
 // 호출:  supabase.functions.invoke('notify-tie', { body: { tie_id } })
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -48,15 +49,13 @@ Deno.serve(async (req) => {
     return json({ error: 'forbidden' }, 403);
   }
 
-  // 4) 양 팀 팀원 수집
+  // 4) 양 팀 주장 + 팀 이름
   const teamIds = [tie.team1_id, tie.team2_id].filter(Boolean) as string[];
   if (teamIds.length === 0) return json({ sent: 0, note: 'no teams' });
-  const { data: members } = await admin
-    .from('tournament_team_members')
-    .select('user_id')
-    .in('team_id', teamIds);
-  const userIds = [...new Set((members ?? []).map((m) => m.user_id))];
-  if (userIds.length === 0) return json({ sent: 0, note: 'no members' });
+  const { data: teams } = await admin.from('tournament_teams').select('id, name, captain_id').in('id', teamIds);
+  const nameOf = (id: string | null) => (teams ?? []).find((t) => t.id === id)?.name ?? '상대 팀';
+  const captains = [...new Map((teams ?? []).filter((t) => t.captain_id).map((t) => [t.captain_id as string, t])).values()];
+  if (captains.length === 0) return json({ sent: 0, note: 'no captains' });
 
   // 5) 코트 이름(있으면)
   let courtName = '';
@@ -67,18 +66,19 @@ Deno.serve(async (req) => {
 
   // 6) push_notify 로 발송 — 알림함(종 뱃지)에 저장 + push_token 있으면 Expo 푸시.
   //    예전엔 Expo 로 직접 쐈지만, 그러면 기록이 남지 않아 앱 알림 목록에 안 쌓였다.
+  const vs = `${nameOf(tie.team1_id)} vs ${nameOf(tie.team2_id)}`;
   const results = await Promise.all(
-    userIds.map((uid) =>
+    captains.map((team) =>
       admin.rpc('push_notify', {
-        p_user: uid,
+        p_user: team.captain_id,
         p_type: 'tie',
         p_title: '우리 팀 차례예요',
-        p_body: `곧 팀 경기가 시작됩니다${courtName}. 코트로 이동해 주세요!`,
+        p_body: `${vs} 경기가 곧 시작돼요${courtName}. 팀원들과 함께 코트로 이동해 주세요!`,
         p_target_type: 'tournament',
         p_target_id: tie.tournament_id,
       }),
     ),
   );
   const failed = results.filter((r) => r.error).map((r) => r.error?.message);
-  return json({ sent: userIds.length - failed.length, failed });
+  return json({ sent: captains.length - failed.length, failed });
 });

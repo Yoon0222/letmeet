@@ -11,11 +11,12 @@ import { useSession } from '@/lib/use-session';
 import type { TieMatch, TournamentTeam, TournamentTie } from '@/lib/types';
 
 import { useTournament } from '../_ctx';
+import { CourtManager } from '../courts/CourtManager';
 
 export default function TeamBracketTab() {
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
-  const { t, courts, loading } = useTournament();
+  const { t, courts, loading, reload } = useTournament();
 
   const [teams, setTeams] = useState<TournamentTeam[]>([]);
   const [ties, setTies] = useState<TournamentTie[]>([]);
@@ -151,7 +152,7 @@ export default function TeamBracketTab() {
     load();
   }
 
-  // 타이 차례 알림 — 양 팀 선수들에게 푸시 (notify-tie Edge Function)
+  // 타이 차례 알림 — 양 팀 주장에게 푸시 (notify-tie Edge Function). 주장이 팀원들을 데려온다.
   async function notifyTie(tieId: string) {
     const { data, error } = await supabase.functions.invoke('notify-tie', { body: { tie_id: tieId } });
     if (error) {
@@ -159,7 +160,7 @@ export default function TeamBracketTab() {
       return;
     }
     const sent = (data as { sent?: number })?.sent ?? 0;
-    alert(sent > 0 ? `차례 알림을 ${sent}명에게 보냈어요.` : '알림 받을 수 있는 선수가 없어요(푸시 토큰 없음).');
+    alert(sent > 0 ? `양 팀 주장 ${sent}명에게 차례 알림을 보냈어요.` : '알림을 받을 주장이 없어요.');
   }
 
   // 본선(토너먼트) 생성 — 조별 상위 팀 진출 → knockout 타이 + 서브매치
@@ -371,6 +372,12 @@ export default function TeamBracketTab() {
 
   return (
     <div className="space-y-4">
+      {/* 대회 코트 — 단체전은 '코트배정' 탭이 없어 여기서 코트를 등록한다(코트가 있어야 대결마다 코트를 고를 수 있다) */}
+      <CourtManager tournamentId={t.id} courts={courts} canEdit={isOrganizer} reload={reload} />
+      {isOrganizer && courts.length === 0 ? (
+        <p className="text-sm text-amber-700">대회 코트를 먼저 등록하면 각 대결에 코트를 배정하고 양 팀 주장에게 차례 알림을 보낼 수 있어요.</p>
+      ) : null}
+
       {/* 조 선택 */}
       <div className="sticky top-0 z-10 rounded-xl border border-slate-200 bg-white/95 p-3 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-2">
