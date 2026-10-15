@@ -8,6 +8,7 @@ import { useNotifications } from '@/contexts/notifications';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelative } from '@/lib/format';
 import type { AppNotification, NotificationType } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 // 알림 종류별 아이콘
 const ICON: Record<NotificationType, keyof typeof Ionicons.glyphMap> = {
@@ -43,7 +44,7 @@ export default function NotificationsScreen() {
         data={items}
         keyExtractor={(n) => n.id}
         contentContainerStyle={items.length === 0 ? styles.emptyWrap : styles.listContent}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={AppColors.primary} colors={[AppColors.primary]} />}
         ItemSeparatorComponent={() => (
           <View style={[styles.sep, { backgroundColor: theme.border }]} />
         )}

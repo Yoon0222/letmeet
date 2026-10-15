@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   slotTeam2: { backgroundColor: '#12141D' },
   slotLabel: { color: '#707B87', fontSize: 11, fontWeight: '800' },
   slotName: { color: '#F8FAFC', fontSize: 15, fontWeight: '800', marginTop: 3 },
-  slotEmpty: { color: '#4A535E' },
+  slotEmpty: { color: '#707B87' }, // 빈 자리 안내 — 어두운 카드에서도 읽히게(전에는 명암비 2.3:1)
   slotClear: { position: 'absolute', right: 8, top: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   playerChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 4, paddingRight: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
