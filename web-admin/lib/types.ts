@@ -131,11 +131,13 @@ export type TournamentTeam = {
   captain_id: string;
   status: TeamStatus;
   seed: number | null;
+  club_id: string | null; // 소속 클럽(0101) — 클럽을 고르지 않은 팀(옛 앱)은 null
   created_at: string;
 };
 
 export type TournamentTeamWithMembers = TournamentTeam & {
-  members: { user_id: string; profiles: { id: string; nickname: string; skill_level: number; avatar_url: string | null; region: string } }[];
+  club?: { id: string; name: string } | null;
+  members: { user_id: string; is_guest?: boolean; profiles: { id: string; nickname: string; skill_level: number; avatar_url: string | null; region: string } }[];
 };
 
 export type TieMatchKind = 'singles' | 'doubles';
@@ -530,9 +532,9 @@ export interface Database {
         Relationships: [];
       };
       tournament_team_members: {
-        Row: { team_id: string; user_id: string; created_at: string };
-        Insert: { team_id: string; user_id: string };
-        Update: Write<{ team_id: string; user_id: string; created_at: string }>;
+        Row: { team_id: string; user_id: string; is_guest: boolean; created_at: string };
+        Insert: { team_id: string; user_id: string; is_guest?: boolean };
+        Update: Write<{ team_id: string; user_id: string; is_guest: boolean; created_at: string }>;
         Relationships: [];
       };
       tournament_ties: {

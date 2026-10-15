@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import type { TournamentTeamWithMembers } from '@/lib/types';
 
 // 단체전 신청현황 — 신청 팀 목록 + 주최자 승인/거절.
+//   팀마다 소속 클럽과 용병(클럽 밖 회원)을 보여 주고, 운영자는 팀 이름을 고치거나 클럽 이름으로 되돌릴 수 있다(0101).
 export function TeamRoster({ tournamentId, isOrganizer }: { tournamentId: string; isOrganizer: boolean }) {
   const [teams, setTeams] = useState<TournamentTeamWithMembers[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +15,7 @@ export function TeamRoster({ tournamentId, isOrganizer }: { tournamentId: string
   const load = useCallback(async () => {
     const { data } = await supabase
       .from('tournament_teams')
-      .select('*, members:tournament_team_members(user_id, profiles(id, nickname, skill_level, avatar_url, region))')
+      .select('*, club:clubs(id, name), members:tournament_team_members(user_id, is_guest, profiles(id, nickname, skill_level, avatar_url, region))')
       .eq('tournament_id', tournamentId)
       .order('created_at', { ascending: true });
     setTeams((data as unknown as TournamentTeamWithMembers[]) ?? []);
@@ -32,6 +33,17 @@ export function TeamRoster({ tournamentId, isOrganizer }: { tournamentId: string
     load();
   }
 
+  // 팀 이름 수정 — 직접 입력하거나 클럽 이름으로 되돌린다
+  async function rename(team: TournamentTeamWithMembers, next?: string) {
+    const name = (next ?? prompt('팀 이름', team.name) ?? '').trim();
+    if (!name || name === team.name) return;
+    if (name.length > 20) return alert('팀 이름은 20자까지 쓸 수 있어요.');
+    const { data, error } = await supabase.from('tournament_teams').update({ name }).eq('id', team.id).select('id');
+    if (error) return alert(`이름을 바꾸지 못했어요: ${error.message}`);
+    if (!data || data.length === 0) return alert('이 대회의 주최자만 팀 이름을 바꿀 수 있어요.');
+    load();
+  }
+
   if (loading) return <p className="text-slate-500">불러오는 중…</p>;
 
   const pending = teams.filter((t) => t.status === 'pending');
@@ -42,7 +54,22 @@ export function TeamRoster({ tournamentId, isOrganizer }: { tournamentId: string
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-medium">{team.name}</h3>
-          <p className="mt-0.5 text-xs text-slate-500">{team.members.length}명</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {team.club ? `소속 클럽 ${team.club.name}` : '소속 클럽 없음(옛 앱으로 신청)'} · {team.members.length}명
+            {team.members.some((m) => m.is_guest) ? ` · 용병 ${team.members.filter((m) => m.is_guest).length}명` : ''}
+          </p>
+          {isOrganizer && (
+            <div className="mt-1 flex gap-3 text-xs">
+              <button onClick={() => rename(team)} className="text-blue-600 hover:underline">
+                이름 수정
+              </button>
+              {team.club && team.club.name !== team.name && (
+                <button onClick={() => rename(team, team.club?.name)} className="text-blue-600 hover:underline">
+                  클럽 이름으로
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {actions && isOrganizer && (
           <div className="flex gap-2">
@@ -61,6 +88,7 @@ export function TeamRoster({ tournamentId, isOrganizer }: { tournamentId: string
             <Avatar nickname={m.profiles?.nickname ?? '?'} url={m.profiles?.avatar_url ?? null} size={22} />
             <span className="text-slate-700">{m.profiles?.nickname ?? '알 수 없음'}</span>
             {m.user_id === team.captain_id && <span className="rounded-full bg-sky-100 px-1.5 text-xs font-medium text-sky-700">주장</span>}
+            {m.is_guest && <span className="rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-700">용병</span>}
           </span>
         ))}
       </div>

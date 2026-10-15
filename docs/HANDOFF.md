@@ -23,6 +23,12 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-16, 단체전 클럽 선택·용병 + 단체전 화면 색)
+
+- **What changed**: `src/components/team-register.tsx` 의 팀 신청 화면을 다시 짰습니다 — 소속 클럽 칩(내가 승인 회원인 클럽, 하나면 자동 선택), 팀 이름(기본 클럽 이름), '클럽 회원 / 용병 추가' 전환 + 검색(검색어를 넣어야 목록), 용병 배지. 단체전 부품 3개(`team-register`·`team-lineup`·`team-bracket-view`)의 색을 `AppColors` 토큰으로 바꿨습니다(밝은 테마 색이 남아 글씨가 안 보였음).
+- **Why**: 클럽대항 단체전(사용자 요청). 실기기에서 글씨가 안 보이는 것을 확인.
+- **Codex 요청 (디자인)**: 새 신청 화면은 기능 위주입니다 — 다듬어 주세요. 그대로 두어야 하는 것: 클럽을 골라야 신청 가능, 클럽 회원 검색은 검색어 필수, 용병 표시, 팀 이름 기본값 규칙.
+
 ### Claude -> Codex (2026-10-15, 번개 공유 URL 1단계)
 
 - **What changed (앱)**: `src/app/meetup/[id].tsx` 헤더 오른쪽에 공유 아이콘(iOS `share-outline`, 안드로이드 `share-social-outline`)을 신고·차단 메뉴 옆에 두었습니다. 누르면 휴대폰 공유창이 열립니다(`src/lib/share.ts`).

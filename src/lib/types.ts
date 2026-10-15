@@ -798,18 +798,21 @@ export type TournamentTeam = {
   captain_id: string;
   status: TeamStatus;
   seed: number | null;
+  club_id: string | null; // 소속 클럽(0101) — 클럽을 고르지 않은 팀(옛 앱)은 null
   created_at: string;
 };
 
 export type TournamentTeamMember = {
   team_id: string;
   user_id: string;
+  is_guest: boolean; // 용병(클럽 밖 회원, 0101)
   created_at: string;
 };
 
-/** 팀 + 팀원 프로필 (조인 결과) */
+/** 팀 + 팀원 프로필 (조인 결과). club·is_guest 는 고른 열에 따라 없을 수 있다 */
 export type TournamentTeamWithMembers = TournamentTeam & {
-  members: { user_id: string; profiles: PartnerProfile }[];
+  club?: { id: string; name: string } | null;
+  members: { user_id: string; is_guest?: boolean; profiles: PartnerProfile }[];
 };
 
 // ---- 단체전 진행: tie(팀 대 팀) + 서브매치 (0039) ----
@@ -1387,7 +1390,7 @@ export interface Database {
       };
       tournament_team_members: {
         Row: TournamentTeamMember;
-        Insert: { team_id: string; user_id: string };
+        Insert: { team_id: string; user_id: string; is_guest?: boolean };
         Update: WriteDefaults<TournamentTeamMember>;
         Relationships: [];
       };
