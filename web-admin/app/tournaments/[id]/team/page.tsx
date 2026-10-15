@@ -24,9 +24,12 @@ export default function TeamBracketTab() {
   const [perGroup, setPerGroup] = useState(4);
   const [busy, setBusy] = useState(false);
   const [score, setScore] = useState<Record<string, { s1: string; s2: string }>>({}); // 서브매치 점수 입력
-  // 조 선택 — 조가 많으면(예: 34개) 한 조씩 보며 진행한다. '' = 아직 안 고름(진행할 첫 조), 'all' | 'ko' | 'g:<조 번호>'
-  const [view, setView] = useState('');
-  const [teamQ, setTeamQ] = useState(''); // 팀 이름으로 조 찾기
+  // 보기 선택 — 예선(조별)과 본선(토너먼트)을 먼저 나누고, 예선은 조를, 본선은 라운드를 골라 본다(조·라운드가 많아서).
+  //   '' = 아직 안 고름 → 진행할 곳을 알아서 보여 준다
+  const [stage, setStage] = useState<'' | 'group' | 'ko'>('');
+  const [view, setView] = useState(''); // 예선: 'all' | 'g:<조 번호>'
+  const [round, setRound] = useState(''); // 본선: 'all' | 'r:<라운드 순서>'
+  const [teamQ, setTeamQ] = useState(''); // 팀 이름으로 찾기
 
   const load = useCallback(async () => {
     const [{ data: tm }, { data: ti }] = await Promise.all([
@@ -343,33 +346,54 @@ export default function TeamBracketTab() {
     );
   }
 
-  // ── 조 선택 ──
+  // ── 보기 선택 ──
   // 조 상태: 모든 대결이 끝났으면 완료, 끝난 게임이 있거나 코트가 배정됐으면 진행 중, 아니면 대기
-  const groupState = (g: number): 'done' | 'live' | 'todo' => {
-    const gt = groupTies.filter((x) => (x.group_no ?? 1) === g);
-    if (gt.length > 0 && gt.every((x) => x.status === 'done')) return 'done';
-    const ids = new Set(gt.map((x) => x.id));
-    if (gt.some((x) => x.court_id) || subs.some((m) => ids.has(m.tie_id) && m.status === 'done')) return 'live';
+  const tieSetState = (list: TournamentTie[]): 'done' | 'live' | 'todo' => {
+    if (list.length > 0 && list.every((x) => x.status === 'done')) return 'done';
+    const ids = new Set(list.map((x) => x.id));
+    if (list.some((x) => x.court_id) || subs.some((m) => ids.has(m.tie_id) && m.status === 'done')) return 'live';
     return 'todo';
   };
+  const isBye = (x: TournamentTie) => x.status === 'done' && (!x.team1_id || !x.team2_id);
+  const groupState = (g: number) => tieSetState(groupTies.filter((x) => (x.group_no ?? 1) === g));
+  const realTiesOf = (r: number) => koTies.filter((x) => (x.round_order ?? 1) === r && !isBye(x));
+  const roundState = (r: number) => tieSetState(realTiesOf(r));
+  const roundLabel = (r: number) => koTies.find((x) => (x.round_order ?? 1) === r)?.round_name ?? `${r}라운드`;
   const koAvailable = koTies.length > 0 || (groupsDone && isOrganizer);
+
+  // 단계: 본선이 만들어졌으면 본선, 아니면 예선
+  const curStage: 'group' | 'ko' = stage === 'ko' && koAvailable ? 'ko' : stage === 'group' ? 'group' : koTies.length > 0 ? 'ko' : 'group';
+
+  // 예선: 진행할 첫 조
   const firstOpen = groupNos.find((g) => groupState(g) !== 'done');
-  const defaultView = firstOpen != null ? `g:${firstOpen}` : koAvailable ? 'ko' : 'all';
-  const validView = view === 'all' || (view === 'ko' && koAvailable) || (view.startsWith('g:') && groupNos.includes(Number(view.slice(2))));
-  const current = validView ? view : defaultView;
-  const shownGroups = current === 'all' ? groupNos : current.startsWith('g:') ? [Number(current.slice(2))] : [];
-  const showKo = current === 'all' || current === 'ko';
+  const validView = view === 'all' || (view.startsWith('g:') && groupNos.includes(Number(view.slice(2))));
+  const current = validView ? view : firstOpen != null ? `g:${firstOpen}` : 'all';
+  const shownGroups = curStage !== 'group' ? [] : current === 'all' ? groupNos : [Number(current.slice(2))];
   const curGroup = current.startsWith('g:') ? Number(current.slice(2)) : null;
   const curIdx = curGroup != null ? groupNos.indexOf(curGroup) : -1;
-  // 팀 이름 → 그 팀이 속한 조
+
+  // 본선: 실제 경기가 남은 첫 라운드(없으면 마지막 라운드)
+  const firstOpenRound = koRounds.find((r) => realTiesOf(r).some((x) => x.status !== 'done'));
+  const validRound = round === 'all' || (round.startsWith('r:') && koRounds.includes(Number(round.slice(2))));
+  const curRoundKey = validRound ? round : firstOpenRound != null ? `r:${firstOpenRound}` : koRounds.length ? `r:${koRounds[koRounds.length - 1]}` : 'all';
+  const shownRounds = curStage !== 'ko' ? [] : curRoundKey === 'all' ? koRounds : [Number(curRoundKey.slice(2))];
+  const curRound = curRoundKey.startsWith('r:') ? Number(curRoundKey.slice(2)) : null;
+  const curRoundIdx = curRound != null ? koRounds.indexOf(curRound) : -1;
+
+  // 팀 이름 찾기 — 예선은 그 팀의 조로, 본선은 그 팀이 들어간 가장 늦은 라운드로
   const groupOfTeam = new Map<string, number>();
   groupTies.forEach((x) => {
     if (x.team1_id) groupOfTeam.set(x.team1_id, x.group_no ?? 1);
     if (x.team2_id) groupOfTeam.set(x.team2_id, x.group_no ?? 1);
   });
+  const roundOfTeam = new Map<string, number>();
+  koTies.forEach((x) => {
+    const r = x.round_order ?? 1;
+    for (const id of [x.team1_id, x.team2_id]) if (id && (roundOfTeam.get(id) ?? 0) < r) roundOfTeam.set(id, r);
+  });
   const q = teamQ.trim().toLowerCase();
   const teamHits = q
-    ? teams.filter((x) => groupOfTeam.has(x.id) && x.name.toLowerCase().includes(q)).slice(0, 8)
+    ? teams.filter((x) => (curStage === 'ko' ? roundOfTeam.has(x.id) : groupOfTeam.has(x.id)) && x.name.toLowerCase().includes(q)).slice(0, 8)
     : [];
   const doneCount = groupNos.filter((g) => groupState(g) === 'done').length;
   const chipCls = (on: boolean, state?: 'done' | 'live' | 'todo') =>
@@ -382,6 +406,9 @@ export default function TeamBracketTab() {
             ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
     }`;
+  const stageCls = (on: boolean) =>
+    `flex-1 rounded-lg px-3 py-2 text-sm font-medium ${on ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'} disabled:cursor-not-allowed disabled:opacity-40`;
+  const navBtn = 'rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40';
 
   return (
     <div className="space-y-4">
@@ -391,18 +418,29 @@ export default function TeamBracketTab() {
         <p className="text-sm text-amber-700">대회 코트를 먼저 등록하면 각 대결에 코트를 배정하고 양 팀 주장에게 차례 알림을 보낼 수 있어요.</p>
       ) : null}
 
-      {/* 조 선택 */}
-      <div className="sticky top-0 z-10 rounded-xl border border-slate-200 bg-white/95 p-3 backdrop-blur">
+      {/* 보기 선택: 예선 / 본선 → 조 또는 라운드 */}
+      <div className="sticky top-0 z-10 space-y-2 rounded-xl border border-slate-200 bg-white/95 p-3 backdrop-blur">
+        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+          <button onClick={() => setStage('group')} className={stageCls(curStage === 'group')}>
+            예선 (조별) <span className="opacity-60">{doneCount}/{groupNos.length}조 완료</span>
+          </button>
+          <button
+            onClick={() => setStage('ko')}
+            disabled={!koAvailable}
+            title={koAvailable ? undefined : '예선이 끝나면 본선을 만들 수 있어요'}
+            className={stageCls(curStage === 'ko')}>
+            본선 (토너먼트){koTies.length === 0 && koAvailable ? <span className="opacity-60"> 생성 전</span> : null}
+          </button>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium text-slate-700">
-            조 선택 <span className="font-normal text-slate-400">· 예선 {groupNos.length}개 조 중 {doneCount}개 완료</span>
-          </p>
+          <p className="text-sm font-medium text-slate-700">{curStage === 'group' ? '조 선택' : '라운드 선택'}</p>
           <div className="flex items-center gap-2">
             <div className="relative">
               <input
                 value={teamQ}
                 onChange={(e) => setTeamQ(e.target.value)}
-                placeholder="팀 이름으로 조 찾기"
+                placeholder={curStage === 'group' ? '팀 이름으로 조 찾기' : '팀 이름으로 라운드 찾기'}
                 className="w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
               />
               {teamHits.length > 0 ? (
@@ -411,12 +449,15 @@ export default function TeamBracketTab() {
                     <button
                       key={x.id}
                       onClick={() => {
-                        setView(`g:${groupOfTeam.get(x.id)}`);
+                        if (curStage === 'group') setView(`g:${groupOfTeam.get(x.id)}`);
+                        else setRound(`r:${roundOfTeam.get(x.id)}`);
                         setTeamQ('');
                       }}
                       className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-slate-50">
                       <span>{x.name}</span>
-                      <span className="text-xs text-slate-400">{groupOfTeam.get(x.id)}조</span>
+                      <span className="text-xs text-slate-400">
+                        {curStage === 'group' ? `${groupOfTeam.get(x.id)}조` : roundLabel(roundOfTeam.get(x.id) ?? 1)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -424,41 +465,55 @@ export default function TeamBracketTab() {
                 <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400 shadow-lg">찾는 팀이 없어요.</div>
               ) : null}
             </div>
-            {curIdx >= 0 ? (
+            {curStage === 'group' && curIdx >= 0 ? (
               <>
-                <button
-                  onClick={() => setView(`g:${groupNos[curIdx - 1]}`)}
-                  disabled={curIdx <= 0}
-                  className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                <button onClick={() => setView(`g:${groupNos[curIdx - 1]}`)} disabled={curIdx <= 0} className={navBtn}>
                   ‹ 이전 조
                 </button>
-                <button
-                  onClick={() => setView(`g:${groupNos[curIdx + 1]}`)}
-                  disabled={curIdx >= groupNos.length - 1}
-                  className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                <button onClick={() => setView(`g:${groupNos[curIdx + 1]}`)} disabled={curIdx >= groupNos.length - 1} className={navBtn}>
                   다음 조 ›
+                </button>
+              </>
+            ) : null}
+            {curStage === 'ko' && curRoundIdx >= 0 ? (
+              <>
+                <button onClick={() => setRound(`r:${koRounds[curRoundIdx - 1]}`)} disabled={curRoundIdx <= 0} className={navBtn}>
+                  ‹ 이전 라운드
+                </button>
+                <button onClick={() => setRound(`r:${koRounds[curRoundIdx + 1]}`)} disabled={curRoundIdx >= koRounds.length - 1} className={navBtn}>
+                  다음 라운드 ›
                 </button>
               </>
             ) : null}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <button onClick={() => setView('all')} className={chipCls(current === 'all')}>
-            전체
-          </button>
-          {groupNos.map((g) => (
-            <button key={g} onClick={() => setView(`g:${g}`)} className={chipCls(current === `g:${g}`, groupState(g))} title={`${g}조`}>
-              {g}
+
+        {curStage === 'group' ? (
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setView('all')} className={chipCls(current === 'all')}>
+              전체
             </button>
-          ))}
-          {koAvailable ? (
-            <button onClick={() => setView('ko')} className={chipCls(current === 'ko')}>
-              본선
+            {groupNos.map((g) => (
+              <button key={g} onClick={() => setView(`g:${g}`)} className={chipCls(current === `g:${g}`, groupState(g))} title={`${g}조`}>
+                {g}
+              </button>
+            ))}
+          </div>
+        ) : koTies.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setRound('all')} className={chipCls(curRoundKey === 'all')}>
+              전체
             </button>
-          ) : null}
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
+            {koRounds.map((r) => (
+              <button key={r} onClick={() => setRound(`r:${r}`)} className={chipCls(curRoundKey === `r:${r}`, roundState(r))}>
+                {roundLabel(r)} <span className="opacity-60">{realTiesOf(r).length}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <p className="text-xs text-slate-400">
           <span className="text-emerald-700">초록</span> 완료 · <span className="text-amber-700">노랑</span> 진행 중(코트 배정·점수 입력) · 흰색 대기
+          {curStage === 'ko' && koTies.length > 0 ? ' · 라운드 옆 숫자는 실제 경기 수(부전승 제외)' : ''}
         </p>
       </div>
 
@@ -491,25 +546,32 @@ export default function TeamBracketTab() {
         );
       })}
 
-      {/* 본선(토너먼트) — '전체' 또는 '본선'을 골랐을 때 */}
-      {!showKo ? null : koTies.length > 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="font-medium">본선 토너먼트</h3>
-          <div className="mt-3 space-y-4">
-            {koRounds.map((r) => {
-              const rTies = koTies.filter((x) => (x.round_order ?? 1) === r);
-              return (
-                <div key={r}>
-                  <p className="mb-1.5 text-sm font-medium text-slate-500">{rTies[0]?.round_name ?? `${r}라운드`}</p>
-                  <div className="space-y-3">{rTies.map((tie) => renderTie(tie))}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* 본선(토너먼트) — 고른 라운드의 실제 경기만, 부전승은 접어 둔다 */}
+      {curStage !== 'ko' ? null : koTies.length > 0 ? (
+        shownRounds.map((r) => {
+          const all = koTies.filter((x) => (x.round_order ?? 1) === r);
+          const real = all.filter((x) => !isBye(x));
+          const byes = all.filter(isBye);
+          return (
+            <div key={r} className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="font-medium">
+                {roundLabel(r)} <span className="text-sm font-normal text-slate-400">· 경기 {real.length}개</span>
+              </h3>
+              {byes.length > 0 ? (
+                <details className="mt-1 text-sm text-slate-500">
+                  <summary className="cursor-pointer">부전승 {byes.length}팀</summary>
+                  <p className="mt-1 leading-6">{byes.map((x) => nameOf(x.team1_id ?? x.team2_id)).join(', ')}</p>
+                </details>
+              ) : null}
+              <div className="mt-3 space-y-3">
+                {real.length > 0 ? real.map((tie) => renderTie(tie)) : <p className="text-sm text-slate-500">이 라운드는 모두 부전승이에요.</p>}
+              </div>
+            </div>
+          );
+        })
       ) : groupsDone && isOrganizer ? (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-600">예선이 끝났어요. 상위 팀으로 본선 토너먼트를 만들 수 있어요.</p>
+          <p className="text-sm text-slate-600">예선이 끝났어요. 진출 팀으로 본선 토너먼트를 만들 수 있어요.</p>
           <button onClick={generateKnockout} disabled={busy} className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
             {busy ? '생성 중…' : '본선 토너먼트 생성'}
           </button>
