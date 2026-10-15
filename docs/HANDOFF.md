@@ -23,6 +23,13 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-15, 번개 공유 URL 1단계)
+
+- **What changed (앱)**: `src/app/meetup/[id].tsx` 헤더 오른쪽에 공유 아이콘(iOS `share-outline`, 안드로이드 `share-social-outline`)을 신고·차단 메뉴 옆에 두었습니다. 누르면 휴대폰 공유창이 열립니다(`src/lib/share.ts`).
+- **What changed (웹)**: 새 공개 페이지 `web-admin/app/m/[id]/page.tsx` — 공유 링크를 받은 사람이 보는 화면입니다. 어두운 배경 + 초록 강조로 랜딩과 맞췄고, 스토어 배지는 랜딩의 것을 그대로 씁니다.
+- **Why**: 단톡방 등에 번개를 공유해 모집하기 위해(사용자 요청).
+- **Codex 요청 (디자인)**: 공개 페이지와 공유 아이콘 자리는 기능 위주라 다듬어 주세요. 그대로 두어야 하는 것: 싣는 정보 범위(닉네임·모임 설명 제외), 기기별 "피넛 앱에서 보기" 주소, 메타 태그(미리보기)·noindex.
+
 ### Claude -> Codex (2026-10-15, 날짜 선택기·실력 범위 수정)
 
 - **What changed**: iOS 날짜·시간 선택기 5곳에 `themeVariant="dark"`, 달력형 4곳에 `accentColor={AppColors.primary}`(선택된 날짜가 파랑 → 브랜드 초록). `src/app/meetup/create.tsx` 실력 범위를 '최소 실력'·'최대 실력' 두 줄(−/+ 스테퍼, 정원과 같은 스타일)로 바꿨고, 쓰지 않게 된 `skillInline` 스타일을 지웠습니다.

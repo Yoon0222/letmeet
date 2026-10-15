@@ -13,7 +13,8 @@ export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
 
-  if (pathname === '/' || pathname === '/landing' || pathname === '/account-delete') return null;
+  // 공개 페이지(랜딩·계정 삭제 안내·번개 공유)에는 관리자 메뉴를 띄우지 않는다
+  if (pathname === '/' || pathname === '/landing' || pathname === '/account-delete' || pathname.startsWith('/m/')) return null;
 
   async function logout() {
     await supabase.auth.signOut();

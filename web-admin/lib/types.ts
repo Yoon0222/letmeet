@@ -452,6 +452,26 @@ export type ReportWithNames = Report & {
 
 type Write<T> = Partial<T>;
 
+// 번개 공유 페이지(/m/[id])가 읽는 번개 요약 — meetups_with_counts 뷰의 일부 열(누구나 읽을 수 있는 공개 정보만)
+export type MeetupShareRow = {
+  id: string;
+  title: string;
+  location_name: string;
+  region: string;
+  start_time: string;
+  duration_min: number;
+  skill_min: number;
+  skill_max: number;
+  max_players: number;
+  fee: number; // 게스트비(원), 0=무료
+  discipline: 'any' | 'singles' | 'doubles';
+  status: 'open' | 'closed' | 'cancelled';
+  image_url: string | null; // 코트·장소 사진(미리보기 이미지로 쓴다)
+  dupr_certified: boolean;
+  dupr_premium: boolean;
+  participant_count: number; // 승인된 참가자 수(호스트 포함)
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -604,6 +624,10 @@ export interface Database {
     Views: {
       tournaments_with_counts: {
         Row: TournamentWithCounts;
+        Relationships: [];
+      };
+      meetups_with_counts: {
+        Row: MeetupShareRow;
         Relationships: [];
       };
     };

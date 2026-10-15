@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,8 +13,10 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
 import { ATTENDANCE_LABEL, fetchMeetupAttendance, fetchMeetupCompletion } from '@/lib/challenge';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
+import { shareMeetup } from '@/lib/share';
 import { supabase } from '@/lib/supabase';
 import type { AttendanceStatus, MeetupCompletion, MeetupWithCounts, ParticipantWithProfile } from '@/lib/types';
+import { AppColors } from '@/theme';
 
 const ATTENDANCE_COLOR: Record<AttendanceStatus, { color: string; bg: string }> = {
   present: { color: '#16C784', bg: 'rgba(22,199,132,0.14)' },
@@ -112,10 +114,25 @@ export default function MeetupDetail() {
   useEffect(() => {
     navigation.setOptions({
       title: '모임 상세',
-      headerRight:
-        meetup && !isHost
-          ? () => <ReportBlock targetType="meetup" targetId={meetup.id} targetUserId={meetup.host_id} targetLabel={meetup.title} onBlocked={() => router.back()} />
-          : undefined,
+      // 공유(누구나) + 신고·차단(호스트가 아닐 때)
+      headerRight: meetup
+        ? () => (
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={async () => {
+                  if (!(await shareMeetup(meetup))) Alert.alert('공유하지 못했어요', '잠시 후 다시 시도해주세요.');
+                }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="모임 공유하기">
+                <Ionicons name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={22} color={AppColors.textSecondary} />
+              </Pressable>
+              {!isHost ? (
+                <ReportBlock targetType="meetup" targetId={meetup.id} targetUserId={meetup.host_id} targetLabel={meetup.title} onBlocked={() => router.back()} />
+              ) : null}
+            </View>
+          )
+        : undefined,
     });
   }, [navigation, meetup, isHost, router]);
 
@@ -455,6 +472,7 @@ function FactCell({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: 
 }
 
 const styles = StyleSheet.create({
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   safe: { flex: 1, backgroundColor: '#070A0D' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
   notFound: { color: '#AAB4C0', fontSize: 15 },
