@@ -12,6 +12,7 @@ import type { TieMatch, TournamentTeam, TournamentTie } from '@/lib/types';
 
 import { useTournament } from '../_ctx';
 import { CourtManager } from '../courts/CourtManager';
+import { TeamKnockoutTree } from '@/components/team-knockout-tree';
 
 export default function TeamBracketTab() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +31,8 @@ export default function TeamBracketTab() {
   const [view, setView] = useState(''); // 예선: 'all' | 'g:<조 번호>'
   const [round, setRound] = useState(''); // 본선: 'all' | 'r:<라운드 순서>'
   const [teamQ, setTeamQ] = useState(''); // 팀 이름으로 찾기
+  const [koView, setKoView] = useState<'tree' | 'list'>('tree'); // 본선: 대진표(트리) / 라운드 목록(점수 입력)
+  const [zoom, setZoom] = useState(1);
 
   const load = useCallback(async () => {
     const [{ data: tm }, { data: ti }] = await Promise.all([
@@ -434,7 +437,26 @@ export default function TeamBracketTab() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium text-slate-700">{curStage === 'group' ? '조 선택' : '라운드 선택'}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-slate-700">{curStage === 'group' ? '조 선택' : '라운드 선택'}</p>
+            {curStage === 'ko' && koTies.length > 0 ? (
+              <div className="flex h-8 overflow-hidden rounded-lg border border-slate-300 bg-white text-sm font-medium">
+                <button onClick={() => setKoView('tree')} className={`px-3 ${koView === 'tree' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  대진표
+                </button>
+                <button onClick={() => setKoView('list')} className={`border-l border-slate-300 px-3 ${koView === 'list' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  라운드 목록
+                </button>
+              </div>
+            ) : null}
+            {curStage === 'ko' && koTies.length > 0 && koView === 'tree' ? (
+              <div className="flex h-8 overflow-hidden rounded-lg border border-slate-300 bg-white">
+                <button title="축소" onClick={() => setZoom((v) => Math.max(0.6, +(v - 0.1).toFixed(1)))} className="w-8 text-slate-600 hover:bg-slate-50">−</button>
+                <button title="원래 크기" onClick={() => setZoom(1)} className="w-10 border-x border-slate-300 text-xs text-slate-600 hover:bg-slate-50">{Math.round(zoom * 100)}%</button>
+                <button title="확대" onClick={() => setZoom((v) => Math.min(1.3, +(v + 0.1).toFixed(1)))} className="w-8 text-slate-600 hover:bg-slate-50">+</button>
+              </div>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <input
@@ -450,7 +472,10 @@ export default function TeamBracketTab() {
                       key={x.id}
                       onClick={() => {
                         if (curStage === 'group') setView(`g:${groupOfTeam.get(x.id)}`);
-                        else setRound(`r:${roundOfTeam.get(x.id)}`);
+                        else {
+                          setRound(`r:${roundOfTeam.get(x.id)}`);
+                          setKoView('list');
+                        }
                         setTeamQ('');
                       }}
                       className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-slate-50">
@@ -475,7 +500,7 @@ export default function TeamBracketTab() {
                 </button>
               </>
             ) : null}
-            {curStage === 'ko' && curRoundIdx >= 0 ? (
+            {curStage === 'ko' && koView === 'list' && curRoundIdx >= 0 ? (
               <>
                 <button onClick={() => setRound(`r:${koRounds[curRoundIdx - 1]}`)} disabled={curRoundIdx <= 0} className={navBtn}>
                   ‹ 이전 라운드
@@ -501,11 +526,22 @@ export default function TeamBracketTab() {
           </div>
         ) : koTies.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
-            <button onClick={() => setRound('all')} className={chipCls(curRoundKey === 'all')}>
+            <button
+              onClick={() => {
+                setRound('all');
+                setKoView('list');
+              }}
+              className={chipCls(koView === 'list' && curRoundKey === 'all')}>
               전체
             </button>
             {koRounds.map((r) => (
-              <button key={r} onClick={() => setRound(`r:${r}`)} className={chipCls(curRoundKey === `r:${r}`, roundState(r))}>
+              <button
+                key={r}
+                onClick={() => {
+                  setRound(`r:${r}`);
+                  setKoView('list');
+                }}
+                className={chipCls(koView === 'list' && curRoundKey === `r:${r}`, roundState(r))}>
                 {roundLabel(r)} <span className="opacity-60">{realTiesOf(r).length}</span>
               </button>
             ))}
@@ -513,7 +549,7 @@ export default function TeamBracketTab() {
         ) : null}
         <p className="text-xs text-slate-400">
           <span className="text-emerald-700">초록</span> 완료 · <span className="text-amber-700">노랑</span> 진행 중(코트 배정·점수 입력) · 흰색 대기
-          {curStage === 'ko' && koTies.length > 0 ? ' · 라운드 옆 숫자는 실제 경기 수(부전승 제외)' : ''}
+          {curStage === 'ko' && koTies.length > 0 ? ' · 라운드 옆 숫자는 실제 경기 수(부전승 제외) · 대진표 카드를 누르면 그 라운드 목록에서 점수를 넣어요' : ''}
         </p>
       </div>
 
@@ -547,7 +583,20 @@ export default function TeamBracketTab() {
       })}
 
       {/* 본선(토너먼트) — 고른 라운드의 실제 경기만, 부전승은 접어 둔다 */}
-      {curStage !== 'ko' ? null : koTies.length > 0 ? (
+      {curStage !== 'ko' ? null : koTies.length > 0 && koView === 'tree' ? (
+        <TeamKnockoutTree
+          ties={koTies}
+          subs={subs}
+          nameOf={nameOf}
+          courtName={(cid) => courts.find((c) => c.id === cid)?.name ?? null}
+          onOpenRound={(r) => {
+            setRound(`r:${r}`);
+            setKoView('list');
+          }}
+          highlight={q ? (x) => [x.team1_id, x.team2_id].some((tid) => !!tid && nameOf(tid).toLowerCase().includes(q)) : undefined}
+          zoom={zoom}
+        />
+      ) : koTies.length > 0 ? (
         shownRounds.map((r) => {
           const all = koTies.filter((x) => (x.round_order ?? 1) === r);
           const real = all.filter((x) => !isBye(x));
