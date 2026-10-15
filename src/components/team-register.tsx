@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
+import { AppColors } from '@/theme';
 import { skillLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { PartnerProfile, TournamentTeamWithMembers, TournamentWithCounts } from '@/lib/types';
@@ -215,7 +216,7 @@ export function TeamRegister({
               <Text style={styles.mutedSmall}>검색 중…</Text>
             ) : query.trim().length > 0 && results.length === 0 ? (
               <View style={styles.notice}>
-                <Ionicons name="alert-circle-outline" size={16} color="#6B7280" />
+                <Ionicons name="alert-circle-outline" size={16} color={AppColors.textMuted} />
                 <Text style={[styles.mMeta, { flex: 1 }]}>추가할 수 있는 회원이 없어요. (가입 회원만, 이미 다른 팀이면 제외)</Text>
               </View>
             ) : (
@@ -267,16 +268,16 @@ export function TeamRegister({
 
 const styles = StyleSheet.create({
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  mutedSmall: { fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 19 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: AppColors.textPrimary },
+  mutedSmall: { fontSize: 13, color: AppColors.textSecondary, marginTop: 4, lineHeight: 19 },
   myTeamHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   mRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   mNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  mMeta: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  mName: { fontSize: 15, fontWeight: '700', color: AppColors.textPrimary },
+  mMeta: { fontSize: 13, color: AppColors.textSecondary, marginTop: 1 },
   removeBtn: { fontSize: 13, fontWeight: '700', color: '#E5484D', paddingHorizontal: 8, paddingVertical: 6 },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 10 },
-  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 8 },
-  teamCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
-  teamName: { fontSize: 16, fontWeight: '800', color: '#111827' },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 10, padding: 10 },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 12, padding: 8 },
+  teamCard: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
+  teamName: { fontSize: 16, fontWeight: '800', color: AppColors.textPrimary },
 });

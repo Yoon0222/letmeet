@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
+import { AppColors } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import type { TieMatch, TournamentTeamWithMembers, TournamentTie } from '@/lib/types';
 
@@ -167,29 +168,29 @@ export function TeamBracketView({ tournamentId, refreshKey = 0 }: { tournamentId
 
 const styles = StyleSheet.create({
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 6 },
-  card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, borderCurve: 'continuous', overflow: 'hidden' },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: AppColors.textPrimary, marginBottom: 6 },
+  card: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 12, borderCurve: 'continuous', overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, gap: 10 },
-  divider: { borderTopWidth: 1, borderTopColor: '#F1F3F5' },
-  rank: { width: 18, fontSize: 13, fontWeight: '700', color: '#6B7280', textAlign: 'center' },
-  standName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111827' },
-  standDiff: { fontSize: 12, color: '#6B7280', minWidth: 34, textAlign: 'right' },
+  divider: { borderTopWidth: 1, borderTopColor: AppColors.border },
+  rank: { width: 18, fontSize: 13, fontWeight: '700', color: AppColors.textSecondary, textAlign: 'center' },
+  standName: { flex: 1, fontSize: 15, fontWeight: '600', color: AppColors.textPrimary },
+  standDiff: { fontSize: 12, color: AppColors.textSecondary, minWidth: 34, textAlign: 'right' },
   standWins: { fontSize: 13, fontWeight: '700', color: '#16C784', minWidth: 34, textAlign: 'right' },
-  tie: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, borderCurve: 'continuous', padding: 12 },
+  tie: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 12, borderCurve: 'continuous', padding: 12 },
   tieHead: { flexDirection: 'row', alignItems: 'center' },
-  tieName: { flex: 1, fontSize: 14, fontWeight: '700', color: '#111827' },
+  tieName: { flex: 1, fontSize: 14, fontWeight: '700', color: AppColors.textPrimary },
   right: { textAlign: 'right' },
   win: { color: '#16A34A' },
-  tieScore: { fontSize: 14, fontWeight: '800', color: '#6B7280', paddingHorizontal: 10 },
+  tieScore: { fontSize: 14, fontWeight: '800', color: AppColors.textSecondary, paddingHorizontal: 10 },
   court: { fontSize: 12, fontWeight: '700', color: '#2D6BD6', marginTop: 4 },
-  sub: { backgroundColor: '#F6F7F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, gap: 2 },
+  sub: { backgroundColor: AppColors.surfaceSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, gap: 2 },
   subTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  subKind: { fontSize: 13, color: '#6B7280' },
-  subResult: { fontSize: 13, fontWeight: '600', color: '#111827' },
-  lineup: { fontSize: 12, color: '#6B7280' },
-  lineupHidden: { fontSize: 12, color: '#9CA3AF', fontStyle: 'italic' },
-  emptyBox: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.four, marginTop: Spacing.two },
-  emptyText: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
-  pending: { fontSize: 12, color: '#9CA3AF', marginTop: 6 },
-  roundLabel: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
+  subKind: { fontSize: 13, color: AppColors.textSecondary },
+  subResult: { fontSize: 13, fontWeight: '600', color: AppColors.textPrimary },
+  lineup: { fontSize: 12, color: AppColors.textSecondary },
+  lineupHidden: { fontSize: 12, color: AppColors.textMuted, fontStyle: 'italic' },
+  emptyBox: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 14, borderCurve: 'continuous', padding: Spacing.four, marginTop: Spacing.two },
+  emptyText: { fontSize: 14, color: AppColors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  pending: { fontSize: 12, color: AppColors.textMuted, marginTop: 6 },
+  roundLabel: { fontSize: 14, fontWeight: '700', color: AppColors.textSecondary },
 });

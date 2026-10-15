@@ -4,6 +4,7 @@ import { AppAlert as Alert } from '@/lib/feedback';
 
 import { Badge } from '@/components/ui/badge';
 import { Spacing } from '@/constants/theme';
+import { AppColors } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import type { TieMatch, TournamentTeam, TournamentTeamWithMembers, TournamentTie } from '@/lib/types';
 
@@ -184,25 +185,25 @@ export function TeamLineup({ team, onChange }: { team: TournamentTeamWithMembers
 
 const styles = StyleSheet.create({
   section: { marginTop: Spacing.two },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  hint: { fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 19 },
-  tieCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: AppColors.textPrimary },
+  hint: { fontSize: 13, color: AppColors.textSecondary, marginTop: 4, lineHeight: 19 },
+  tieCard: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
   tieHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tieVs: { fontSize: 15, fontWeight: '800', color: '#111827' },
+  tieVs: { fontSize: 15, fontWeight: '800', color: AppColors.textPrimary },
   subBlock: { gap: 6 },
   subHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subKind: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  subKind: { fontSize: 14, fontWeight: '700', color: AppColors.textPrimary },
   saveBtn: { backgroundColor: '#16C784', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   saveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFFFF' },
+  chip: { borderWidth: 1, borderColor: AppColors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: AppColors.surfaceSoft },
   chipOn: { backgroundColor: '#16C784', borderColor: '#16C784' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  chipText: { fontSize: 13, fontWeight: '600', color: AppColors.textSecondary },
   chipTextOn: { color: '#fff' },
   submitBtn: { backgroundColor: '#2D6BD6', borderRadius: 12, borderCurve: 'continuous', paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  submitOff: { backgroundColor: '#C7CDD6' },
+  submitOff: { backgroundColor: AppColors.surfaceSoft },
   submitText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  roRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F6F7F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  roNames: { fontSize: 13, fontWeight: '600', color: '#111827' },
-  lockNote: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
+  roRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: AppColors.surfaceSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  roNames: { fontSize: 13, fontWeight: '600', color: AppColors.textPrimary },
+  lockNote: { fontSize: 12, color: AppColors.textMuted, marginTop: 4 },
 });
