@@ -23,6 +23,9 @@ export default function TeamBracketTab() {
   const [perGroup, setPerGroup] = useState(4);
   const [busy, setBusy] = useState(false);
   const [score, setScore] = useState<Record<string, { s1: string; s2: string }>>({}); // 서브매치 점수 입력
+  // 조 선택 — 조가 많으면(예: 34개) 한 조씩 보며 진행한다. '' = 아직 안 고름(진행할 첫 조), 'all' | 'ko' | 'g:<조 번호>'
+  const [view, setView] = useState('');
+  const [teamQ, setTeamQ] = useState(''); // 팀 이름으로 조 찾기
 
   const load = useCallback(async () => {
     const [{ data: tm }, { data: ti }] = await Promise.all([
@@ -326,9 +329,120 @@ export default function TeamBracketTab() {
     );
   }
 
+  // ── 조 선택 ──
+  // 조 상태: 모든 대결이 끝났으면 완료, 끝난 게임이 있거나 코트가 배정됐으면 진행 중, 아니면 대기
+  const groupState = (g: number): 'done' | 'live' | 'todo' => {
+    const gt = groupTies.filter((x) => (x.group_no ?? 1) === g);
+    if (gt.length > 0 && gt.every((x) => x.status === 'done')) return 'done';
+    const ids = new Set(gt.map((x) => x.id));
+    if (gt.some((x) => x.court_id) || subs.some((m) => ids.has(m.tie_id) && m.status === 'done')) return 'live';
+    return 'todo';
+  };
+  const koAvailable = koTies.length > 0 || (groupsDone && isOrganizer);
+  const firstOpen = groupNos.find((g) => groupState(g) !== 'done');
+  const defaultView = firstOpen != null ? `g:${firstOpen}` : koAvailable ? 'ko' : 'all';
+  const validView = view === 'all' || (view === 'ko' && koAvailable) || (view.startsWith('g:') && groupNos.includes(Number(view.slice(2))));
+  const current = validView ? view : defaultView;
+  const shownGroups = current === 'all' ? groupNos : current.startsWith('g:') ? [Number(current.slice(2))] : [];
+  const showKo = current === 'all' || current === 'ko';
+  const curGroup = current.startsWith('g:') ? Number(current.slice(2)) : null;
+  const curIdx = curGroup != null ? groupNos.indexOf(curGroup) : -1;
+  // 팀 이름 → 그 팀이 속한 조
+  const groupOfTeam = new Map<string, number>();
+  groupTies.forEach((x) => {
+    if (x.team1_id) groupOfTeam.set(x.team1_id, x.group_no ?? 1);
+    if (x.team2_id) groupOfTeam.set(x.team2_id, x.group_no ?? 1);
+  });
+  const q = teamQ.trim().toLowerCase();
+  const teamHits = q
+    ? teams.filter((x) => groupOfTeam.has(x.id) && x.name.toLowerCase().includes(q)).slice(0, 8)
+    : [];
+  const doneCount = groupNos.filter((g) => groupState(g) === 'done').length;
+  const chipCls = (on: boolean, state?: 'done' | 'live' | 'todo') =>
+    `min-w-[2.5rem] rounded-lg border px-2 py-1 text-sm font-medium ${
+      on
+        ? 'border-slate-900 bg-slate-900 text-white'
+        : state === 'done'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+          : state === 'live'
+            ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+    }`;
+
   return (
     <div className="space-y-4">
-      {groupNos.map((g) => {
+      {/* 조 선택 */}
+      <div className="sticky top-0 z-10 rounded-xl border border-slate-200 bg-white/95 p-3 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium text-slate-700">
+            조 선택 <span className="font-normal text-slate-400">· 예선 {groupNos.length}개 조 중 {doneCount}개 완료</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <input
+                value={teamQ}
+                onChange={(e) => setTeamQ(e.target.value)}
+                placeholder="팀 이름으로 조 찾기"
+                className="w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
+              />
+              {teamHits.length > 0 ? (
+                <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                  {teamHits.map((x) => (
+                    <button
+                      key={x.id}
+                      onClick={() => {
+                        setView(`g:${groupOfTeam.get(x.id)}`);
+                        setTeamQ('');
+                      }}
+                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-slate-50">
+                      <span>{x.name}</span>
+                      <span className="text-xs text-slate-400">{groupOfTeam.get(x.id)}조</span>
+                    </button>
+                  ))}
+                </div>
+              ) : q ? (
+                <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400 shadow-lg">찾는 팀이 없어요.</div>
+              ) : null}
+            </div>
+            {curIdx >= 0 ? (
+              <>
+                <button
+                  onClick={() => setView(`g:${groupNos[curIdx - 1]}`)}
+                  disabled={curIdx <= 0}
+                  className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                  ‹ 이전 조
+                </button>
+                <button
+                  onClick={() => setView(`g:${groupNos[curIdx + 1]}`)}
+                  disabled={curIdx >= groupNos.length - 1}
+                  className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                  다음 조 ›
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button onClick={() => setView('all')} className={chipCls(current === 'all')}>
+            전체
+          </button>
+          {groupNos.map((g) => (
+            <button key={g} onClick={() => setView(`g:${g}`)} className={chipCls(current === `g:${g}`, groupState(g))} title={`${g}조`}>
+              {g}
+            </button>
+          ))}
+          {koAvailable ? (
+            <button onClick={() => setView('ko')} className={chipCls(current === 'ko')}>
+              본선
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          <span className="text-emerald-700">초록</span> 완료 · <span className="text-amber-700">노랑</span> 진행 중(코트 배정·점수 입력) · 흰색 대기
+        </p>
+      </div>
+
+      {shownGroups.map((g) => {
         const gTies = groupTies.filter((x) => (x.group_no ?? 1) === g);
         const teamIds = [...new Set(gTies.flatMap((x) => [x.team1_id, x.team2_id]).filter(Boolean) as string[])];
         const st = teamStandings(teamIds, gTies, subs);
@@ -357,8 +471,8 @@ export default function TeamBracketTab() {
         );
       })}
 
-      {/* 본선(토너먼트) */}
-      {koTies.length > 0 ? (
+      {/* 본선(토너먼트) — '전체' 또는 '본선'을 골랐을 때 */}
+      {!showKo ? null : koTies.length > 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="font-medium">본선 토너먼트</h3>
           <div className="mt-3 space-y-4">
