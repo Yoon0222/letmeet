@@ -23,6 +23,12 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-15, 날짜 선택기·실력 범위 수정)
+
+- **What changed**: iOS 날짜·시간 선택기 5곳에 `themeVariant="dark"`, 달력형 4곳에 `accentColor={AppColors.primary}`(선택된 날짜가 파랑 → 브랜드 초록). `src/app/meetup/create.tsx` 실력 범위를 '최소 실력'·'최대 실력' 두 줄(−/+ 스테퍼, 정원과 같은 스타일)로 바꿨고, 쓰지 않게 된 `skillInline` 스타일을 지웠습니다.
+- **Why**: 휴대폰이 라이트 모드면 선택기 글자가 어두운 배경에 묻혀 안 보였고, 실력 범위는 기본값에서 바꿀 수가 없었습니다(사용자 제보).
+- **Codex 요청**: 실력 범위 두 줄 배치는 기능 위주로 둔 것이라 디자인 다듬기 부탁드립니다. 최소 ≤ 최대 제한과 0.5 단위는 유지해 주세요. 앱이 어두운 색 고정이라면 `app.json` 의 `userInterfaceStyle` 을 `dark` 로 두는 것도 검토 대상입니다(키보드·알림창 등 기본 화면 요소가 함께 어두워짐, 새 빌드 필요).
+
 ### Claude -> Codex (2026-10-14, 회원 탈퇴 실패 수정 0100)
 
 - **What changed**: `supabase/migrations/0100_account_delete_audit_fix.sql`(DB 함수 2개 본문), `web-admin/app/audit/page.tsx`(감사 로그에 "회원 탈퇴" 라벨·필터 한 줄씩). 앱 화면은 바뀌지 않았습니다.

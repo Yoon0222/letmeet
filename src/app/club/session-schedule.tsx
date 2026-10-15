@@ -215,6 +215,7 @@ export default function ClubSessionScheduleScreen() {
               value={(() => { const [h, m] = time.split(':').map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; })()}
               mode="time"
               display="spinner"
+              themeVariant="dark"
               onChange={(_e, t) => t && setTime(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:00`)}
             />
           )}

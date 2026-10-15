@@ -13,6 +13,7 @@ import { useLoading } from '@/contexts/loading';
 import { effectiveClubPlan, planAtLeast } from '@/lib/club-plan';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { AppColors } from '@/theme';
 import type { Discipline, TournamentFormat } from '@/lib/types';
 
 function defaultStart(): Date {
@@ -169,6 +170,8 @@ export default function CreateClubTournament() {
               value={start}
               mode="datetime"
               display="inline"
+              themeVariant="dark"
+              accentColor={AppColors.primary}
               minimumDate={new Date()}
               onChange={(_e, date) => date && setStart(date)}
             />

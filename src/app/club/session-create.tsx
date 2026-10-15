@@ -13,6 +13,7 @@ import { useLoading } from '@/contexts/loading';
 import { effectiveClubPlan, planAtLeast } from '@/lib/club-plan';
 import { formatMeetupTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { AppColors } from '@/theme';
 
 // 정기모임 기본 일자: 다음 주말(토요일) 오전 10시
 function defaultSessionDate(): Date {
@@ -171,6 +172,8 @@ export default function CreateClubSession() {
               value={sessionDate}
               mode="datetime"
               display="inline"
+              themeVariant="dark"
+              accentColor={AppColors.primary}
               minimumDate={new Date()}
               onChange={(_e, d) => {
                 if (d) {
@@ -194,6 +197,8 @@ export default function CreateClubSession() {
               value={deadline}
               mode="datetime"
               display="inline"
+              themeVariant="dark"
+              accentColor={AppColors.primary}
               minimumDate={new Date()}
               maximumDate={sessionDate}
               onChange={(_e, d) => d && setDeadline(d)}
