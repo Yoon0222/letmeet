@@ -556,7 +556,7 @@ export default function TournamentDetail() {
               <InfoTile
                 icon="people-outline"
                 label="참가 현황"
-                value={`${t.approved_count + t.pending_count}/${t.max_participants}${isDoubles ? '팀' : '명'}`}
+                value={`${t.approved_count + t.pending_count}/${t.max_participants}${t.format === 'team' || isDoubles ? '팀' : '명'}`}
               />
               <InfoTile icon="cash-outline" label="참가비" value={t.fee > 0 ? `${t.fee.toLocaleString()}원` : '무료'} />
               <InfoTile

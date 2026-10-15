@@ -86,6 +86,27 @@ create trigger tournament_team_members_club_guard
 
 revoke all on function public.tournament_team_club_guard() from public, anon, authenticated;
 
+-- 대회 목록·상세의 "참가 현황": 단체전은 개인 신청이 아니라 팀 수를 센다(전에는 늘 0 으로 보였다).
+--   뷰만 바꾸므로 이미 깔린 앱에도 바로 반영된다. t.* 를 쓰는 뷰라 drop 후 다시 만든다(0059·0084 와 같은 방식).
+drop view if exists public.tournaments_with_counts;
+create view public.tournaments_with_counts
+with (security_invoker = true)
+as
+select
+  t.*,
+  p.nickname   as organizer_nickname,
+  p.avatar_url as organizer_avatar_url,
+  case when t.format = 'team'
+       then (select count(*) from public.tournament_teams tt where tt.tournament_id = t.id and tt.status = 'approved')
+       else (select count(*) from public.tournament_entries e where e.tournament_id = t.id and e.status = 'approved')
+  end as approved_count,
+  case when t.format = 'team'
+       then (select count(*) from public.tournament_teams tt where tt.tournament_id = t.id and tt.status = 'pending')
+       else (select count(*) from public.tournament_entries e where e.tournament_id = t.id and e.status = 'pending')
+  end as pending_count
+from public.tournaments t
+join public.profiles p on p.id = t.organizer_id;
+
 notify pgrst, 'reload schema';
 
 commit;

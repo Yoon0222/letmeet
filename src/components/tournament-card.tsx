@@ -55,7 +55,7 @@ export function TournamentCard({
           </View>
           <View style={styles.capacity}>
             <Ionicons name="people-outline" size={14} color="#AAB4C0" />
-            <Text style={styles.capacityText}>{t.approved_count + t.pending_count}/{t.max_participants}{t.discipline === 'doubles' ? '팀' : '명'}</Text>
+            <Text style={styles.capacityText}>{t.approved_count + t.pending_count}/{t.max_participants}{t.format === 'team' || t.discipline === 'doubles' ? '팀' : '명'}</Text>
           </View>
         </View>
       </View>
