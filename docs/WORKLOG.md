@@ -113,6 +113,17 @@
 
 ## 2026-10-16
 
+### 대회 전체 화면 디자인 통일
+- **결정**: 대회 목록·상세·신청·단체전·클럽 대회 화면을 새 신청 시안과 같은 어두운 배경, 피넛 그린, 8px 규격으로 통일하되 카드가 연속되는 구성은 피한다. 상세 상단은 카드 없는 대회 요약, 탭은 밑줄형 내비게이션, 핵심 조건은 하나의 요약 패널로 재구성했다.
+- **만든 것**: `src/app/tournament/[id].tsx`, `src/app/(tabs)/tournaments.tsx`, `src/components/team-register.tsx`, `team-lineup.tsx`, `team-bracket-view.tsx`, `src/app/club/tournaments.tsx`, `tournament-create.tsx`의 정보 위계·단계 표시·상태·버튼을 개편했다. 단체전 참가 목록은 검색 가능한 접이식 행으로, 본선은 라운드 열과 연결선이 있는 가로 트리로 바꿨다.
+- **메모**: 단체전 신청은 팀 정보·선수 구성·신청 확인의 현재 진행 단계를 표시하고, 오더는 블라인드 안내·선택 인원·제출 상태를 강조한다.
+- **검증**: `npx tsc --noEmit`, `npx expo lint`, Android Expo export 통과.
+
+### 대회 참가 신청 2단계 UX 개편
+- **결정**: 대회 상세에 섞여 있던 신청 입력을 `참가 정보 → 신청 확인` 전용 화면으로 분리해 신청 조건과 최종 내용을 한눈에 확인하게 했다.
+- **만든 것**: `src/app/tournament/apply/[id].tsx` — 신청자·복식 파트너 검색/미정 신청, 참가 조건, 규정·환불 동의, 무료·유료 결제·대기 신청 흐름. `src/app/tournament/[id].tsx` 는 신청 화면 진입과 신청 후 파트너 관리만 담당한다.
+- **검증**: `npx tsc --noEmit`, `npx expo lint`, Android Expo export 통과.
+
 ### 단체전 — 소속 클럽 선택 + 용병, 화면 글씨·알림함 오류 수정
 - **결정(사용자)**: 단체전 신청은 주장이 자기가 속한(승인) 클럽을 골라서 한다. 팀원은 그 클럽 회원이 기본, 클럽 밖 회원은 '용병'으로 추가 가능. 한 클럽에서 여러 팀 허용 — 팀 이름은 클럽 이름이 기본이고 주장이 바꿀 수 있으며 운영자도 관리자 웹에서 고칠 수 있다. 클럽 회원 찾기는 검색어를 넣어야 목록이 뜬다(회원 많은 클럽 대비, 10명까지).
 - **만든 것**: `supabase/migrations/0101_team_club.sql`(+`schema.sql`·`docs/PROD_APPLY_0101.sql`) — `tournament_teams.club_id`, `tournament_team_members.is_guest`, 검사 트리거(주장·용병 아닌 팀원은 그 클럽 승인 회원). `src/components/team-register.tsx`(클럽 선택·클럽 회원/용병 추가·용병 배지), `web-admin/components/team-roster.tsx`(소속 클럽·용병 수·배지, 팀 이름 수정·클럽 이름으로), 타입 2곳.

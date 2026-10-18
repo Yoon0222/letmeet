@@ -142,6 +142,13 @@ export default function CreateClubTournament() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.progress}>
+          <View style={styles.progressStep}><View style={[styles.progressDot, styles.progressDotOn]}><Text style={styles.progressNumberOn}>1</Text></View><Text style={styles.progressLabelOn}>기본 정보</Text></View>
+          <View style={styles.progressLine} />
+          <View style={styles.progressStep}><View style={styles.progressDot}><Text style={styles.progressNumber}>2</Text></View><Text style={styles.progressLabel}>진행 설정</Text></View>
+          <View style={styles.progressLine} />
+          <View style={styles.progressStep}><View style={styles.progressDot}><Text style={styles.progressNumber}>3</Text></View><Text style={styles.progressLabel}>확인</Text></View>
+        </View>
         {clubName ? (
           <View style={styles.clubBanner}>
             <Ionicons name="people" size={16} color="#16C784" />
@@ -261,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(22,199,132,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(22,199,132,0.22)',
-    borderRadius: 14,
+    borderRadius: 8,
     borderCurve: 'continuous',
     paddingHorizontal: Spacing.three,
     paddingVertical: 10,
@@ -274,7 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     minHeight: 52,
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: '#10161D',
     borderWidth: 1,
@@ -288,7 +295,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: '#10161D',
     borderWidth: 1,
@@ -301,7 +308,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: '#10161D',
     borderWidth: 1,
@@ -317,7 +324,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 52,
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: '#10161D',
     borderWidth: 1,
@@ -327,7 +334,7 @@ const styles = StyleSheet.create({
   stepBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 6,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
@@ -341,9 +348,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(22,199,132,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(22,199,132,0.22)',
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     padding: Spacing.three,
   },
   noteText: { flex: 1, fontSize: 13, color: '#16C784', fontWeight: '700', lineHeight: 18 },
+  progress: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 6, marginBottom: 6 },
+  progressStep: { width: 68, alignItems: 'center' },
+  progressDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#151D25', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  progressDotOn: { backgroundColor: '#16C784', borderColor: '#16C784' },
+  progressNumber: { color: '#707B87', fontSize: 12, fontWeight: '800' },
+  progressNumberOn: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  progressLabel: { color: '#707B87', fontSize: 11, fontWeight: '700', marginTop: 5 },
+  progressLabelOn: { color: '#F8FAFC', fontSize: 11, fontWeight: '800', marginTop: 5 },
+  progressLine: { flex: 1, height: 2, backgroundColor: 'rgba(255,255,255,0.09)', marginTop: 13 },
 });

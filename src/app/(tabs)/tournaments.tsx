@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   // 필터 모달 (가운데 다이얼로그)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.four },
   modalCard: {
-    maxHeight: '78%', backgroundColor: '#10161D', borderRadius: 24, borderCurve: 'continuous',
+    maxHeight: '78%', backgroundColor: '#10161D', borderRadius: 8, borderCurve: 'continuous',
     paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.four,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)',
   },
@@ -332,9 +332,9 @@ const styles = StyleSheet.create({
   modalLabel: { color: '#AAB4C0', fontSize: 13, fontWeight: '800', marginTop: 14, marginBottom: 8 },
   modalChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   modalFooter: { flexDirection: 'row', gap: 10, marginTop: 20 },
-  resetBtn: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#151D25', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  resetBtn: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#151D25', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
   resetTxt: { color: '#AAB4C0', fontSize: 15, fontWeight: '800' },
-  doneBtn: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#16C784' },
+  doneBtn: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#16C784' },
   doneTxt: { color: '#07100D', fontSize: 15, fontWeight: '900' },
   list: { padding: Spacing.four, paddingTop: 0, gap: Spacing.three, paddingBottom: 124 },
   monthHeader: {

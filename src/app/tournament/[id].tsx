@@ -14,10 +14,9 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth';
-import { useLoading } from '@/contexts/loading';
 import { groupMembers, standings } from '@/lib/bracket';
 import { formatMeetupTime, skillLabel, skillRangeLabel } from '@/lib/format';
-import { cancelTournamentEntry, createTournamentEntryPayment, isTossConfigured } from '@/lib/payments';
+import { cancelTournamentEntry, createTournamentEntryPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import { TOURNAMENT_FORMAT_LABELS } from '@/lib/types';
 import type {
@@ -40,9 +39,8 @@ const ENTRY_LABEL: Record<EntryStatus, string> = {
 export default function TournamentDetail() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session, profile } = useAuth();
+  const { session } = useAuth();
   const router = useRouter();
-  const { show, hide } = useLoading();
   const uid = session?.user.id;
 
   const [t, setT] = useState<TournamentWithCounts | null>(null);
@@ -52,10 +50,11 @@ export default function TournamentDetail() {
   const [clubNamesByUser, setClubNamesByUser] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
-  const [tab, setTab] = useState<'info' | 'players' | 'prelim' | 'final' | 'register' | 'bracket'>('info');
+  const [tab, setTab] = useState<'players' | 'prelim' | 'final' | 'register' | 'bracket'>('players');
   const [groupTab, setGroupTab] = useState<number | null>(null);
   const [groupScrollHasMore, setGroupScrollHasMore] = useState(true);
   const initializedGroupTournamentRef = useRef<string | null>(null);
+  const initializedDetailTabRef = useRef<string | null>(null);
   const [search, setSearch] = useState('');
   const [coverIdx, setCoverIdx] = useState(0); // 대회 사진 갤러리: 크게 볼 사진 인덱스
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
@@ -64,7 +63,6 @@ export default function TournamentDetail() {
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
   const [partnerResults, setPartnerResults] = useState<PartnerProfile[]>([]);
-  const [partnerSel, setPartnerSel] = useState<PartnerProfile | null>(null);
   const [searching, setSearching] = useState(false);
   const [editingPartner, setEditingPartner] = useState(false); // 신청 후 파트너 변경 모드 (0090)
 
@@ -90,6 +88,10 @@ export default function TournamentDetail() {
     ]);
     const entryRows = (ents as unknown as TournamentEntryWithProfile[]) ?? [];
     setT(tour ?? null);
+    if (tour && initializedDetailTabRef.current !== id) {
+      initializedDetailTabRef.current = id;
+      setTab(tour.format === 'team' ? 'register' : 'players');
+    }
     setEntries(entryRows);
     setMatches((ms as TournamentMatch[]) ?? []);
     setCourts((cs as TournamentCourt[]) ?? []);
@@ -127,8 +129,8 @@ export default function TournamentDetail() {
   }, [load]);
 
   useEffect(() => {
-    navigation.setOptions({ title: t?.title ?? '대회' });
-  }, [navigation, t?.title]);
+    navigation.setOptions({ title: '', headerTitle: '' });
+  }, [navigation]);
 
   const myEntry = entries.find((e) => e.user_id === uid);
   // 내가 다른 사람의 파트너로 이미 등록돼 있는지 (중복 신청 방지)
@@ -244,28 +246,25 @@ export default function TournamentDetail() {
   const slotsFull =
     !!t && entries.filter((e) => e.status === 'pending' || e.status === 'approved').length >= t.max_participants;
 
-  // 대진이 있고 공개됐으면 정보/예선/본선 탭으로 분리 (미공개 시 선수에겐 정보 탭만)
+  // 기본 정보는 탭 위에 항상 노출하고, 참가자와 대진만 탭으로 구분한다.
   const drawGenerated = matches.length > 0;
   const hasBracket = drawGenerated && drawRevealed;
-  const tabItems: { key: 'info' | 'players' | 'prelim' | 'final'; label: string }[] = [
-    { key: 'info', label: '정보' },
+  const tabItems: { key: 'players' | 'prelim' | 'final'; label: string }[] = [
     { key: 'players', label: `참가자 ${approved.length}` },
     // KDK 는 조별 풀리그 개인순위가 결과라 '순위' 로 표기 (본선 없음)
     ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: t?.format === 'kdk' ? '순위' : '예선' }] : []),
     ...(koMatches.length > 0 ? [{ key: 'final' as const, label: '본선' }] : []),
   ];
-  // 단체전은 정보/참가/대진 탭으로 분리
-  const teamTabItems: { key: 'info' | 'register' | 'bracket'; label: string }[] = [
-    { key: 'info', label: '정보' },
+  // 단체전은 참가/대진 탭으로 분리
+  const teamTabItems: { key: 'register' | 'bracket'; label: string }[] = [
     { key: 'register', label: '참가' },
     { key: 'bracket', label: '대진' },
   ];
-  const showTabBar = true; // 개인전도 [정보/참가자/(순위·예선/본선)] 탭 상시 표시 — 정보 탭 과밀 해소
 
   // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
   useEffect(() => {
     const q = partnerQuery.trim();
-    if (partnerSel || q.length < 1) {
+    if (q.length < 1) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPartnerResults([]);
       return;
@@ -287,102 +286,7 @@ export default function TournamentDetail() {
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [partnerQuery, partnerSel, uid, entries]);
-
-  // 참가 신청 전 확인 알럿
-  function confirmApply() {
-    // DUPR+ 전용 대회는 PREMIUM_L1 + VERIFIED_L1 보유자만 참가 (0084)
-    if (t?.dupr_premium && !(profile?.dupr_status === 'verified' && profile?.dupr_premium && profile?.dupr_verified_l1)) {
-      if (profile?.dupr_status !== 'verified') {
-        Alert.alert(
-          'DUPR+ 전용 대회예요',
-          '이 대회는 DUPR+ 회원(PREMIUM + VERIFIED)만 참가할 수 있어요. 먼저 DUPR 계정을 연결해 주세요.',
-          [
-            { text: '나중에', style: 'cancel' },
-            { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
-          ],
-        );
-      } else {
-        Alert.alert('DUPR+ 자격 필요', 'DUPR+ 전용 대회는 PREMIUM 구독과 VERIFIED 자격이 모두 필요해요. DUPR 앱에서 구독·인증 상태를 확인해 주세요.');
-      }
-      return;
-    }
-    // DUPR 인증 대회는 연결(verified) + BASIC_L1(활성 회원)만 참가
-    if (t?.dupr_certified && !(profile?.dupr_status === 'verified' && profile?.dupr_basic)) {
-      if (profile?.dupr_status === 'verified' && !profile?.dupr_basic) {
-        Alert.alert('DUPR 자격 필요', 'DUPR 계정이 활성(BASIC) 상태가 아니에요. DUPR 앱에서 계정 상태를 확인한 뒤 다시 시도해 주세요.');
-        return;
-      }
-      Alert.alert(
-        'DUPR 인증이 필요해요',
-        'DUPR 인증 대회는 DUPR 계정을 연결한 선수만 참가할 수 있어요. 경기 결과가 DUPR 공식 레이팅에 반영됩니다.\n\n지금 바로 연결할까요? (DUPR 계정이 없으면 가입도 가능해요)',
-        [
-          { text: '나중에', style: 'cancel' },
-          { text: 'DUPR 연결하기', onPress: () => router.push('/dupr-connect' as never) },
-        ],
-      );
-      return;
-    }
-    const fee = t?.fee ?? 0;
-    // 유료 대회인데 결제 설정이 없으면 신청을 막는다 (결제 없이 슬롯만 잡는 것 방지)
-    if (fee > 0 && !slotsFull && !isTossConfigured) {
-      Alert.alert('결제 준비 중', '참가비 결제 설정이 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요.');
-      return;
-    }
-    const partnerLine = isDoubles
-      ? partnerSel
-        ? `\n파트너: ${partnerSel.nickname}`
-        : '\n파트너 미정 — 신청 후에도 등록할 수 있어요'
-      : '';
-    const feeLine = fee > 0 ? `\n참가비 ${fee.toLocaleString()}원 · 결제 완료 시 참가 확정` : '';
-    Alert.alert(
-      slotsFull ? '대기 신청' : '참가 신청',
-      `${t?.title ?? '대회'}${partnerLine}${feeLine}\n${
-        slotsFull
-          ? `정원이 차서 대기열로 신청됩니다.${fee > 0 ? ' 자리가 나면 알림을 보내드리고, 24시간 안에 결제하면 확정돼요.' : ''}`
-          : fee > 0
-            ? '신청 후 바로 결제 화면으로 이동합니다.'
-            : '이 대회에 참가 신청할까요? (신청 즉시 확정)'
-      }`,
-      [
-        { text: '닫기', style: 'cancel' },
-        { text: slotsFull ? '대기 신청' : fee > 0 ? '신청하고 결제' : '신청', onPress: apply },
-      ],
-    );
-  }
-
-  async function apply() {
-    if (!uid || !id) return;
-    setActing(true);
-    const { error } = await supabase.from('tournament_entries').insert({
-      tournament_id: id,
-      user_id: uid,
-      partner_id: isDoubles ? partnerSel?.id ?? null : null,
-      partner_name: isDoubles ? partnerSel?.nickname ?? null : null,
-    });
-    setActing(false);
-    if (error) {
-      Alert.alert('신청 실패', error.message);
-      return;
-    }
-    // 유료 대회 & 정원 내(= 결제 대기 상태로 들어감)면 바로 결제로 이어간다
-    if ((t?.fee ?? 0) > 0) {
-      const { data: myRow } = await supabase
-        .from('tournament_entries')
-        .select('status')
-        .eq('tournament_id', id)
-        .eq('user_id', uid)
-        .maybeSingle();
-      if (myRow?.status === 'pending') {
-        await load();
-        startFeePayment();
-        return;
-      }
-    }
-    await show();
-    await load();
-    hide();
-  }
+  }, [partnerQuery, uid, entries]);
 
   // 참가비 결제 시작 — 주문 생성 후 결제 화면으로 (0089)
   async function startFeePayment() {
@@ -426,7 +330,6 @@ export default function TournamentDetail() {
     }
     setEditingPartner(false);
     setPartnerQuery('');
-    setPartnerSel(null);
     load();
   }
 
@@ -479,63 +382,31 @@ export default function TournamentDetail() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <View style={styles.headerArea}>
-        <View style={styles.heroCard}>
-          <View style={styles.badgeRow}>
-            <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#67A4FF" bg="rgba(56,132,255,0.14)" />
-            <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5B942" bg="rgba(245,166,35,0.16)" />
-            {t.dupr_certified ? <Badge label="DUPR 인증" color="#67A4FF" bg="rgba(45,107,214,0.12)" /> : null}
-            {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#A98BFF" bg="rgba(139,92,246,0.14)" /> : null}
-          </View>
-          <View style={styles.heroTitleRow}>
-            <Text style={styles.title}>{t.title}</Text>
-            <View style={[styles.heroStatus, t.status !== 'registration' && styles.heroStatusMuted]}>
-              <View style={[styles.heroStatusDot, t.status !== 'registration' && styles.heroStatusDotMuted]} />
-              <Text style={[styles.heroStatusText, t.status !== 'registration' && styles.heroStatusTextMuted]}>
-                {t.status === 'registration' ? '접수중' : t.status === 'ongoing' ? '진행중' : t.status === 'finished' ? '종료' : '취소됨'}
-              </Text>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.headerArea}>
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.badgeRow}>
+                <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#67A4FF" bg="rgba(56,132,255,0.14)" />
+                <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5B942" bg="rgba(245,166,35,0.16)" />
+                {t.dupr_certified ? <Badge label="DUPR 인증" color="#67A4FF" bg="rgba(45,107,214,0.12)" /> : null}
+                {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#A98BFF" bg="rgba(139,92,246,0.14)" /> : null}
+              </View>
+              <View style={[styles.heroStatus, t.status !== 'registration' && styles.heroStatusMuted]}>
+                <View style={[styles.heroStatusDot, t.status !== 'registration' && styles.heroStatusDotMuted]} />
+                <Text style={[styles.heroStatusText, t.status !== 'registration' && styles.heroStatusTextMuted]}>
+                  {t.status === 'registration' ? '접수중' : t.status === 'ongoing' ? '진행중' : t.status === 'finished' ? '종료' : '취소됨'}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.title} numberOfLines={3}>{t.title}</Text>
+            <View style={styles.heroMetaList}>
+              <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
+              <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
             </View>
           </View>
-          <View style={styles.heroMetaList}>
-            <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
-            <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
-          </View>
         </View>
-      </View>
-
-      {showTabBar && (
-        <View style={styles.tabBar}>
-          {(isTeam ? teamTabItems : tabItems).map((it) => {
-            const active = tab === it.key;
-            return (
-              <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
-                <View style={[styles.tabPill, active && styles.tabPillActive]}>
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{it.label}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {tab !== 'info' && (approved.length > 0 || hasBracket) && (
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={16} color="#AAB4C0" />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="이름으로 검색"
-              placeholderTextColor="#707B87"
-              autoCapitalize="none"
-              style={styles.searchInput}
-            />
-            {search.length > 0 && (
-              <Ionicons name="close-circle" size={18} color="#707B87" onPress={() => setSearch('')} />
-            )}
-          </View>
-        )}
-        {tab === 'info' && (
+        {(
           <>
             {t.images?.length ? (
               <View style={styles.gallery}>
@@ -682,8 +553,8 @@ export default function TournamentDetail() {
               )
             )}
 
-            {/* 복식 파트너 — 신청 전엔 선택(선택 사항), 신청 후엔 대진 생성 전까지 등록·변경·해제 (0090) */}
-            {!isTeam && isDoubles && !iAmPartner && ((canRegister && !myEntry) || (!!myEntry && myEntry.status !== 'rejected' && !drawGenerated)) && (
+            {/* 신청 후 복식 파트너 등록·변경·해제 (0090) */}
+            {!isTeam && isDoubles && !iAmPartner && !!myEntry && myEntry.status !== 'rejected' && !drawGenerated && (
               <View style={styles.partnerCard}>
                 <View style={styles.partnerHead}>
                   <Ionicons name="people-circle" size={20} color="#16C784" />
@@ -728,24 +599,6 @@ export default function TournamentDetail() {
                       <Button title="파트너 등록" variant="outline" onPress={() => setEditingPartner(true)} />
                     </>
                   )
-                ) : !myEntry && partnerSel ? (
-                  <View style={styles.partnerChip}>
-                    <Avatar nickname={partnerSel.nickname} uri={partnerSel.avatar_url} size={36} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pName}>{partnerSel.nickname}</Text>
-                      <Text style={styles.pMeta}>
-                        {partnerSel.region || '지역 미설정'} · {partnerSel.skill_level.toFixed(1)} {skillLabel(partnerSel.skill_level)}
-                      </Text>
-                    </View>
-                    <Text
-                      onPress={() => {
-                        setPartnerSel(null);
-                        setPartnerQuery('');
-                      }}
-                      style={styles.partnerClear}>
-                      변경
-                    </Text>
-                  </View>
                 ) : (
                   <>
                     <TextField
@@ -769,7 +622,7 @@ export default function TournamentDetail() {
                         {partnerResults.map((p) => (
                           <Pressable
                             key={p.id}
-                            onPress={() => (myEntry ? updatePartner(p) : setPartnerSel(p))}
+                            onPress={() => updatePartner(p)}
                             style={styles.partnerRow}>
                             <Avatar nickname={p.nickname} uri={p.avatar_url} size={34} />
                             <View style={{ flex: 1 }}>
@@ -831,6 +684,36 @@ export default function TournamentDetail() {
             )}
 
           </>
+        )}
+
+        <View style={styles.tabBar}>
+          {(isTeam ? teamTabItems : tabItems).map((it) => {
+            const active = tab === it.key;
+            return (
+              <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
+                <View style={[styles.tabPill, active && styles.tabPillActive]}>
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{it.label}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {!isTeam && (approved.length > 0 || hasBracket) && (
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={16} color="#AAB4C0" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="이름으로 검색"
+              placeholderTextColor="#707B87"
+              autoCapitalize="none"
+              style={styles.searchInput}
+            />
+            {search.length > 0 && (
+              <Ionicons name="close-circle" size={18} color="#707B87" onPress={() => setSearch('')} />
+            )}
+          </View>
         )}
 
         {/* 참가자 탭 */}
@@ -895,7 +778,14 @@ export default function TournamentDetail() {
         {/* 단체전: 참가 탭 */}
         {isTeam && tab === 'register' && <TeamRegister tournament={t} uid={uid} onChange={() => setTeamRev((v) => v + 1)} />}
         {/* 단체전: 대진 탭 */}
-        {isTeam && tab === 'bracket' && <TeamBracketView tournamentId={t.id} refreshKey={teamRev} />}
+        {isTeam && tab === 'bracket' && (
+          <TeamBracketView
+            tournamentId={t.id}
+            uid={uid}
+            refreshKey={teamRev}
+            onChange={() => setTeamRev((value) => value + 1)}
+          />
+        )}
 
         {/* 예선 (조별리그) */}
         {hasBracket && tab === 'prelim' && (
@@ -983,7 +873,7 @@ export default function TournamentDetail() {
 
       </ScrollView>
 
-      {!isTeam && tab === 'info' && (
+      {!isTeam && (
       <View style={styles.actionBar}>
         {myEntry ? (
           <View style={{ gap: 8 }}>
@@ -1039,15 +929,11 @@ export default function TournamentDetail() {
             <Text style={styles.statusText}>{iAmPartner.profiles?.nickname ?? '상대'}님의 파트너로 참가 신청됨</Text>
           </View>
         ) : canRegister ? (
-          <View style={{ gap: 8 }}>
-            {isDoubles && !partnerSel ? (
-              <View style={styles.statusRow}>
-                <Ionicons name="people-outline" size={16} color="#AAB4C0" />
-                <Text style={[styles.pMeta, { marginTop: 0 }]}>파트너 없이 신청하고 나중에 등록해도 돼요.</Text>
-              </View>
-            ) : null}
-            <Button title={slotsFull ? '대기 신청하기' : '참가 신청하기'} onPress={confirmApply} loading={acting} />
-          </View>
+          <Button
+            title={slotsFull ? '대기 신청하기' : '참가 신청하기'}
+            icon="arrow-forward"
+            onPress={() => router.push(`/tournament/apply/${id}` as never)}
+          />
         ) : (
           <Button title="접수가 마감되었어요" variant="secondary" disabled onPress={() => {}} />
         )}
@@ -1140,64 +1026,80 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#070A0D' },
   notFound: { color: '#AAB4C0', fontSize: 15 },
   mutedText: { color: '#AAB4C0', fontSize: 14 },
-  content: { padding: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.four },
-  headerArea: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three, paddingBottom: Spacing.three },
-  heroCard: {
-    padding: Spacing.three,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    backgroundColor: '#10161D',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    gap: 13,
+  content: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, gap: Spacing.three, paddingBottom: Spacing.four },
+  headerArea: {
+    paddingBottom: Spacing.three,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  heroTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  heroStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 6 },
+  heroCard: {
+    gap: 12,
+  },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  heroStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(22,199,132,0.1)',
+  },
   heroStatusMuted: { opacity: 0.7 },
   heroStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#16C784' },
   heroStatusDotMuted: { backgroundColor: '#AAB4C0' },
   heroStatusText: { color: '#16C784', fontSize: 12, fontWeight: '800' },
   heroStatusTextMuted: { color: '#AAB4C0' },
-  heroMetaList: { gap: 9, paddingTop: 2 },
+  heroMetaList: { gap: 8, paddingTop: 2 },
   tabBar: {
     flexDirection: 'row',
-    marginHorizontal: Spacing.four,
-    height: 46,
-    padding: 4,
-    borderRadius: 13,
-    borderCurve: 'continuous',
-    backgroundColor: '#10161D',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    height: 49,
+    paddingHorizontal: Spacing.four,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.09)',
   },
   tabItem: { flex: 1 },
-  tabPill: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderCurve: 'continuous' },
-  tabPillActive: { backgroundColor: 'rgba(22,199,132,0.16)' },
-  tabText: { color: '#AAB4C0', fontSize: 14, fontWeight: '700' },
-  tabTextActive: { color: '#16C784', fontWeight: '900' },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  title: { flex: 1, fontSize: 24, lineHeight: 32, fontWeight: '800', color: '#F8FAFC' },
-  gallery: { marginBottom: Spacing.three, gap: 8 },
-  cover: { width: '100%', height: 200, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#151D25' },
-  thumbRow: { gap: 8, paddingVertical: 2 },
-  thumb: { width: 64, height: 64, borderRadius: 12, borderCurve: 'continuous', backgroundColor: '#151D25', opacity: 0.6 },
-  thumbActive: { opacity: 1, borderWidth: 2, borderColor: '#16C784' },
-  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  infoTile: {
-    width: '48.5%',
-    minHeight: 82,
-    flexDirection: 'row',
+  tabPill: {
+    flex: 1,
     alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 15,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabPillActive: { borderBottomColor: '#16C784' },
+  tabText: { color: '#7F8B98', fontSize: 14, fontWeight: '700' },
+  tabTextActive: { color: '#F8FAFC', fontWeight: '900' },
+  badgeRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  title: { fontSize: 23, lineHeight: 31, fontWeight: '900', color: '#F8FAFC' },
+  gallery: { marginBottom: Spacing.three, gap: 8 },
+  cover: { width: '100%', height: 200, borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#151D25' },
+  thumbRow: { gap: 8, paddingVertical: 2 },
+  thumb: { width: 64, height: 64, borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#151D25', opacity: 0.6 },
+  thumbActive: { opacity: 1, borderWidth: 2, borderColor: '#16C784' },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    overflow: 'hidden',
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: '#10161D',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
   },
-  infoTileIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,199,132,0.11)' },
-  infoTileCopy: { flex: 1, gap: 3 },
+  infoTile: {
+    width: '50%',
+    minHeight: 76,
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  infoTileIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  infoTileCopy: { gap: 2 },
   infoTileLabel: { color: '#7F8B98', fontSize: 11.5, fontWeight: '700' },
   infoTileValue: { color: '#F8FAFC', fontSize: 13.5, lineHeight: 18, fontWeight: '800' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -1248,7 +1150,7 @@ const styles = StyleSheet.create({
   waitlistCard: {
     marginTop: 12,
     padding: Spacing.three,
-    borderRadius: 18,
+    borderRadius: 8,
     borderCurve: 'continuous',
     backgroundColor: 'rgba(22,199,132,0.045)',
     borderWidth: 1,
@@ -1287,7 +1189,7 @@ const styles = StyleSheet.create({
   waitlistRuleText: { color: '#16C784', fontSize: 13, fontWeight: '800' },
   // 내 현황 카드 (0092 UX)
   myCard: {
-    marginTop: 12, padding: Spacing.three, borderRadius: 20, borderCurve: 'continuous',
+    marginTop: 12, padding: Spacing.three, borderRadius: 8, borderCurve: 'continuous',
     backgroundColor: 'rgba(22,199,132,0.06)', borderWidth: 1, borderColor: 'rgba(22,199,132,0.35)', gap: 10,
   },
   myHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1297,13 +1199,13 @@ const styles = StyleSheet.create({
   myHint: { color: '#AAB4C0', fontSize: 12.5, lineHeight: 18, fontWeight: '700' },
   myStatsRow: { flexDirection: 'row', gap: 8 },
   myStatBox: {
-    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14, borderCurve: 'continuous',
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderCurve: 'continuous',
     backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', gap: 2,
   },
   myStatLabel: { color: '#707B87', fontSize: 11, fontWeight: '800' },
   myStatValue: { color: '#F8FAFC', fontSize: 15, fontWeight: '900' },
   myNextRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.two, borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.two, borderRadius: 8,
     borderCurve: 'continuous', backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)',
   },
   myNextName: { color: '#F8FAFC', fontSize: 15, fontWeight: '900', marginTop: 2 },
@@ -1312,7 +1214,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(22,199,132,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(22,199,132,0.28)',
-    borderRadius: 16,
+    borderRadius: 8,
     borderCurve: 'continuous',
     padding: Spacing.three,
   },
@@ -1325,7 +1227,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10161D',
     borderWidth: 1,
     borderColor: '#16C784',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 10,
     marginTop: 8,
   },
@@ -1337,7 +1239,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10161D',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
-    borderRadius: 10,
+    borderRadius: 8,
     padding: 10,
     marginTop: 6,
   },
@@ -1346,7 +1248,7 @@ const styles = StyleSheet.create({
   courtName: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
   courtTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   courtTagText: { fontSize: 12, fontWeight: '700' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, paddingHorizontal: 12, height: 44 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 8, paddingHorizontal: 12, height: 44 },
   searchInput: { flex: 1, fontSize: 15, color: '#F8FAFC', paddingVertical: 0 },
   groupSectionTitle: { fontSize: 18, lineHeight: 24, fontWeight: '900', color: '#F8FAFC' },
   groupSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
@@ -1378,18 +1280,18 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: '#27313B',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
   },
   groupMatchList: { gap: 7, marginTop: 8 },
   selectedGroupContent: { marginTop: 14 },
-  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, padding: 14, marginTop: Spacing.two },
+  revealBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 8, padding: 14, marginTop: Spacing.two },
   revealText: { fontSize: 15, fontWeight: '600', color: '#F8FAFC', flex: 1 },
   subLabel: { fontSize: 14, fontWeight: '700', color: '#AAB4C0', marginTop: 2 },
   subLabelPrimary: { fontSize: 14, fontWeight: '800', color: '#16C784', marginTop: 2 },
-  tableCard: { backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 12, marginTop: 6, overflow: 'hidden' },
+  tableCard: { backgroundColor: '#10161D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 8, marginTop: 6, overflow: 'hidden' },
   standRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 8 },
   standRowDivider: { borderTopColor: 'rgba(255,255,255,0.09)', borderTopWidth: 1 },
   standRank: { width: 18, fontSize: 13, fontWeight: '700', color: '#AAB4C0', textAlign: 'center' },
@@ -1401,7 +1303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#10161D',
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
     gap: 8,
@@ -1420,7 +1322,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10161D',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 8,
   },
 });

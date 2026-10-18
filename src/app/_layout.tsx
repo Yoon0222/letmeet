@@ -164,6 +164,16 @@ function RootNavigator() {
         />
         <Stack.Screen name="tournament/[id]" options={{ headerShown: true, title: '대회' }} />
         <Stack.Screen
+          name="tournament/apply/[id]"
+          options={{
+            headerShown: true,
+            title: '대회 참가 신청',
+            headerStyle: { backgroundColor: '#070A0D' },
+            headerTintColor: '#F8FAFC',
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
           name="club/board"
           options={{ headerShown: true, title: '게시판', headerStyle: { backgroundColor: '#070A0D' }, headerTintColor: '#F8FAFC', headerShadowVisible: false }}
         />

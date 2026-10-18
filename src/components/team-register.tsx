@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 
-import { TeamLineup } from '@/components/team-lineup';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,6 +49,8 @@ export function TeamRegister({
   const [query, setQuery] = useState('');
   const [guestResults, setGuestResults] = useState<PartnerProfile[]>([]);
   const [searching, setSearching] = useState(false);
+  const [teamQuery, setTeamQuery] = useState('');
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -117,6 +118,13 @@ export function TeamRegister({
   const myTeam = teams.find((t) => t.captain_id === uid || t.members.some((m) => m.user_id === uid));
   const isCaptain = myTeam?.captain_id === uid;
   const approvedTeams = teams.filter((t) => t.status === 'approved');
+  const filteredTeams = approvedTeams.filter((item) => {
+    const term = teamQuery.trim().toLowerCase();
+    if (!term) return true;
+    return item.name.toLowerCase().includes(term) ||
+      item.club?.name.toLowerCase().includes(term) ||
+      item.members.some((member) => member.profiles?.nickname.toLowerCase().includes(term));
+  });
 
   // 이미 이 대회 팀에 속한 유저(주장·팀원)는 추가 후보에서 제외
   const takenIds = useMemo(() => new Set<string>(teams.flatMap((t) => [t.captain_id, ...t.members.map((m) => m.user_id)])), [teams]);
@@ -241,6 +249,7 @@ export function TeamRegister({
 
   const guestCount = picked.filter((p) => p.guest).length;
   const shownResults = mode === 'club' ? clubResults : guestResults;
+  const formStep: 1 | 2 | 3 = !clubId || !teamName.trim() ? 1 : picked.length + 1 < minSize ? 2 : 3;
 
   return (
     <View style={{ gap: Spacing.three }}>
@@ -277,15 +286,30 @@ export function TeamRegister({
           {isCaptain && canRegister && myTeam.status !== 'approved' ? (
             <Button title="팀 신청 취소" variant="outline" onPress={confirmCancel} loading={acting} style={{ marginTop: Spacing.two }} />
           ) : null}
-          {/* 주장: 확정 팀이면 오더(라인업) 배정 */}
-          {isCaptain && myTeam.status === 'approved' ? <TeamLineup team={myTeam} onChange={onChange} /> : null}
         </View>
       ) : canRegister ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>팀으로 참가 신청</Text>
+          <Text style={styles.sectionTitle}>단체전 참가 신청</Text>
           <Text style={styles.mutedSmall}>
             소속 클럽을 고르고 함께 뛸 팀원을 추가하세요. 클럽 밖 회원은 용병으로 넣을 수 있어요. 팀당 최소 {minSize}명.
           </Text>
+
+          <View style={styles.stepProgress}>
+            {(['팀 정보', '선수 구성', '신청 확인'] as const).map((label, index) => {
+              const number = (index + 1) as 1 | 2 | 3;
+              const active = formStep === number;
+              const done = formStep > number;
+              return (
+                <View key={label} style={styles.stepItem}>
+                  <View style={[styles.stepCircle, (active || done) && styles.stepCircleOn]}>
+                    {done ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : <Text style={[styles.stepNumber, active && styles.stepNumberOn]}>{number}</Text>}
+                  </View>
+                  <Text style={[styles.stepLabel, active && styles.stepLabelOn]}>{label}</Text>
+                  {index < 2 ? <View style={[styles.stepLine, done && styles.stepLineOn]} /> : null}
+                </View>
+              );
+            })}
+          </View>
 
           {myClubs === null ? (
             <ActivityIndicator color="#16C784" style={{ marginTop: Spacing.three }} />
@@ -300,7 +324,7 @@ export function TeamRegister({
           ) : (
             <View style={{ marginTop: 10, gap: 10 }}>
               {/* 소속 클럽 */}
-              <Text style={styles.fieldLabel}>소속 클럽</Text>
+              <View style={styles.numberedTitle}><Text style={styles.number}>01</Text><Text style={styles.fieldLabelStrong}>소속 클럽</Text></View>
               <View style={styles.chips}>
                 {myClubs.map((c) => (
                   <Pressable key={c.id} onPress={() => chooseClub(c)} style={[styles.chip, clubId === c.id && styles.chipOn]} accessibilityRole="button">
@@ -321,6 +345,7 @@ export function TeamRegister({
               />
 
               {/* 선택된 팀원 */}
+              <View style={styles.numberedTitle}><Text style={styles.number}>02</Text><Text style={styles.fieldLabelStrong}>선수 구성</Text></View>
               {picked.length > 0 ? (
                 <View style={{ gap: 8 }}>
                   {picked.map((p) => (
@@ -411,32 +436,75 @@ export function TeamRegister({
               <Text style={styles.mutedSmall}>
                 주장(나) 포함 {picked.length + 1}명 / 최소 {minSize}명{guestCount > 0 ? ` · 용병 ${guestCount}명` : ''}
               </Text>
-              <Button title="팀 신청하기" onPress={submitTeam} loading={acting} disabled={!clubId || picked.length + 1 < minSize} />
+              <View style={styles.applySummary}>
+                <View style={{ flex: 1 }}><Text style={styles.summaryLabel}>신청 팀</Text><Text style={styles.summaryValue}>{teamName.trim() || '팀 이름 미정'}</Text></View>
+                <Text style={styles.summaryCount}>{picked.length + 1}/{minSize}명</Text>
+              </View>
+              <Button title={picked.length + 1 < minSize ? `선수 ${minSize - picked.length - 1}명 더 필요` : '팀 참가 신청 완료'} onPress={submitTeam} loading={acting} disabled={!clubId || picked.length + 1 < minSize} />
             </View>
           )}
         </View>
       ) : (
-        <View style={styles.section}>
-          <Text style={styles.mutedSmall}>접수가 마감되어 팀 신청을 받지 않아요.</Text>
+        <View style={styles.closedNotice}>
+          <Ionicons name="lock-closed-outline" size={16} color={AppColors.textMuted} />
+          <Text style={styles.closedText}>접수가 마감되어 새로운 팀 신청을 받지 않아요.</Text>
         </View>
       )}
 
       {/* 참가 팀 목록 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>참가 팀 {approvedTeams.length}팀</Text>
-        <View style={{ gap: 12, marginTop: 8 }}>
+        <View style={styles.teamListHead}>
+          <View><Text style={styles.eyebrow}>TEAMS</Text><Text style={styles.sectionTitle}>참가 팀 {approvedTeams.length}팀</Text></View>
+          <Text style={styles.expandHint}>팀을 눌러 선수 확인</Text>
+        </View>
+        {approvedTeams.length > 8 ? (
+          <View style={styles.teamSearch}>
+            <Ionicons name="search" size={17} color={AppColors.textMuted} />
+            <TextInput
+              value={teamQuery}
+              onChangeText={setTeamQuery}
+              placeholder="팀·클럽·선수 이름 검색"
+              placeholderTextColor={AppColors.textMuted}
+              style={styles.teamSearchInput}
+            />
+            {teamQuery ? <Pressable onPress={() => setTeamQuery('')} hitSlop={8}><Ionicons name="close-circle" size={18} color={AppColors.textMuted} /></Pressable> : null}
+          </View>
+        ) : null}
+        <View style={styles.teamList}>
           {approvedTeams.length === 0 ? (
             <Text style={styles.mutedSmall}>아직 확정된 팀이 없어요.</Text>
+          ) : filteredTeams.length === 0 ? (
+            <View style={styles.noResult}><Ionicons name="search-outline" size={20} color={AppColors.textMuted} /><Text style={styles.mutedSmall}>검색 결과가 없어요.</Text></View>
           ) : (
-            approvedTeams.map((team) => (
-              <View key={team.id} style={styles.teamCard}>
-                <Text style={styles.teamName}>{team.name}</Text>
-                {team.club && team.club.name !== team.name ? <Text style={styles.mMeta}>{team.club.name}</Text> : null}
-                <Text style={styles.mMeta}>
-                  {team.members.map((m) => `${m.profiles?.nickname ?? '?'}${m.is_guest ? '(용병)' : ''}`).join(', ')} · {team.members.length}명
-                </Text>
-              </View>
-            ))
+            filteredTeams.map((team, index) => {
+              const expanded = expandedTeamId === team.id;
+              const guestCountInTeam = team.members.filter((member) => member.is_guest).length;
+              return (
+                <View key={team.id} style={[styles.teamRowWrap, index > 0 && styles.teamRowDivider]}>
+                  <Pressable onPress={() => setExpandedTeamId(expanded ? null : team.id)} style={styles.teamRow}>
+                    <View style={styles.teamIndex}><Text style={styles.teamIndexText}>{String(index + 1).padStart(2, '0')}</Text></View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.teamName} numberOfLines={1}>{team.name}</Text>
+                      <Text style={styles.teamMeta} numberOfLines={1}>
+                        {team.club?.name ?? '소속 클럽 없음'} · 선수 {team.members.length}명{guestCountInTeam ? ` · 용병 ${guestCountInTeam}명` : ''}
+                      </Text>
+                    </View>
+                    <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={AppColors.textMuted} />
+                  </Pressable>
+                  {expanded ? (
+                    <View style={styles.roster}>
+                      {team.members.map((member) => (
+                        <View key={member.user_id} style={styles.rosterRow}>
+                          <Avatar nickname={member.profiles?.nickname ?? '?'} uri={member.profiles?.avatar_url} size={30} />
+                          <View style={{ flex: 1 }}><Text style={styles.rosterName}>{member.profiles?.nickname ?? '알 수 없음'}</Text><Text style={styles.rosterMeta}>{member.profiles?.region || '지역 미설정'} · {member.profiles?.skill_level.toFixed(1) ?? '-'}</Text></View>
+                          {member.user_id === team.captain_id ? <Badge label="주장" color="#16C784" bg="rgba(22,199,132,0.14)" /> : member.is_guest ? <Badge label="용병" color="#F5B942" bg="rgba(245,185,66,0.14)" /> : null}
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
           )}
         </View>
       </View>
@@ -447,6 +515,7 @@ export function TeamRegister({
 const styles = StyleSheet.create({
   section: { marginTop: Spacing.two },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: AppColors.textPrimary },
+  eyebrow: { color: AppColors.primary, fontSize: 10, fontWeight: '900', marginBottom: 3 },
   mutedSmall: { fontSize: 13, color: AppColors.textSecondary, marginTop: 4, lineHeight: 19 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: AppColors.textSecondary },
   myTeamHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
@@ -456,18 +525,52 @@ const styles = StyleSheet.create({
   mMeta: { fontSize: 13, color: AppColors.textSecondary, marginTop: 1 },
   removeBtn: { fontSize: 13, fontWeight: '700', color: '#E5484D', paddingHorizontal: 8, paddingVertical: 6 },
   linkText: { fontSize: 13, fontWeight: '800', color: AppColors.primary, paddingHorizontal: 4 },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 10, padding: 10 },
-  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 12, padding: 8 },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 8, padding: 10 },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 8, padding: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderColor: AppColors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: AppColors.surface, maxWidth: '100%' },
+  chip: { borderWidth: 1, borderColor: AppColors.border, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: AppColors.surface, maxWidth: '100%' },
   chipOn: { backgroundColor: AppColors.primary, borderColor: AppColors.primary },
   chipText: { fontSize: 14, fontWeight: '700', color: AppColors.textSecondary },
   chipTextOn: { color: '#07110C' },
-  segment: { flexDirection: 'row', padding: 3, borderRadius: 12, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border },
-  segmentBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
+  segment: { flexDirection: 'row', padding: 3, borderRadius: 8, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border },
+  segmentBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 6 },
   segmentOn: { backgroundColor: AppColors.surfaceSoft },
   segmentText: { fontSize: 14, fontWeight: '700', color: AppColors.textMuted },
   segmentTextOn: { color: AppColors.textPrimary },
-  teamCard: { backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 14, borderCurve: 'continuous', padding: Spacing.three },
-  teamName: { fontSize: 16, fontWeight: '800', color: AppColors.textPrimary },
+  closedNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
+  closedText: { flex: 1, color: AppColors.textSecondary, fontSize: 12, lineHeight: 18 },
+  teamListHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
+  expandHint: { color: AppColors.textMuted, fontSize: 10, fontWeight: '700' },
+  teamSearch: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 12, borderRadius: 8, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border },
+  teamSearchInput: { flex: 1, color: AppColors.textPrimary, fontSize: 14, paddingVertical: 10 },
+  teamList: { marginTop: 8, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, borderRadius: 8, overflow: 'hidden' },
+  teamRowWrap: { backgroundColor: AppColors.surface },
+  teamRowDivider: { borderTopWidth: 1, borderTopColor: AppColors.border },
+  teamRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 11, paddingVertical: 9 },
+  teamIndex: { width: 31, height: 31, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: AppColors.surfaceSoft },
+  teamIndexText: { color: AppColors.primary, fontSize: 11, fontWeight: '900' },
+  teamName: { fontSize: 14, fontWeight: '800', color: AppColors.textPrimary },
+  teamMeta: { fontSize: 11, color: AppColors.textSecondary, marginTop: 3 },
+  roster: { backgroundColor: '#0B1015', borderTopWidth: 1, borderTopColor: AppColors.border, paddingHorizontal: 12, paddingVertical: 4 },
+  rosterRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: AppColors.border },
+  rosterName: { color: AppColors.textPrimary, fontSize: 13, fontWeight: '700' },
+  rosterMeta: { color: AppColors.textMuted, fontSize: 10, marginTop: 2 },
+  noResult: { minHeight: 90, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  stepProgress: { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 16, paddingHorizontal: 8 },
+  stepItem: { flex: 1, alignItems: 'center', position: 'relative' },
+  stepCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: AppColors.surfaceSoft, borderWidth: 1, borderColor: AppColors.border, zIndex: 1 },
+  stepCircleOn: { backgroundColor: AppColors.primary, borderColor: AppColors.primary },
+  stepNumber: { color: AppColors.textMuted, fontSize: 12, fontWeight: '800' },
+  stepNumberOn: { color: '#FFFFFF' },
+  stepLabel: { color: AppColors.textMuted, fontSize: 11, fontWeight: '700', marginTop: 6 },
+  stepLabelOn: { color: AppColors.textPrimary },
+  stepLine: { position: 'absolute', top: 13, left: '65%', width: '70%', height: 2, backgroundColor: AppColors.border },
+  stepLineOn: { backgroundColor: AppColors.primary },
+  numberedTitle: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  number: { color: AppColors.primary, fontSize: 11, fontWeight: '900' },
+  fieldLabelStrong: { color: AppColors.textPrimary, fontSize: 16, fontWeight: '800' },
+  applySummary: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: AppColors.border, borderRadius: 8, padding: 12, backgroundColor: AppColors.surface },
+  summaryLabel: { color: AppColors.textMuted, fontSize: 11, fontWeight: '700' },
+  summaryValue: { color: AppColors.textPrimary, fontSize: 14, fontWeight: '800', marginTop: 3 },
+  summaryCount: { color: AppColors.primary, fontSize: 14, fontWeight: '900' },
 });
