@@ -134,7 +134,7 @@ update public.app_config set min_version = '4.2.0', updated_at = now() where id 
 
 | 플랫폼 | 버전(빌드 번호) | EAS 빌드 id | 상태 |
 |---|---|---|---|
-| iOS | 4.2.0 (35) | `dac40758-f41c-4c9d-92f8-b5e5a446c232` | ✅ 빌드 완료 2026-10-20 00:44 — App Store Connect 업로드 전 |
+| iOS | 4.2.0 (35) | `dac40758-f41c-4c9d-92f8-b5e5a446c232` | ✅ 빌드 완료 2026-10-20 00:44 · ✅ App Store Connect 업로드 완료(EAS 제출 `f50ceb6f`) — 4.2.0 버전 만들기·심사 제출 전 |
 | Android | 4.2.0 (versionCode 37) | `d81414ce-3d17-42e9-bb1d-04dae591704d` | ✅ 빌드 완료 2026-10-20 01:05 — Play 업로드 전 |
 
 - iOS 를 App Store Connect 에 올리기: `npx eas-cli submit --platform ios --id dac40758-f41c-4c9d-92f8-b5e5a446c232 --profile production --non-interactive`
