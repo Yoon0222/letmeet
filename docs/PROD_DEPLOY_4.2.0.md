@@ -34,6 +34,8 @@
 
 ## ② 엣지함수 `notify-tie` — 차례 알림을 양 팀 주장에게만
 
+> ✅ **완료 2026-10-20 01:28** — 운영 `notify-tie` v11(코드 지문 `727235448a`, DEV 에서 시험한 것과 같음). 2026-10-14 이후 바뀐 엣지함수는 이것 하나.
+
 ```
 npx supabase functions deploy notify-tie --project-ref jbvtdthtmrlndduqiikj --use-api
 ```
