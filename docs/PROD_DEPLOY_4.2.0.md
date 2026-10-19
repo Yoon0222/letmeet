@@ -17,6 +17,8 @@
 
 ## ① 운영 DB — `docs/PROD_APPLY_4.2.0_ALL.sql` (사용자)
 
+> ✅ **완료 2026-10-20** — 사용자 실행. 확인 쿼리 9개 모두 expect 값과 같음(읽기 조회로 확인).
+
 담긴 것(한 트랜잭션, 다시 실행해도 안전):
 - **0101** 단체전 팀의 소속 클럽 + 용병(검사 트리거), 대회 목록의 단체전 참가 수를 팀 수로
 - **0102** 단체전 오더: 한 대결에서 한 선수는 한 게임만(최종 제출 때 확인), 오류 문구 한국어
@@ -44,6 +46,8 @@ npx supabase functions deploy notify-tie --project-ref jbvtdthtmrlndduqiikj --us
 
 ## ③ 관리자 웹 — ①이 끝난 뒤
 
+> ✅ **완료 2026-10-20** — 배포 `web-admin-hllban6c4`(READY), pinut.org·admin.pinut.org 가 새 배포를 가리킴. 랜딩·관리자 로그인·대회 만들기·번개 공유 페이지 응답 200 확인(로그인 뒤 화면은 미확인).
+
 ```
 cd web-admin
 npx vercel --prod --yes
@@ -57,7 +61,7 @@ npx vercel --prod --yes
 
 빌드: 2026-10-20 시작(빌드 번호는 아래 '빌드 기록'에).
 - **iOS**: 빌드를 App Store Connect 에 올림(`npx eas-cli submit --platform ios --id <빌드 id> --profile production`) → App Store Connect 에서 **4.2.0 버전 만들기** → 빌드 선택 → 아래 '새로운 기능' 붙여넣기 → 심사 제출.
-  **'수동 출시'를 권장** — 심사가 ①보다 먼저 끝나 자동 공개되면 단체전 신청(소속 클럽)이 실패한다.
+  ~~'수동 출시'를 권장~~ → ①이 끝났으므로(2026-10-20) 자동 출시도 괜찮다.
 - **Android**: Play Console → 프로덕션 → 새 버전 → 4.2.0 AAB 업로드 → 출시 노트(아래 짧은 버전) → 검토 제출.
 - 4.1.0(iOS 32·33 / Android 34·35)·4.1.1(iOS 34 / Android 36) 빌드는 쓰지 않는다.
 
