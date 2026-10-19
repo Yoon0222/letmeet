@@ -130,4 +130,12 @@ update public.app_config set min_version = '4.2.0', updated_at = now() where id 
 
 ## 빌드 기록
 
-(빌드 시작 후 채움)
+2026-10-20 00:36 시작, 커밋 `4ce4fcf`(production 프로필).
+
+| 플랫폼 | 버전(빌드 번호) | EAS 빌드 id | 상태 |
+|---|---|---|---|
+| iOS | 4.2.0 (35) | `dac40758-f41c-4c9d-92f8-b5e5a446c232` | 빌드 중 |
+| Android | 4.2.0 (versionCode 37) | `d81414ce-3d17-42e9-bb1d-04dae591704d` | 빌드 중 |
+
+- iOS 를 App Store Connect 에 올리기: `npx eas-cli submit --platform ios --id dac40758-f41c-4c9d-92f8-b5e5a446c232 --profile production --non-interactive`
+- Android AAB 받기: https://expo.dev/accounts/yoonsik2/projects/pickleball/builds/d81414ce-3d17-42e9-bb1d-04dae591704d
