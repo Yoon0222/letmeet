@@ -9,6 +9,61 @@ import { AppColors } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import type { TieMatch, TournamentTeamWithMembers, TournamentTie } from '@/lib/types';
 
+type BracketZone = {
+  key: string;
+  label: string;
+  shortLabel: string;
+  ties: TournamentTie[];
+};
+
+const MAX_FIRST_ROUND_TIES_PER_ZONE = 32;
+
+function splitKnockoutIntoZones(ties: TournamentTie[], rounds: number[]): BracketZone[] {
+  const firstRound = rounds[0];
+  if (firstRound === undefined) return [];
+  const firstRoundTies = ties.filter((tie) => (tie.round_order ?? 1) === firstRound);
+  if (firstRoundTies.length <= MAX_FIRST_ROUND_TIES_PER_ZONE) return [];
+
+  const zoneCount = Math.ceil(firstRoundTies.length / MAX_FIRST_ROUND_TIES_PER_ZONE);
+  const zoneNames = zoneCount === 2
+    ? [
+        { label: '상단 브래킷', shortLabel: '상단' },
+        { label: '하단 브래킷', shortLabel: '하단' },
+      ]
+    : Array.from({ length: zoneCount }, (_, index) => ({
+        label: `${String.fromCharCode(65 + index)} 브래킷`,
+        shortLabel: String.fromCharCode(65 + index),
+      }));
+  const zones: BracketZone[] = zoneNames.map((name, index) => ({
+    key: `zone-${index}`,
+    ...name,
+    ties: [],
+  }));
+  const finalTies: TournamentTie[] = [];
+
+  ties.forEach((tie) => {
+    const roundIndex = rounds.indexOf(tie.round_order ?? 1);
+    if (roundIndex < 0) return;
+    const firstRoundSpan = 2 ** roundIndex;
+    const rangeStart = tie.slot * firstRoundSpan;
+    const rangeEnd = rangeStart + firstRoundSpan;
+    const zoneIndex = Math.floor(rangeStart / MAX_FIRST_ROUND_TIES_PER_ZONE);
+    const zoneStart = zoneIndex * MAX_FIRST_ROUND_TIES_PER_ZONE;
+    const zoneEnd = Math.min(zoneStart + MAX_FIRST_ROUND_TIES_PER_ZONE, firstRoundTies.length);
+
+    if (zones[zoneIndex] && rangeStart >= zoneStart && rangeEnd <= zoneEnd) {
+      zones[zoneIndex].ties.push(tie);
+    } else {
+      finalTies.push(tie);
+    }
+  });
+
+  if (finalTies.length > 0) {
+    zones.push({ key: 'final', label: '최종 라운드', shortLabel: '최종', ties: finalTies });
+  }
+  return zones;
+}
+
 // 단체전 대진 표시 (읽기전용) — 조별 팀 순위 + 타이·서브매치 결과·오더 + 본선.
 // 오더는 양 팀 모두 제출해야(블라인드) 공개된다.
 export function TeamBracketView({
@@ -33,6 +88,7 @@ export function TeamBracketView({
   const [phase, setPhase] = useState<'group' | 'knockout'>('group');
   const [knockoutView, setKnockoutView] = useState<'tree' | 'list'>('tree');
   const [selectedKoRound, setSelectedKoRound] = useState<number | null>(null);
+  const [selectedBracketZone, setSelectedBracketZone] = useState<string | null>(null);
   const [playerQuery, setPlayerQuery] = useState('');
   const [matchDetailTieId, setMatchDetailTieId] = useState<string | null>(null);
   const [lineupTieId, setLineupTieId] = useState<string | null>(null);
@@ -101,8 +157,15 @@ export function TeamBracketView({
   const visibleKoTies = normalizedPlayerQuery
     ? koTies.filter((tie) => (tie.team1_id && matchedTeamIds.has(tie.team1_id)) || (tie.team2_id && matchedTeamIds.has(tie.team2_id)))
     : koTies;
-  const visibleKoRounds = [...new Set(visibleKoTies.map((tie) => tie.round_order ?? 1))].sort((a, b) => a - b);
-  const activeKoRound = selectedKoRound && visibleKoRounds.includes(selectedKoRound) ? selectedKoRound : visibleKoRounds[0] ?? null;
+  const bracketZones = splitKnockoutIntoZones(koTies, koRounds);
+  const visibleTieIds = new Set(visibleKoTies.map((tie) => tie.id));
+  const visibleBracketZones = bracketZones
+    .map((zone) => ({ ...zone, ties: zone.ties.filter((tie) => visibleTieIds.has(tie.id)) }))
+    .filter((zone) => !normalizedPlayerQuery || zone.ties.length > 0);
+  const activeBracketZone = visibleBracketZones.find((zone) => zone.key === selectedBracketZone) ?? visibleBracketZones[0] ?? null;
+  const activeBracketTies = bracketZones.length > 0 ? activeBracketZone?.ties ?? [] : visibleKoTies;
+  const activeBracketRounds = [...new Set(activeBracketTies.map((tie) => tie.round_order ?? 1))].sort((a, b) => a - b);
+  const activeKoRound = selectedKoRound && activeBracketRounds.includes(selectedKoRound) ? selectedKoRound : activeBracketRounds[0] ?? null;
   const myTeam = teams.find((team) => team.captain_id === uid || team.members.some((member) => member.user_id === uid));
   const captainTeam = teams.find((team) => team.captain_id === uid && team.status === 'approved');
   const myUpcomingTies = myTeam
@@ -314,6 +377,34 @@ export function TeamBracketView({
               {matchedTeamIds.size > 0 ? `일치 팀 ${matchedTeamIds.size}개 · 경기 ${visibleKoTies.length}개` : '일치하는 선수가 없어요.'}
             </Text>
           ) : null}
+          {bracketZones.length > 0 && visibleBracketZones.length > 0 ? (
+            <View style={styles.zoneSection}>
+              <View style={styles.zoneHeader}>
+                <Text style={styles.zoneTitle}>대진 구역</Text>
+                <Text style={styles.zoneMeta}>구역당 최대 64팀</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.zoneTabs}>
+                {visibleBracketZones.map((zone) => {
+                  const active = activeBracketZone?.key === zone.key;
+                  return (
+                    <Pressable
+                      key={zone.key}
+                      onPress={() => {
+                        setSelectedBracketZone(zone.key);
+                        setSelectedKoRound(null);
+                      }}
+                      style={[styles.zoneTab, active && styles.zoneTabOn]}>
+                      <Text style={[styles.zoneTabShort, active && styles.zoneTabShortOn]}>{zone.shortLabel}</Text>
+                      <View style={styles.zoneTabCopy}>
+                        <Text style={[styles.zoneTabLabel, active && styles.zoneTabLabelOn]}>{zone.label}</Text>
+                        <Text style={styles.zoneTabCount}>{zone.ties.length}경기</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
           <View style={styles.viewSwitch}>
             {([
               { key: 'tree' as const, label: '대진표', icon: 'git-network-outline' as const },
@@ -325,7 +416,7 @@ export function TeamBracketView({
               </Pressable>
             ))}
           </View>
-          {visibleKoTies.length === 0 ? (
+          {activeBracketTies.length === 0 ? (
             <View style={styles.searchEmpty}>
               <Ionicons name="search-outline" size={22} color={AppColors.textMuted} />
               <Text style={styles.searchEmptyText}>검색된 선수의 본선 경기가 없어요.</Text>
@@ -334,7 +425,7 @@ export function TeamBracketView({
             <>
               <Text style={styles.treeHint}>좌우로 움직여 전체 대진을 확인하고, 경기를 누르면 상세 정보가 열려요.</Text>
               <TeamKnockoutTree
-                ties={visibleKoTies}
+                ties={activeBracketTies}
                 subs={subs}
                 nameOf={nameOf}
                 selectedId={selectedKoTieId}
@@ -347,8 +438,8 @@ export function TeamBracketView({
           ) : (
             <View style={styles.knockoutList}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roundTabs}>
-                {visibleKoRounds.map((round) => {
-                  const roundTies = visibleKoTies.filter((tie) => (tie.round_order ?? 1) === round);
+                {activeBracketRounds.map((round) => {
+                  const roundTies = activeBracketTies.filter((tie) => (tie.round_order ?? 1) === round);
                   const active = activeKoRound === round;
                   return (
                     <Pressable key={round} onPress={() => setSelectedKoRound(round)} style={[styles.roundTab, active && styles.roundTabOn]}>
@@ -359,7 +450,7 @@ export function TeamBracketView({
                 })}
               </ScrollView>
               {activeKoRound ? (() => {
-                const roundTies = visibleKoTies.filter((tie) => (tie.round_order ?? 1) === activeKoRound);
+                const roundTies = activeBracketTies.filter((tie) => (tie.round_order ?? 1) === activeKoRound);
                 return (
                   <View style={styles.roundListSection}>
                     <View style={styles.roundListHead}>
@@ -638,6 +729,19 @@ const styles = StyleSheet.create({
   playerSearch: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface, marginBottom: 8 },
   playerSearchInput: { flex: 1, color: AppColors.textPrimary, fontSize: 14, paddingVertical: 0 },
   searchResultText: { color: AppColors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 8 },
+  zoneSection: { gap: 7, marginBottom: 10 },
+  zoneHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  zoneTitle: { color: AppColors.textPrimary, fontSize: 12, fontWeight: '900' },
+  zoneMeta: { color: AppColors.textMuted, fontSize: 10, fontWeight: '700' },
+  zoneTabs: { gap: 7, paddingBottom: 2 },
+  zoneTab: { minWidth: 118, height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 8, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface },
+  zoneTabOn: { borderColor: 'rgba(22,199,132,0.55)', backgroundColor: 'rgba(22,199,132,0.13)' },
+  zoneTabShort: { width: 30, height: 30, borderRadius: 6, textAlign: 'center', textAlignVertical: 'center', color: AppColors.textSecondary, fontSize: 12, fontWeight: '900', backgroundColor: AppColors.surfaceSoft, overflow: 'hidden' },
+  zoneTabShortOn: { color: AppColors.primary, backgroundColor: 'rgba(22,199,132,0.15)' },
+  zoneTabCopy: { gap: 2 },
+  zoneTabLabel: { color: AppColors.textSecondary, fontSize: 11, fontWeight: '900' },
+  zoneTabLabelOn: { color: AppColors.textPrimary },
+  zoneTabCount: { color: AppColors.textMuted, fontSize: 9.5, fontWeight: '700' },
   searchEmpty: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface },
   searchEmptyText: { color: AppColors.textMuted, fontSize: 13, fontWeight: '700' },
   viewSwitch: { flexDirection: 'row', padding: 3, borderRadius: 8, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, marginBottom: 10 },
