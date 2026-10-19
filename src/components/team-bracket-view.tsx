@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { TeamLineup } from '@/components/team-lineup';
@@ -32,6 +32,8 @@ export function TeamBracketView({
   const [selectedKoTieId, setSelectedKoTieId] = useState<string | null>(null);
   const [phase, setPhase] = useState<'group' | 'knockout'>('group');
   const [knockoutView, setKnockoutView] = useState<'tree' | 'list'>('tree');
+  const [selectedKoRound, setSelectedKoRound] = useState<number | null>(null);
+  const [playerQuery, setPlayerQuery] = useState('');
   const [matchDetailTieId, setMatchDetailTieId] = useState<string | null>(null);
   const [lineupTieId, setLineupTieId] = useState<string | null>(null);
 
@@ -85,6 +87,22 @@ export function TeamBracketView({
   const groupNos = [...new Set(groupTies.map((x) => x.group_no ?? 1))].sort((a, b) => a - b);
   const koTies = ties.filter((x) => x.phase === 'knockout').sort((a, b) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot);
   const koRounds = [...new Set(koTies.map((x) => x.round_order ?? 1))].sort((a, b) => a - b);
+  const normalizedPlayerQuery = playerQuery.trim().toLowerCase();
+  const matchedTeamIds = new Set(
+    normalizedPlayerQuery
+      ? teams
+          .filter((team) =>
+            team.name.toLowerCase().includes(normalizedPlayerQuery) ||
+            team.members.some((member) => (member.profiles?.nickname ?? '').toLowerCase().includes(normalizedPlayerQuery)),
+          )
+          .map((team) => team.id)
+      : teams.map((team) => team.id),
+  );
+  const visibleKoTies = normalizedPlayerQuery
+    ? koTies.filter((tie) => (tie.team1_id && matchedTeamIds.has(tie.team1_id)) || (tie.team2_id && matchedTeamIds.has(tie.team2_id)))
+    : koTies;
+  const visibleKoRounds = [...new Set(visibleKoTies.map((tie) => tie.round_order ?? 1))].sort((a, b) => a - b);
+  const activeKoRound = selectedKoRound && visibleKoRounds.includes(selectedKoRound) ? selectedKoRound : visibleKoRounds[0] ?? null;
   const myTeam = teams.find((team) => team.captain_id === uid || team.members.some((member) => member.user_id === uid));
   const captainTeam = teams.find((team) => team.captain_id === uid && team.status === 'approved');
   const myUpcomingTies = myTeam
@@ -97,7 +115,8 @@ export function TeamBracketView({
     const tsubs = subs.filter((x) => x.tie_id === tie.id);
     const w1 = tsubs.filter((x) => x.winner === 'team1').length;
     const w2 = tsubs.filter((x) => x.winner === 'team2').length;
-    const done = tie.status === 'done';
+    const teamsConfirmed = !!tie.team1_id && !!tie.team2_id;
+    const done = teamsConfirmed && tie.status === 'done';
     const expanded = showAllMatches || expandedTieId === tie.id;
     const canSubmitLineup = !!captainTeam && !!tie.court_id && !done && (tie.team1_id === captainTeam.id || tie.team2_id === captainTeam.id);
     // 오더는 양 팀 모두 제출해야 공개 (또는 경기 종료 시)
@@ -106,7 +125,9 @@ export function TeamBracketView({
       <View style={styles.tie}>
         <Pressable disabled={showAllMatches} onPress={() => setExpandedTieId(expanded ? null : tie.id)} style={styles.tiePress}>
           <View style={styles.tieStatusRow}>
-            <Text style={styles.tieStatus}>{done ? '종료' : tie.court_id ? courts.find((c) => c.id === tie.court_id)?.name ?? '코트 배정' : '예정'}</Text>
+            <Text style={styles.tieStatus}>
+              {!teamsConfirmed ? '진행 전 · 상대 대기' : done ? '종료' : tie.court_id ? courts.find((c) => c.id === tie.court_id)?.name ?? '코트 배정' : '예정'}
+            </Text>
             {showAllMatches ? (
               <Text style={styles.tieHint}>{tsubs.length}경기</Text>
             ) : (
@@ -114,9 +135,9 @@ export function TeamBracketView({
             )}
           </View>
           <View style={styles.tieHead}>
-            <Text style={[styles.tieName, done && tie.winner_team_id === tie.team1_id && styles.win]} numberOfLines={1}>{nameOf(tie.team1_id)}</Text>
-            <View style={styles.scoreBox}><Text style={styles.tieScore}>{w1} : {w2}</Text></View>
-            <Text style={[styles.tieName, styles.right, done && tie.winner_team_id === tie.team2_id && styles.win]} numberOfLines={1}>{nameOf(tie.team2_id)}</Text>
+            <Text style={[styles.tieName, done && !!tie.winner_team_id && tie.winner_team_id === tie.team1_id && styles.win]} numberOfLines={1}>{nameOf(tie.team1_id)}</Text>
+            <View style={styles.scoreBox}><Text style={styles.tieScore}>{done ? `${w1} : ${w2}` : 'VS'}</Text></View>
+            <Text style={[styles.tieName, styles.right, done && !!tie.winner_team_id && tie.winner_team_id === tie.team2_id && styles.win]} numberOfLines={1}>{nameOf(tie.team2_id)}</Text>
           </View>
         </Pressable>
         {canSubmitLineup ? (
@@ -270,6 +291,27 @@ export function TeamBracketView({
       {phase === 'knockout' && koTies.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}><View><Text style={styles.eyebrow}>KNOCKOUT</Text><Text style={styles.sectionTitle}>본선 토너먼트</Text></View><Ionicons name="trophy-outline" size={22} color="#F5B942" /></View>
+          <View style={styles.playerSearch}>
+            <Ionicons name="search" size={17} color={AppColors.textMuted} />
+            <TextInput
+              value={playerQuery}
+              onChangeText={setPlayerQuery}
+              placeholder="선수 이름으로 대진 검색"
+              placeholderTextColor={AppColors.textMuted}
+              autoCapitalize="none"
+              style={styles.playerSearchInput}
+            />
+            {playerQuery ? (
+              <Pressable onPress={() => setPlayerQuery('')} hitSlop={8} accessibilityLabel="검색어 지우기">
+                <Ionicons name="close-circle" size={19} color={AppColors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+          {normalizedPlayerQuery ? (
+            <Text style={styles.searchResultText}>
+              {matchedTeamIds.size > 0 ? `일치 팀 ${matchedTeamIds.size}개 · 경기 ${visibleKoTies.length}개` : '일치하는 선수가 없어요.'}
+            </Text>
+          ) : null}
           <View style={styles.viewSwitch}>
             {([
               { key: 'tree' as const, label: '대진표', icon: 'git-network-outline' as const },
@@ -281,11 +323,16 @@ export function TeamBracketView({
               </Pressable>
             ))}
           </View>
-          {knockoutView === 'tree' ? (
+          {visibleKoTies.length === 0 ? (
+            <View style={styles.searchEmpty}>
+              <Ionicons name="search-outline" size={22} color={AppColors.textMuted} />
+              <Text style={styles.searchEmptyText}>검색된 선수의 본선 경기가 없어요.</Text>
+            </View>
+          ) : knockoutView === 'tree' ? (
             <>
               <Text style={styles.treeHint}>좌우로 움직여 전체 대진을 확인하고, 경기를 누르면 상세 정보가 열려요.</Text>
               <TeamKnockoutTree
-                ties={koTies}
+                ties={visibleKoTies}
                 subs={subs}
                 nameOf={nameOf}
                 selectedId={selectedKoTieId}
@@ -297,15 +344,30 @@ export function TeamBracketView({
             </>
           ) : (
             <View style={styles.knockoutList}>
-              {koRounds.map((round) => {
-                const roundTies = koTies.filter((tie) => (tie.round_order ?? 1) === round);
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roundTabs}>
+                {visibleKoRounds.map((round) => {
+                  const roundTies = visibleKoTies.filter((tie) => (tie.round_order ?? 1) === round);
+                  const active = activeKoRound === round;
+                  return (
+                    <Pressable key={round} onPress={() => setSelectedKoRound(round)} style={[styles.roundTab, active && styles.roundTabOn]}>
+                      <Text style={[styles.roundTabText, active && styles.roundTabTextOn]}>{roundTies[0]?.round_name ?? `${round}라운드`}</Text>
+                      <Text style={[styles.roundTabCount, active && styles.roundTabCountOn]}>{roundTies.length}경기</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              {activeKoRound ? (() => {
+                const roundTies = visibleKoTies.filter((tie) => (tie.round_order ?? 1) === activeKoRound);
                 return (
-                  <View key={round} style={styles.roundListSection}>
-                    <Text style={styles.roundListTitle}>{roundTies[0]?.round_name ?? `${round}라운드`}</Text>
+                  <View style={styles.roundListSection}>
+                    <View style={styles.roundListHead}>
+                      <Text style={styles.roundListTitle}>{roundTies[0]?.round_name ?? `${activeKoRound}라운드`}</Text>
+                      <Text style={styles.roundListMeta}>{roundTies.filter((tie) => tie.status === 'done').length}/{roundTies.length} 완료</Text>
+                    </View>
                     <View style={styles.roundListMatches}>{roundTies.map((tie) => <TieRow key={tie.id} tie={tie} />)}</View>
                   </View>
                 );
-              })}
+              })() : null}
             </View>
           )}
           {(() => {
@@ -571,14 +633,28 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: AppColors.textSecondary, textAlign: 'center', lineHeight: 20 },
   pending: { fontSize: 12, color: AppColors.textMuted, marginTop: 6 },
   treeHint: { color: AppColors.textMuted, fontSize: 11, lineHeight: 17, marginBottom: 8 },
+  playerSearch: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface, marginBottom: 8 },
+  playerSearchInput: { flex: 1, color: AppColors.textPrimary, fontSize: 14, paddingVertical: 0 },
+  searchResultText: { color: AppColors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 8 },
+  searchEmpty: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface },
+  searchEmptyText: { color: AppColors.textMuted, fontSize: 13, fontWeight: '700' },
   viewSwitch: { flexDirection: 'row', padding: 3, borderRadius: 8, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, marginBottom: 10 },
   viewSwitchButton: { flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 6 },
   viewSwitchButtonOn: { backgroundColor: 'rgba(22,199,132,0.13)' },
   viewSwitchText: { color: AppColors.textMuted, fontSize: 12, fontWeight: '800' },
   viewSwitchTextOn: { color: AppColors.textPrimary },
   knockoutList: { gap: 18 },
+  roundTabs: { gap: 7, paddingBottom: 2 },
+  roundTab: { minWidth: 76, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface },
+  roundTabOn: { borderColor: 'rgba(22,199,132,0.55)', backgroundColor: 'rgba(22,199,132,0.13)' },
+  roundTabText: { color: AppColors.textSecondary, fontSize: 12, fontWeight: '900' },
+  roundTabTextOn: { color: AppColors.primary },
+  roundTabCount: { color: AppColors.textMuted, fontSize: 10, fontWeight: '700', marginTop: 2 },
+  roundTabCountOn: { color: AppColors.textSecondary },
   roundListSection: { gap: 8 },
+  roundListHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   roundListTitle: { color: AppColors.primary, fontSize: 13, fontWeight: '900' },
+  roundListMeta: { color: AppColors.textMuted, fontSize: 11, fontWeight: '700' },
   roundListMatches: { gap: 8 },
   championBox: { flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: 'rgba(245,185,66,0.10)', borderWidth: 1, borderColor: 'rgba(245,185,66,0.28)' },
   championIcon: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(245,185,66,0.13)' },

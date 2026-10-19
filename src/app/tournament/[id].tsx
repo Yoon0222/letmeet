@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -59,6 +59,7 @@ export default function TournamentDetail() {
   const [coverIdx, setCoverIdx] = useState(0); // 대회 사진 갤러리: 크게 볼 사진 인덱스
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
   const [teamRev, setTeamRev] = useState(0); // 단체전 오더 저장 시 대진뷰 새로고침 트리거
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -140,6 +141,7 @@ export default function TournamentDetail() {
   const canRegister = t?.status === 'registration' && matches.length === 0;
   const isDoubles = t?.discipline === 'doubles';
   const isTeam = t?.format === 'team'; // 단체전: 개인 신청 대신 팀 신청 UI
+  const showTournamentOverview = isTeam ? tab !== 'bracket' : tab === 'players';
   const isOrganizer = !!t && t.organizer_id === uid;
 
   // 조추첨 공개: 시합 전날 오후 7시부터 선수에게 공개 (운영자는 항상)
@@ -383,7 +385,7 @@ export default function TournamentDetail() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerArea}>
+        {showTournamentOverview ? <View style={styles.headerArea}>
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
               <View style={styles.badgeRow}>
@@ -405,8 +407,8 @@ export default function TournamentDetail() {
               <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
             </View>
           </View>
-        </View>
-        {(
+        </View> : null}
+        {showTournamentOverview && (
           <>
             {t.images?.length ? (
               <View style={styles.gallery}>
@@ -686,6 +688,19 @@ export default function TournamentDetail() {
           </>
         )}
 
+        {!showTournamentOverview ? (
+          <View style={styles.compactTournamentBar}>
+            <View style={styles.compactTournamentCopy}>
+              <Text style={styles.compactTournamentLabel}>{isTeam ? '단체전 대진' : tab === 'prelim' ? '예선 대진' : '본선 대진'}</Text>
+              <Text style={styles.compactTournamentTitle} numberOfLines={1}>{t.title}</Text>
+            </View>
+            <Pressable onPress={() => setShowInfoModal(true)} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="대회 정보 보기">
+              <Ionicons name="information-circle-outline" size={18} color="#16C784" />
+              <Text style={styles.infoButtonText}>대회 정보</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.tabBar}>
           {(isTeam ? teamTabItems : tabItems).map((it) => {
             const active = tab === it.key;
@@ -872,6 +887,50 @@ export default function TournamentDetail() {
         )}
 
       </ScrollView>
+
+      <Modal visible={showInfoModal} transparent animationType="fade" onRequestClose={() => setShowInfoModal(false)}>
+        <View style={styles.infoModalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowInfoModal(false)} />
+          <View style={styles.infoModalCard}>
+            <View style={styles.infoModalHead}>
+              <View style={styles.infoModalHeadCopy}>
+                <Text style={styles.infoModalEyebrow}>TOURNAMENT INFO</Text>
+                <Text style={styles.infoModalTitle} numberOfLines={2}>{t.title}</Text>
+              </View>
+              <Pressable onPress={() => setShowInfoModal(false)} style={styles.infoModalClose} accessibilityLabel="대회 정보 닫기">
+                <Ionicons name="close" size={22} color="#F8FAFC" />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.infoModalContent}>
+              <View style={styles.infoModalMeta}>
+                <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
+                <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
+              </View>
+              <View style={styles.infoGrid}>
+                <InfoTile icon="ribbon-outline" label="참가 실력" value={skillRangeLabel(t.skill_min, t.skill_max)} />
+                <InfoTile icon="people-outline" label="참가 현황" value={`${t.approved_count + t.pending_count}/${t.max_participants}${t.format === 'team' || isDoubles ? '팀' : '명'}`} />
+                <InfoTile icon="cash-outline" label="참가비" value={t.fee > 0 ? `${t.fee.toLocaleString()}원` : '무료'} />
+                <InfoTile icon="hourglass-outline" label="접수 마감" value={t.registration_deadline ? formatMeetupTime(t.registration_deadline) : '별도 공지'} />
+              </View>
+              {courts.length > 0 ? (
+                <View style={styles.infoModalSection}>
+                  <Text style={styles.sectionTitle}>코트 {courts.length}면</Text>
+                  <View style={styles.courtWrap}>
+                    {courts.map((court) => (
+                      <View key={court.id} style={styles.courtChip}>
+                        <Text style={styles.courtName}>{court.name}</Text>
+                        <View style={[styles.courtTag, { backgroundColor: court.indoor ? 'rgba(56,132,255,0.14)' : 'rgba(245,166,35,0.16)' }]}>
+                          <Text style={[styles.courtTagText, { color: court.indoor ? '#67A4FF' : '#F5A623' }]}>{court.indoor ? '실내' : '실외'}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {!isTeam && (
       <View style={styles.actionBar}>
@@ -1070,6 +1129,12 @@ const styles = StyleSheet.create({
   tabPillActive: { borderBottomColor: '#16C784' },
   tabText: { color: '#7F8B98', fontSize: 14, fontWeight: '700' },
   tabTextActive: { color: '#F8FAFC', fontWeight: '900' },
+  compactTournamentBar: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 4 },
+  compactTournamentCopy: { flex: 1, minWidth: 0 },
+  compactTournamentLabel: { color: '#16C784', fontSize: 10, fontWeight: '900' },
+  compactTournamentTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '900', marginTop: 2 },
+  infoButton: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(22,199,132,0.35)', backgroundColor: 'rgba(22,199,132,0.08)' },
+  infoButtonText: { color: '#16C784', fontSize: 11, fontWeight: '900' },
   badgeRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   title: { fontSize: 23, lineHeight: 31, fontWeight: '900', color: '#F8FAFC' },
   gallery: { marginBottom: Spacing.three, gap: 8 },
@@ -1325,4 +1390,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
+  infoModalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(0,0,0,0.72)' },
+  infoModalCard: { width: '100%', maxHeight: '82%', borderRadius: 8, borderCurve: 'continuous', overflow: 'hidden', backgroundColor: '#070A0D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  infoModalHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)' },
+  infoModalHeadCopy: { flex: 1 },
+  infoModalEyebrow: { color: '#16C784', fontSize: 10, fontWeight: '900' },
+  infoModalTitle: { color: '#F8FAFC', fontSize: 18, lineHeight: 24, fontWeight: '900', marginTop: 3 },
+  infoModalClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  infoModalContent: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.four },
+  infoModalMeta: { gap: 8 },
+  infoModalSection: { gap: 6 },
 });
