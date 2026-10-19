@@ -36,9 +36,11 @@ function NewTournamentInner() {
   const [duprCertified, setDuprCertified] = useState(false);
   const [duprPremium, setDuprPremium] = useState(false); // DUPR+ 전용 (0084)
   // 단체전 설정
-  const [teamMinSize, setTeamMinSize] = useState(2);
+  const [teamMinSize, setTeamMinSize] = useState(4);
   const [tieSingles, setTieSingles] = useState(2);
   const [tieDoubles, setTieDoubles] = useState(1);
+  // 한 대결에서 한 선수는 한 게임만(0102) → 오더를 내려면 팀에 적어도 단식 수 + 복식 수×2 명이 있어야 한다(서버도 0103 으로 맞춘다)
+  const teamNeed = tieSingles + 2 * tieDoubles;
   const [venue, setVenue] = useState('');
   const [region, setRegion] = useState('');
   const [startAt, setStartAt] = useState('');
@@ -147,6 +149,10 @@ function NewTournamentInner() {
       setError('최소 실력이 최대 실력보다 클 수 없습니다.');
       return;
     }
+    if (format === 'team' && tieSingles + tieDoubles === 0) {
+      setError('단체전은 한 대결에 단식이나 복식이 한 경기 이상 있어야 합니다.');
+      return;
+    }
     setSaving(true);
     const { data, error } = await supabase
       .from('tournaments')
@@ -155,7 +161,7 @@ function NewTournamentInner() {
         title: title.trim(),
         format,
         discipline,
-        team_min_size: teamMinSize,
+        team_min_size: Math.max(teamMinSize, teamNeed),
         tie_singles: tieSingles,
         tie_doubles: tieDoubles,
         venue: venue.trim(),
@@ -216,17 +222,50 @@ function NewTournamentInner() {
             <span className="mb-2 block text-sm font-medium text-slate-700">단체전 설정</span>
             <div className="grid grid-cols-3 gap-4">
               <Field label="팀당 최소 인원">
-                <input type="number" min={1} max={20} className={inputCls} value={teamMinSize} onChange={(e) => setTeamMinSize(Number(e.target.value))} />
+                <input
+                  type="number"
+                  min={Math.max(1, teamNeed)}
+                  max={Math.max(20, teamNeed)}
+                  className={inputCls}
+                  value={teamMinSize}
+                  onChange={(e) => setTeamMinSize(Number(e.target.value))}
+                  onBlur={() => setTeamMinSize((m) => Math.max(m, teamNeed))}
+                />
               </Field>
               <Field label="타이당 단식 수">
-                <input type="number" min={0} max={9} className={inputCls} value={tieSingles} onChange={(e) => setTieSingles(Number(e.target.value))} />
+                <input
+                  type="number"
+                  min={0}
+                  max={9}
+                  className={inputCls}
+                  value={tieSingles}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setTieSingles(v);
+                    setTeamMinSize((m) => Math.max(m, v + 2 * tieDoubles));
+                  }}
+                />
               </Field>
               <Field label="타이당 복식 수">
-                <input type="number" min={0} max={9} className={inputCls} value={tieDoubles} onChange={(e) => setTieDoubles(Number(e.target.value))} />
+                <input
+                  type="number"
+                  min={0}
+                  max={9}
+                  className={inputCls}
+                  value={tieDoubles}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setTieDoubles(v);
+                    setTeamMinSize((m) => Math.max(m, tieSingles + 2 * v));
+                  }}
+                />
               </Field>
             </div>
             <p className="mt-2 text-xs text-slate-500">
               팀 대 팀 한 판(타이)은 단식 {tieSingles}경기 + 복식 {tieDoubles}경기 = 총 {tieSingles + tieDoubles}경기로 겨루고, 더 많이 이긴 팀이 승리합니다.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              한 선수는 한 대결에서 한 게임만 나갈 수 있어서 팀당 최소 {teamNeed}명이 필요합니다(단식 {tieSingles}명 + 복식 {tieDoubles}조×2명).
             </p>
           </div>
         ) : (

@@ -1339,55 +1339,45 @@ create policy "tie_matches_write_organizer" on public.tie_matches for all using 
 );
 
 -- 오더(라인업): 주장이 자기 팀 서브매치 출전 선수 지정 (0040/0041). 제출 후 수정 불가.
+--   (0102) 정확한 인원·같은 게임 안 중복 없음·그 팀 선수만. 다른 게임과 겹치는지는 제출 때 검사한다
+--   (게임별로 저장하므로 여기서 막으면 두 게임의 선수를 맞바꿀 수 없게 된다). 오류 문구는 한국어.
 create or replace function public.set_tie_lineup(p_tie_match uuid, p_side text, p_players uuid[])
 returns void
 language plpgsql
 security definer set search_path = public
 as $$
 declare
-  v_ok boolean;
-  v_ready boolean;
   v_tie uuid;
   v_team uuid;
+  v_ready boolean;
   v_needed int;
   v_member_count int;
   v_unique_count int;
-  v_overlap boolean;
 begin
-  if p_side not in ('team1', 'team2') then raise exception 'invalid side'; end if;
-  select exists (
-    select 1 from public.tie_matches tm
-    join public.tournament_ties tt on tt.id = tm.tie_id
-    join public.tournament_teams team
-      on team.id = (case when p_side = 'team1' then tt.team1_id else tt.team2_id end)
-    where tm.id = p_tie_match and team.captain_id = auth.uid()
-  ) into v_ok;
-  if not v_ok then raise exception 'not captain of this side'; end if;
-  select (case when p_side = 'team1' then tt.team1_lineup_ready else tt.team2_lineup_ready end) into v_ready
-  from public.tie_matches tm join public.tournament_ties tt on tt.id = tm.tie_id where tm.id = p_tie_match;
-  if v_ready then raise exception 'lineup already submitted'; end if;
+  if p_side not in ('team1', 'team2') then raise exception '잘못된 요청이에요.'; end if;
 
   select tm.tie_id,
          case when p_side = 'team1' then tt.team1_id else tt.team2_id end,
+         case when p_side = 'team1' then tt.team1_lineup_ready else tt.team2_lineup_ready end,
          case when tm.kind = 'singles' then 1 else 2 end
-    into v_tie, v_team, v_needed
+    into v_tie, v_team, v_ready, v_needed
   from public.tie_matches tm
   join public.tournament_ties tt on tt.id = tm.tie_id
-  where tm.id = p_tie_match;
-  if coalesce(cardinality(p_players), 0) <> v_needed then raise exception 'invalid player count'; end if;
+  join public.tournament_teams team
+    on team.id = (case when p_side = 'team1' then tt.team1_id else tt.team2_id end)
+  where tm.id = p_tie_match and team.captain_id = auth.uid();
+
+  if v_tie is null then raise exception '우리 팀 주장만 오더를 정할 수 있어요.'; end if;
+  if v_ready then raise exception '이미 제출한 오더는 바꿀 수 없어요.'; end if;
+  if coalesce(cardinality(p_players), 0) <> v_needed then raise exception '단식은 1명, 복식은 2명을 골라 주세요.'; end if;
+
   select count(distinct player_id) into v_unique_count from unnest(p_players) as player_ids(player_id);
-  if v_unique_count <> v_needed then raise exception 'duplicate player in match'; end if;
+  if v_unique_count <> v_needed then raise exception '한 게임에 같은 선수를 두 번 넣을 수 없어요.'; end if;
+
   select count(*) into v_member_count
   from public.tournament_team_members
   where team_id = v_team and user_id = any(p_players);
-  if v_member_count <> v_needed then raise exception 'player is not a team member'; end if;
-  select exists (
-    select 1
-    from public.tie_matches other
-    cross join lateral unnest(case when p_side = 'team1' then other.team1_players else other.team2_players end) as assigned(existing_player)
-    where other.tie_id = v_tie and other.id <> p_tie_match and existing_player = any(p_players)
-  ) into v_overlap;
-  if v_overlap then raise exception 'player already assigned to another match'; end if;
+  if v_member_count <> v_needed then raise exception '우리 팀 선수만 넣을 수 있어요.'; end if;
 
   if p_side = 'team1' then
     update public.tie_matches set team1_players = p_players where id = p_tie_match;
@@ -1398,6 +1388,7 @@ end;
 $$;
 
 -- 오더 제출(잠금): 모든 서브매치 라인업 완성 시 제출 (0041). 양 팀 제출 시 공개.
+--   (0102) 한 선수가 같은 대결의 두 게임 이상에 들어가 있으면 거절.
 create or replace function public.submit_tie_lineup(p_tie uuid, p_side text)
 returns void
 language plpgsql
@@ -1409,24 +1400,31 @@ declare
   v_assigned int;
   v_unique int;
 begin
-  if p_side not in ('team1', 'team2') then raise exception 'invalid side'; end if;
+  if p_side not in ('team1', 'team2') then raise exception '잘못된 요청이에요.'; end if;
   select exists (
     select 1 from public.tournament_ties tt
-    join public.tournament_teams team on team.id = (case when p_side = 'team1' then tt.team1_id else tt.team2_id end)
+    join public.tournament_teams team
+      on team.id = (case when p_side = 'team1' then tt.team1_id else tt.team2_id end)
     where tt.id = p_tie and team.captain_id = auth.uid()
   ) into v_cap;
-  if not v_cap then raise exception 'not captain of this side'; end if;
-  select count(*) into v_incomplete from public.tie_matches tm
+  if not v_cap then raise exception '우리 팀 주장만 오더를 제출할 수 있어요.'; end if;
+
+  select count(*) into v_incomplete
+  from public.tie_matches tm
   where tm.tie_id = p_tie
-    and coalesce(array_length(case when p_side = 'team1' then tm.team1_players else tm.team2_players end, 1), 0)
+    and coalesce(cardinality(case when p_side = 'team1' then tm.team1_players else tm.team2_players end), 0)
         <> (case when tm.kind = 'singles' then 1 else 2 end);
-  if v_incomplete > 0 then raise exception 'lineup incomplete'; end if;
+  if v_incomplete > 0 then raise exception '모든 게임의 선수를 먼저 정해 주세요.'; end if;
+
   select count(*), count(distinct player_id)
     into v_assigned, v_unique
   from public.tie_matches tm
-  cross join lateral unnest(case when p_side = 'team1' then tm.team1_players else tm.team2_players end) as assigned(player_id)
+  cross join lateral unnest(
+    case when p_side = 'team1' then tm.team1_players else tm.team2_players end
+  ) as assigned(player_id)
   where tm.tie_id = p_tie;
-  if v_assigned <> v_unique then raise exception 'duplicate player across matches'; end if;
+  if v_assigned <> v_unique then raise exception '한 선수는 같은 대결에서 한 게임만 나갈 수 있어요.'; end if;
+
   if p_side = 'team1' then
     update public.tournament_ties set team1_lineup_ready = true where id = p_tie;
   else
@@ -5754,3 +5752,48 @@ join public.profiles p on p.id = t.organizer_id;
 
 notify pgrst, 'reload schema';
 -- ══ /단체전 소속 클럽 + 용병 ══
+
+-- ══ 단체전 팀 최소 인원 보정 ══ (0103_team_min_size.sql 과 같은 내용)
+-- 0103: 단체전 팀 최소 인원·종목 표시 보정
+--
+-- ① 팀 최소 인원: 0102 로 한 대결 안에서 한 선수는 한 게임만 나간다. 그래서 팀에는 적어도 '단식 수 + 복식 수×2' 명이
+--    있어야 오더를 낼 수 있다. 단체전을 만들거나 대결 구성을 바꿀 때 팀 최소 인원(team_min_size)이 그보다 작으면
+--    서버가 그 수로 올린다 — 관리자 웹·앱 클럽 대회 만들기 모두(앱 클럽 대회는 기본값 2명·단식 2·복식 1 을 그대로 쓴다).
+--    그보다 크게 잡은 값은 그대로 둔다.
+-- ② 종목(discipline): 단체전 만들기 화면에는 종목 칸이 없어 기본값 '단식'으로 들어갔다 — 복식만 하는 단체전에도
+--    '단식' 배지가 붙었다. 단체전은 대결 구성에서 정한다: 복식만 있으면 복식, 단식만 있으면 단식(섞여 있으면 그대로).
+-- 개인전·KDK 는 건드리지 않는다.
+create or replace function public.tournament_team_min_size_fix()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.format = 'team' then
+    new.team_min_size := greatest(coalesce(new.team_min_size, 0),
+                                  coalesce(new.tie_singles, 0) + 2 * coalesce(new.tie_doubles, 0));
+    new.discipline := case
+      when coalesce(new.tie_singles, 0) = 0 and coalesce(new.tie_doubles, 0) > 0 then 'doubles'
+      when coalesce(new.tie_doubles, 0) = 0 and coalesce(new.tie_singles, 0) > 0 then 'singles'
+      else new.discipline
+    end;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists tournaments_team_min_size_fix on public.tournaments;
+create trigger tournaments_team_min_size_fix
+  before insert or update of format, discipline, team_min_size, tie_singles, tie_doubles on public.tournaments
+  for each row execute function public.tournament_team_min_size_fix();
+
+revoke all on function public.tournament_team_min_size_fix() from public, anon, authenticated;
+
+-- 이미 있는 단체전도 맞춘다(위 트리거가 같은 값으로 계산한다)
+update public.tournaments
+   set team_min_size = greatest(team_min_size, tie_singles + 2 * tie_doubles)
+ where format = 'team'
+   and (team_min_size < tie_singles + 2 * tie_doubles
+        or (tie_singles = 0 and tie_doubles > 0 and discipline <> 'doubles')
+        or (tie_doubles = 0 and tie_singles > 0 and discipline <> 'singles'));
+-- ══ /단체전 팀 최소 인원 보정 ══
