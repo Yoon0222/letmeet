@@ -116,7 +116,9 @@ export function TeamBracketView({
     const w1 = tsubs.filter((x) => x.winner === 'team1').length;
     const w2 = tsubs.filter((x) => x.winner === 'team2').length;
     const teamsConfirmed = !!tie.team1_id && !!tie.team2_id;
+    const isBye = !teamsConfirmed && tie.status === 'done'; // 부전승: 한 팀만 있고 이미 끝난 대결(상대를 기다리는 게 아님)
     const done = teamsConfirmed && tie.status === 'done';
+    const sideName = (teamId: string | null) => (teamId ? nameOf(teamId) : isBye ? 'BYE' : '미정');
     const expanded = showAllMatches || expandedTieId === tie.id;
     const canSubmitLineup = !!captainTeam && !!tie.court_id && !done && (tie.team1_id === captainTeam.id || tie.team2_id === captainTeam.id);
     // 오더는 양 팀 모두 제출해야 공개 (또는 경기 종료 시)
@@ -126,7 +128,7 @@ export function TeamBracketView({
         <Pressable disabled={showAllMatches} onPress={() => setExpandedTieId(expanded ? null : tie.id)} style={styles.tiePress}>
           <View style={styles.tieStatusRow}>
             <Text style={styles.tieStatus}>
-              {!teamsConfirmed ? '진행 전 · 상대 대기' : done ? '종료' : tie.court_id ? courts.find((c) => c.id === tie.court_id)?.name ?? '코트 배정' : '예정'}
+              {isBye ? '부전승' : !teamsConfirmed ? '진행 전 · 상대 대기' : done ? '종료' : tie.court_id ? courts.find((c) => c.id === tie.court_id)?.name ?? '코트 배정' : '예정'}
             </Text>
             {showAllMatches ? (
               <Text style={styles.tieHint}>{tsubs.length}경기</Text>
@@ -135,9 +137,9 @@ export function TeamBracketView({
             )}
           </View>
           <View style={styles.tieHead}>
-            <Text style={[styles.tieName, done && !!tie.winner_team_id && tie.winner_team_id === tie.team1_id && styles.win]} numberOfLines={1}>{nameOf(tie.team1_id)}</Text>
+            <Text style={[styles.tieName, done && !!tie.winner_team_id && tie.winner_team_id === tie.team1_id && styles.win]} numberOfLines={1}>{sideName(tie.team1_id)}</Text>
             <View style={styles.scoreBox}><Text style={styles.tieScore}>{done ? `${w1} : ${w2}` : 'VS'}</Text></View>
-            <Text style={[styles.tieName, styles.right, done && !!tie.winner_team_id && tie.winner_team_id === tie.team2_id && styles.win]} numberOfLines={1}>{nameOf(tie.team2_id)}</Text>
+            <Text style={[styles.tieName, styles.right, done && !!tie.winner_team_id && tie.winner_team_id === tie.team2_id && styles.win]} numberOfLines={1}>{sideName(tie.team2_id)}</Text>
           </View>
         </Pressable>
         {canSubmitLineup ? (

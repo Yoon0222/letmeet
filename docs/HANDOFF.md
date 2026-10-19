@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-19 (Claude: 단체전 오더 규칙 0102 손질 + 팀 최소 인원·종목 표시 0103)
+Last updated: 2026-10-20 (Claude: 4.2.0 — 운영 배포 체크리스트, 대진 부전승 표시)
 
 ## Purpose
 
@@ -23,12 +23,19 @@ If no code changed, still leave a short note when the session included an import
 
 ## Session Log
 
+### Claude -> Codex (2026-10-20, 4.2.0 — 대진 화면 커밋 + 부전승 표시)
+
+- **What changed**: 코덱스가 2026-10-19 에 만들고 커밋하지 않은 `tournament/[id].tsx`·`team-bracket-view.tsx`(본선 팀·선수 검색, 라운드 탭, 대진 탭 간단 헤더·대회 정보 창)를 사용자의 4.2.0 빌드 요청에 따라 그대로 커밋했습니다(`9f0403a`). 그 위에 `TieRow` 에서 **부전승 대결**(한 팀만 있고 끝난 대결)이 '진행 전 · 상대 대기'·'미정'으로 보이던 것을 '부전승'·'BYE'로 고쳤습니다(로직 3줄 — `isBye`·`sideName`).
+- **Files**: `src/components/team-bracket-view.tsx`(부전승 표시만), `app.json`(4.2.0), `docs/PROD_DEPLOY_4.2.0.md`(운영 배포 체크리스트), `docs/PROD_APPLY_4.2.0_ALL.sql`(이름 변경).
+- **Validation**: `npx tsc --noEmit`, `npx expo lint` 통과.
+- **Codex 요청**: 지금(2026-10-20 00:28~) 같은 파일에 넣고 있는 '대진 구역'은 커밋 전입니다 — 제 부전승 수정은 그 위에 함께 있어요(충돌 없음). 끝나면 WORKLOG/HANDOFF 에 남겨 주세요.
+
 ### Claude -> Codex (2026-10-19, 단체전 오더 규칙 0102 손질 + 팀 최소 인원·종목 표시 0103)
 
 - **What changed**: 사용자가 "한 대결에서 한 선수는 한 게임만"을 확정해서 코덱스의 `0102_unique_tie_lineup.sql` 을 그대로 쓰되 두 가지를 바꿨습니다(아직 어디에도 적용 전이라 파일을 직접 고침). ① `set_tie_lineup`(게임 하나 저장)에서 **다른 게임과 겹치는지 검사를 뺐습니다** — 게임별로 저장하므로 저장한 뒤 두 게임의 선수를 맞바꾸면 중간 저장이 늘 막혀 오더를 고칠 수 없었습니다(6명 팀은 영영 못 바꿈). 겹침은 `submit_tie_lineup`(최종 제출)에서만 막습니다. ② 서버 오류 문구를 한국어로(옛 앱은 서버 문구를 그대로 보여 줌). 새 `0103_team_min_size.sql`: 단체전 팀 최소 인원이 '단식 수 + 복식 수×2' 보다 작으면 서버가 올리고(앱 클럽 대회는 기본값 2명·단식2·복식1 이라 2~3명 팀이 오더를 못 냈음), 단체전 종목(discipline)을 대결 구성에서 정합니다(복식만 → 복식, 단식만 → 단식, 섞이면 그대로 — 복식 3게임 대회에 '단식' 배지가 붙던 것). 관리자 웹 대회 만들기도 최소 인원을 같은 규칙으로 맞춥니다.
-- **Files**: `supabase/migrations/0102_unique_tie_lineup.sql`, `supabase/migrations/0103_team_min_size.sql`, `supabase/schema.sql`, `web-admin/app/tournaments/new/page.tsx`, `docs/PROD_APPLY_4.1.2_ALL.sql`(운영 총합본 0101~0103).
+- **Files**: `supabase/migrations/0102_unique_tie_lineup.sql`, `supabase/migrations/0103_team_min_size.sql`, `supabase/schema.sql`, `web-admin/app/tournaments/new/page.tsx`, `docs/PROD_APPLY_4.2.0_ALL.sql`(운영 총합본 0101~0103 — 처음 이름은 4.1.2).
 - **Validation**: DEV 적용 + 규칙 시험 21개 통과(되돌림), 운영 총합본 DEV 시험 실행 통과, web-admin tsc·lint. 실기기: 대회 상세·대진·제출된 오더 화면 정상(같은 폰을 다른 쪽이 쓰고 있어 신청·오더 입력은 중단).
-- **Codex 요청**: ① `team-lineup.tsx` 의 오류 매핑(`'already assigned' / 'duplicate player'`)은 이제 안 맞습니다 — 서버가 한국어 문구를 주니 그대로 보여 줘도 되고, 매핑을 쓰려면 "한 게임만" 을 찾으세요. ② 단체전 배지: 단식·복식이 섞인 대회는 discipline 이 한쪽만 말하므로, 단체전이면 대결 구성(예: "복식 3" / "단식 2·복식 1")을 보여 주는 게 맞습니다(상세·목록 카드). ③ 지금 고치고 있는 `tournament/[id].tsx`·`team-bracket-view.tsx` 가 끝나면 알려 주세요 — 4.1.2 스토어 빌드를 그 뒤에 만듭니다.
+- **Codex 요청**: ① `team-lineup.tsx` 의 오류 매핑(`'already assigned' / 'duplicate player'`)은 이제 안 맞습니다 — 서버가 한국어 문구를 주니 그대로 보여 줘도 되고, 매핑을 쓰려면 "한 게임만" 을 찾으세요. ② 단체전 배지: 단식·복식이 섞인 대회는 discipline 이 한쪽만 말하므로, 단체전이면 대결 구성(예: "복식 3" / "단식 2·복식 1")을 보여 주는 게 맞습니다(상세·목록 카드). ③ 지금 고치고 있는 `tournament/[id].tsx`·`team-bracket-view.tsx` 가 끝나면 알려 주세요 — 스토어 빌드(4.2.0)를 그 뒤에 만듭니다.
 
 ### Claude -> Codex (2026-10-16, 단체전 클럽 선택·용병 + 단체전 화면 색)
 

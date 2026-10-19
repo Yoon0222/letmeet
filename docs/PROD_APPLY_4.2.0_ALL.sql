@@ -1,11 +1,11 @@
 -- ============================================================================
--- PROD 적용 총합본: 4.1.2 출시용 — 0101 · 0102 · 0103 (단체전 운영)
+-- PROD 적용 총합본: 4.2.0 출시용 — 0101 · 0102 · 0103 (단체전 운영)
 -- 대상: 운영 Supabase (jbvtdthtmrlndduqiikj)
 -- 만든 날: 2026-10-19. 운영 DB 를 조회해 아직 적용되지 않은 것만 담았다(0100 까지는 이미 적용됨).
 --
 -- 실행 (둘 중 하나):
 --   · 운영 Supabase SQL Editor 에 이 파일 전체를 붙여 넣고 Run
---   · npx supabase db query -f docs/PROD_APPLY_4.1.2_ALL.sql --linked --project-ref jbvtdthtmrlndduqiikj
+--   · npx supabase db query -f docs/PROD_APPLY_4.2.0_ALL.sql --linked --project-ref jbvtdthtmrlndduqiikj
 -- 전체가 하나의 트랜잭션 — 중간에 하나라도 실패하면 아무것도 적용되지 않는다(원인을 고친 뒤 처음부터 다시 실행).
 -- 다시 실행해도 안전하다(if not exists / or replace / drop if exists 로 작성됨).
 -- (docs/PROD_APPLY_0101.sql 을 따로 실행했다면 이 파일을 실행해도 된다 — 0101 부분은 그대로 다시 적용될 뿐이다.)
@@ -17,13 +17,13 @@
 --   0103 단체전 팀 최소 인원을 '단식 수 + 복식 수×2' 아래로는 잡히지 않게 서버가 보정(관리자 웹·앱 클럽 대회 모두),
 --        단체전 종목 표시를 대결 구성에서 정한다(복식만 → 복식, 단식만 → 단식 — 복식 단체전에 '단식' 배지가 붙던 것)
 --
--- ⚠️ 4.1.2 출시 순서
+-- ⚠️ 4.2.0 출시 순서
 --   1) 이 파일 실행 → 맨 아래 확인 쿼리의 값이 열 이름의 expect_ 값과 같은지 확인
 --   2) 엣지함수 notify-tie 배포(차례 알림을 양 팀 주장에게만):
 --        npx supabase functions deploy notify-tie --project-ref jbvtdthtmrlndduqiikj --use-api
 --   3) 관리자 웹 배포: web-admin 폴더에서 npx vercel --prod
 --        (단체전 조·예선/본선 선택, 대진표 트리, 코트 등록, 소속 클럽·용병 표시, 팀 이름 수정 — 0101 의 새 열을 읽으므로 1) 다음에)
---   4) 스토어: 4.1.2 심사 제출(iOS) / 업로드(Android). 4.1.1(iOS 34·Android 36)은 쓰지 않는다
+--   4) 스토어: 4.2.0 심사 제출(iOS) / 업로드(Android). 4.1.0·4.1.1 빌드는 쓰지 않는다
 --
 -- 기존 동작에 미치는 영향:
 --   · 지금 깔린 앱(4.0.0·4.1.1)도 그대로 동작한다. 클럽을 고르지 않은 단체전 신청도 받는다(운영자가 신청현황에서 확인).
