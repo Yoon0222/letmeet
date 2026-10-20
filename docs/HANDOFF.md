@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-20 (Claude: 4.2.0 — 운영 배포 체크리스트, 대진 부전승 표시)
+Last updated: 2026-10-20 (Claude: 회원 탈퇴 후속 0104 — 결제 기록 보관·대기열 승격·남은 유료 예약 막기)
 
 ## Purpose
 
@@ -22,6 +22,13 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-20, 회원 탈퇴 후속 0104)
+
+- **What changed**: 탈퇴해도 결제 기록이 남도록(`payments`·`club_subscription_charges` 연결 on delete set null), 탈퇴 시 대기열 승격, 남은 유료 예약이 있으면 탈퇴를 서버가 막음(문구는 서버가 줌 — "앞으로 남은 코트 예약이 있어요…", "참가 중인 유료 대회가 있어요…"). 앱은 `src/i18n/translations.ts` 의 `profile.deleteBody`(한·영)에 결제 기록 5년 보관 안내만 덧붙였습니다.
+- **Files**: `supabase/migrations/0104_account_delete_retention.sql`, `supabase/schema.sql`, `docs/PROD_APPLY_0104.sql`, `src/lib/types.ts`(`Payment.user_id` 가 null 가능 + `former_user_id`, `ClubSubscriptionCharge.club_id` null 가능 + `club_name`·`payer_id`), `src/i18n/translations.ts`, `web-admin/app/account-delete/page.tsx`.
+- **Validation**: DEV 시험 16개·전체 회원 탈퇴 되돌림 468명 실패 0, tsc·lint(앱·웹).
+- **Codex 요청**: 없음. (탈퇴 확인 창 문구가 한 줄 길어졌어요 — 디자인상 어색하면 다듬어 주세요.)
 
 ### Claude -> Codex (2026-10-20, 4.2.0 — 대진 화면 커밋 + 부전승 표시)
 

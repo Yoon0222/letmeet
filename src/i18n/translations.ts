@@ -68,7 +68,7 @@ export const translations = {
       deleting: '탈퇴 처리 중...',
       deleteFailed: '탈퇴 실패',
       deleteTitle: '회원 탈퇴',
-      deleteBody: '정말 탈퇴하시겠어요? 계정과 참여 기록이 삭제되며 되돌릴 수 없습니다.',
+      deleteBody: '정말 탈퇴하시겠어요? 계정과 참여 기록이 삭제되며 되돌릴 수 없습니다. 결제 기록은 관련 법에 따라 5년간 보관한 뒤 파기해요.',
     },
     tabs: {
       home: '홈',
@@ -139,7 +139,7 @@ export const translations = {
       deleting: 'Deleting...',
       deleteFailed: 'Delete failed',
       deleteTitle: 'Delete account',
-      deleteBody: 'Do you really want to delete your account? This cannot be undone.',
+      deleteBody: 'Do you really want to delete your account? This cannot be undone. Payment records are kept for 5 years as required by law, then destroyed.',
     },
     tabs: {
       home: 'Home',

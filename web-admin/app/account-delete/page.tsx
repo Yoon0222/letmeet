@@ -51,14 +51,26 @@ export default function AccountDeletePage() {
               <ul className="mt-3 list-disc space-y-2 pl-5 text-base font-medium leading-7 text-[#374151]">
                 <li>계정 정보와 프로필 정보</li>
                 <li>모임, 클럽, 대회 참가 기록</li>
-                <li>코트 예약 및 앱 이용과 관련된 사용자 데이터</li>
+                <li>코트 예약, 등록한 결제 카드 정보 및 앱 이용과 관련된 사용자 데이터</li>
               </ul>
             </div>
 
             <div>
-              <h2 className="text-xl font-extrabold">보관될 수 있는 데이터</h2>
+              <h2 className="text-xl font-extrabold">보관되는 데이터</h2>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-base font-medium leading-7 text-[#374151]">
+                <li>
+                  결제·환불 기록(결제 일시, 금액, 결제 수단, 주문 내역)은 「전자상거래 등에서의 소비자보호에 관한 법률」에 따라 5년간
+                  보관한 뒤 파기합니다. 이 기록은 프로필 정보와 분리되어 분쟁 처리 등 법령이 정한 목적에만 사용됩니다.
+                </li>
+                <li>그 밖에 법령 준수와 부정 이용 방지를 위해 필요한 최소한의 기록은 관련 법령이 허용하는 기간 동안 보관될 수 있습니다.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className="text-xl font-extrabold">탈퇴 전 확인</h2>
               <p className="mt-3 text-base font-medium leading-7 text-[#374151]">
-                법령 준수, 분쟁 대응, 부정 이용 방지를 위해 필요한 최소한의 기록은 관련 법령이 허용하는 기간 동안 보관될 수 있습니다.
+                앞으로 남은 유료 코트 예약이나 끝나지 않은 유료 대회 참가가 있으면 먼저 취소한 뒤 탈퇴할 수 있습니다. 취소와 환불은
+                환불 규정에 따라 처리됩니다.
               </p>
             </div>
           </div>

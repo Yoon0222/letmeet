@@ -666,8 +666,10 @@ export type ClubSubscription = {
 
 export type ClubSubscriptionCharge = {
   id: string;
-  subscription_id: string | null; // 구독 행이 없던 주문(첫 카드 등록 중 환불)은 null (0096)
-  club_id: string;
+  subscription_id: string | null; // 구독 행이 없던 주문(첫 카드 등록 중 환불)은 null (0096). 구독이 지워지면 null (0104)
+  club_id: string | null; // 클럽이 지워져도 결제 기록은 남는다(0104)
+  club_name: string; // 결제 때 클럽 이름(서버가 채움, 0104)
+  payer_id: string | null; // 결제자(구독 등록 회원) 번호 — 탈퇴해도 남는다(0104)
   amount: number;
   status: 'paid' | 'failed';
   kind: 'initial' | 'renewal' | 'upgrade'; // 첫 결제 / 갱신 / 업그레이드 차액 (0096)
@@ -985,7 +987,8 @@ export type PaymentOrderType = 'court' | 'tournament';
 export type Payment = {
   id: string;
   order_id: string;
-  user_id: string;
+  user_id: string | null; // 결제자가 탈퇴하면 비워진다 — 결제 기록은 5년 보관(0104)
+  former_user_id: string | null; // 탈퇴한 결제자의 회원 번호(0104)
   order_type: PaymentOrderType;
   target_id: string | null;
   order_name: string;
