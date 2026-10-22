@@ -26,6 +26,8 @@ tools: Bash, PowerShell, Read, Edit, Grep, Glob
 - 확인: `npx --yes vercel inspect pinut.org` 와 `npx --yes vercel inspect admin.pinut.org` 의 url 이 방금 배포와 같은지.
 
 ## 3. EAS 스토어 빌드·제출 (호출자가 요청·승인했을 때만)
+- EAS 세부 동작·오류 대응은 설치된 Expo 공식 스킬을 참고한다: 빌드·제출 `.claude/skills/eas-app-stores/`, OTA `.claude/skills/eas-update/`, OTA 상태(충돌률·설치 수) `.claude/skills/eas-update-insights/`, SDK 올리기 `.claude/skills/expo-upgrade/`. 각 스킬 끝의 "피넛에서 쓸 때" 메모가 우선이다.
+- OTA(운영 `production` 채널)도 사용자에게 바로 나가는 일이라 승인 목록에 "OTA" 가 있을 때만 `eas update` 를 한다.
 - 빌드: `npx --yes eas-cli build --platform all --profile production --non-interactive --no-wait` → 빌드 id·번호를 적는다. 진행은 `npx --yes eas-cli build:list --limit 4 --non-interactive --json`.
 - iOS 제출(빌드 FINISHED 뒤): `npx --yes eas-cli submit --platform ios --id <빌드 id> --profile production --non-interactive` → App Store Connect 업로드까지. 심사 제출·출시 버튼은 사용자가 App Store Connect 에서 누른다.
 - Android: Play Console 업로드는 사용자가 한다(EAS submit 설정 없음) — 빌드 페이지·AAB 링크를 돌려준다.

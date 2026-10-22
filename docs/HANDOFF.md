@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-23 (Claude: Vercel 스킬 2개를 코덱스 `.agents/skills` 에도 설치)
+Last updated: 2026-10-23 (Claude: Expo 공식 스킬 16개를 코덱스 `.agents/skills` 에도 설치)
 
 ## Purpose
 
@@ -22,6 +22,13 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-23, Expo 공식 스킬 16개 설치)
+
+- **What changed**: Expo 팀 공식 스킬(github.com/expo/skills, MIT) 16개를 코덱스 쪽 `.agents/skills/` 와 Claude 쪽 `.claude/skills/` 에 넣었습니다. 화면 작업에 특히 맞는 것: `expo-native-ui`(네이티브 느낌 화면·HIG·SF Symbols), `expo-design-system`(토큰·공용 컴포넌트), `expo-animation`(애니메이션 결정 순서), `expo-ui`(@expo/ui — SwiftUI·Compose 바텀시트·피커), `expo-router`. 빌드·제출·OTA(`eas-*`)와 `expo-upgrade` 는 Claude 쪽 릴리스에서 씁니다.
+- **Files**: `.agents/skills/{expo-overview, eas-app-stores, eas-update, eas-update-insights, eas-workflows, eas-observe, eas-simulator, expo-upgrade, expo-router, expo-dev-client, expo-animation, expo-data-fetching, expo-native-ui, expo-design-system, expo-ui, expo-project-structure}/`(각 폴더 `SOURCE.md` 에 출처). eas-update·eas-app-stores 끝에 "피넛에서 쓸 때"(운영 OTA·스토어 제출은 사용자 승인 뒤에만) 메모.
+- **Validation**: SKILL.md frontmatter 20개 파싱(폴더 이름 = 스킬 이름). 앱 코드 변경 없음.
+- **Codex 요청**: 없음. 새 라이브러리(@expo/ui 등)가 필요한 제안은 도입 전에 상의해 주세요.
 
 ### Claude -> Codex (2026-10-23, Vercel 스킬 2개 설치)
 

@@ -49,6 +49,8 @@ end $$;
 - 넓게 볼 땐 전체 데이터 시험: 대상 함수를 DEV 의 모든 대상 행에 하나씩(서브 블록 `exception` 으로 잡아) 돌려 실패 건수를 센다(과거 예: 전체 회원 탈퇴 되돌림 468명 실패 0).
 
 ## 검토 항목
+외부 기준(설치된 Supabase 공식 스킬): `.claude/skills/supabase/SKILL.md` 의 보안 점검표(뷰 security_invoker, UPDATE 는 SELECT 정책도 필요, `TO authenticated` 만으로는 권한 검사가 아님, UPDATE 의 WITH CHECK, security definer 함수는 public 에서 누구나 호출 가능 등)와 `.claude/skills/supabase-postgres-best-practices/references/`(인덱스·잠금·짧은 트랜잭션·RLS 성능·N+1·페이지네이션)를 함께 대조한다. 그 스킬의 "피넛에서 쓸 때" 메모처럼 로컬 Supabase·MCP 방식은 쓰지 않는다.
+
 ### A. 세트 동기화 (하나라도 빠지면 FAIL)
 - `supabase/migrations/NNNN_*.sql` — 번호 = 기존 최대 +1, 중복 번호 없음.
 - `supabase/schema.sql` 에 같은 내용(처음 설치하는 사람용). 같은 함수가 앞쪽 옛 정의와 뒤쪽 새 정의로 두 번 있으면 뒤쪽이 최종인지, 앞쪽에 "아래에서 다시 정의" 안내 주석이 있는지.

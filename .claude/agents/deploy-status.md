@@ -41,6 +41,7 @@ tools: Bash, Read, Grep, Glob
 ### 5. 앱 빌드·OTA (EAS)
 - `npx --yes eas-cli build:list --limit 6 --non-interactive --json` → platform·status·buildProfile·appVersion·appBuildVersion·createdAt·id·gitCommitHash.
 - `npx --yes eas-cli update:list --branch production --limit 3 --non-interactive --json` → 최근 OTA(runtimeVersion = 앱 버전이라 그 버전 빌드에만 간다).
+- 최근 OTA 가 있으면 그 상태(충돌률·설치·실행 수)를 `.claude/skills/eas-update-insights/SKILL.md` 방법으로 읽어 본다(읽기만).
 - 스토어 심사·출시 상태는 CLI 로 못 본다 → `docs/PROD_DEPLOY_<버전>.md`·`docs/WORKLOG.md` 열린 항목의 기록을 인용하고 "스토어 콘솔에서 확인"으로 둔다.
 
 ### 6. 운영 설정 (운영 DB 읽기)
