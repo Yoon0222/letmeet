@@ -117,6 +117,11 @@
 
 ## 2026-10-23
 
+### Expo·Supabase 공식 스킬 설치 (추천 묶음)
+- **결정(사용자)**: "추천한 거 다 추가". Expo 공식 스킬 16개 — 빌드·제출, OTA·OTA 상태, EAS 워크플로, 성능 관측, 원격 시뮬레이터, SDK 업그레이드, 라우터, dev-client, 애니메이션, 데이터 요청, 네이티브 UI, 디자인 시스템, @expo/ui, 폴더 구조. 우리와 무관한 7개(App Clip·기존 네이티브 앱 통합·DOM·네이티브 모듈 제작·웹→앱·예제 모음·웹 호스팅)는 뺌. Supabase 공식 2개(일반 + Postgres 모범 사례)는 DB 담당인 Claude 쪽에만.
+- **만든 것**: `.claude/skills/` 20개(Claude, 커밋) · `.agents/skills/` 24개(코덱스, gitignore). 플러그인째가 아니라 스킬 파일만(MCP 서버·훅 없음 — Supabase MCP 는 운영 DB 에 쓸 수 있게 돼서 뺌). eas-update·eas-app-stores·supabase 스킬 끝에 "피넛에서 쓸 때"(바깥으로 나가는 건 승인 뒤에만, 운영 DB 는 읽기만) 메모. db-reviewer·release·deploy-status 가 이 스킬을 기준으로 보게 연결.
+- **메모/주의**: Notion·Mobile Release Check·App Store 스크린샷 자동화는 플러그인이라 사용자가 카드에서 추가(Notion 은 로그인 필요). 출처·커밋·라이선스(모두 MIT)는 각 폴더 `SOURCE.md`. (이 커밋 e2a7476 에 다른 세션의 "Playwright 자동 검사" 일지 항목이 함께 들어감 — 그 코드는 아직 커밋 전)
+
 ### 관리자 웹 Playwright 자동 검사 도입
 - **결정(사용자)**: 디자인 스킬은 중복을 피하고, 관리자 웹의 실제 브라우저 검증에는 Playwright를 사용. 기존 보류 결정을 변경함.
 - **만든 것**: `web-admin/playwright.config.ts`, `tests/e2e/public-pages.spec.ts`, `tests/e2e/admin-tournament-flow.spec.ts`, 로컬 계정 템플릿 `playwright.env.example`; 데스크톱·Pixel 7 조건으로 공개/로그인 및 대회 운영 화면 검사.
