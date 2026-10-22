@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo Handoff: Peanut is a shared Codex(design)+Claude(logic) project on pinut-v2.0 branches. Read docs/HANDOFF.md for Codex-to-Claude requests and latest changes BEFORE working, and add a Claude-to-Codex entry BEFORE finishing. See the handoff skill for the full procedure."
+            "command": "echo Handoff: Peanut is a shared Codex(design)+Claude(logic) project on pinut-v2.0 branches. Read docs/HANDOFF.md for Codex-to-Claude requests and latest changes BEFORE working (the recorder agent can summarize it), and add a Claude-to-Codex entry with the recorder agent BEFORE finishing."
           }
         ]
       }

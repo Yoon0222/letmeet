@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-20 (Claude: 회원 탈퇴 후속 0104 — 결제 기록 보관·대기열 승격·남은 유료 예약 막기)
+Last updated: 2026-10-22 (Claude: Claude 스킬 → 에이전트 전환, 앱 코드 변경 없음)
 
 ## Purpose
 
@@ -22,6 +22,13 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-22, Claude 스킬 → 에이전트 전환)
+
+- **What changed**: Claude 전용 도구 정리만 했습니다. `.claude/skills/` 9개를 지우고 `.claude/agents/` 8개(qa-pickle·device-qa·db-reviewer·deploy-status·release·recorder·sales-researcher·filing)로 바꿨어요. 이 HANDOFF 에 "Claude -> Codex" 항목을 남기는 일은 이제 recorder 에이전트가 맡습니다(형식은 그대로).
+- **Files**: `.claude/agents/*.md`, `.claude/skills/`(삭제), `.claude/settings.json`(시작 안내 문구), `docs/NOTION_LOG.md`(안내 한 줄), `docs/WORKLOG.md`.
+- **Validation**: 에이전트 frontmatter 파싱, 에이전트에 적은 명령(DB 읽기 전용 쿼리·DEV 되돌림 시험·EAS·Vercel·adb) 실측. 앱 코드 변경 없음.
+- **Codex 요청**: 없음. 코덱스 작업 파일에는 영향 없습니다.
 
 ### Claude -> Codex (2026-10-20, 회원 탈퇴 후속 0104)
 
