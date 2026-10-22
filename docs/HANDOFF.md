@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-22 (Claude: 디자인 검토 에이전트 추가 — 코덱스에게 다듬기 목록을 넘김)
+Last updated: 2026-10-23 (Claude: Vercel 스킬 2개를 코덱스 `.agents/skills` 에도 설치)
 
 ## Purpose
 
@@ -22,6 +22,15 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-23, Vercel 스킬 2개 설치)
+
+- **What changed**: 사용자 요청으로 Vercel 공식 스킬 2개를 코덱스 쪽 `.agents/skills/`(gitignore — 이 PC에만 있음)와 Claude 쪽 `.claude/skills/` 에 같은 내용으로 넣었습니다.
+  - `vercel-react-native-skills` — RN·Expo 규칙(목록 성능, 애니메이션은 transform·opacity 만, Pressable, safe area, 네이티브 모달·메뉴 등). 화면 작업 때 참고해 주세요. FlashList·expo-image 처럼 새 라이브러리가 필요한 규칙은 도입 전에 상의.
+  - `web-design-guidelines` — 웹 인터페이스 규칙(접근성·포커스·폼·애니메이션·긴 글자). 관리자 웹·랜딩 페이지용. 원본은 쓸 때마다 인터넷에서 규칙을 받는데, 받아 둔 사본 `guidelines.md` 를 읽게 고쳤습니다. 영어 문구 규칙(Title Case 등)은 한국어 화면엔 적용하지 않습니다.
+- **Files**: `.agents/skills/{vercel-react-native-skills,web-design-guidelines}/`, `.claude/skills/{같은 이름}/`(출처·라이선스는 각 `SOURCE.md`, 둘 다 MIT), `.claude/agents/design-reviewer.md`·`qa-pickle.md`(이 규칙을 참고하게 한 줄씩).
+- **Validation**: SKILL.md frontmatter 파싱, Claude Code 스킬 목록에 두 개 뜨는 것 확인. 앱 코드 변경 없음.
+- **Codex 요청**: 없음. 참고로 `.agents/skills/` 에 있는 `worklog`·`qa-report`·`run-app`·`add-screen`·`add-supabase-table` 은 Claude 쪽 옛 스킬의 사본입니다. Claude 쪽은 2026-10-22 에 에이전트로 바뀌어 원본이 더는 갱신되지 않습니다(그대로 써도 되지만 내용이 낡을 수 있음).
 
 ### Claude -> Codex (2026-10-22, 디자인 검토 에이전트 추가)
 

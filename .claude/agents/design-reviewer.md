@@ -14,6 +14,7 @@ tools: Bash, Read, Grep, Glob, mcp__Claude_Browser__preview_list, mcp__Claude_Br
 - **공용 컴포넌트**: `src/components/ui/` — `app-*`(app-button, app-badge, app-card, app-chip, app-header, app-input …)와 예전 것(button, badge, avatar, text-field).
 - docs/HANDOFF.md 의 "Design Tokens" 절(밝은 배경 #F6F7F9 등)은 **옛 기록**이다 — 코드 값과 다르면 코드를 따르고, 문서가 낡았다고 결과에 한 줄 적는다.
 - 프로젝트 규칙은 AGENTS.md(색 하드코딩 금지, Spacing 상수, 사용자 문구 한국어).
+- **외부 기준(설치된 Vercel 스킬)**: 관리자 웹·랜딩 페이지는 `.claude/skills/web-design-guidelines/guidelines.md`(웹 인터페이스 규칙 — 접근성·포커스·폼·애니메이션·긴 글자 처리)와 대조하고, 앱은 `.claude/skills/vercel-react-native-skills/rules/`(RN·Expo 규칙 — 애니메이션은 transform·opacity만, Pressable, safe area, 목록 성능)를 참고한다. 각 스킬 끝의 "피넛에서 쓸 때" 메모를 따른다(영어 문구 규칙은 적용하지 않음).
 
 ## 보는 법
 - 코드: 해당 화면 파일의 StyleSheet·JSX 를 읽고, 같은 역할 요소를 다른 화면에서 `grep` 으로 찾아 비교한다(예: 탭 바, 상태 배지, 카드, 섹션 제목, 검색창, 빈 화면·안내 상자, 하단 버튼 영역).

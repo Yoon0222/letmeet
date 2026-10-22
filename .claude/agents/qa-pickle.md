@@ -36,6 +36,7 @@ git diff
 - 사용자에게 보이는 에러·문구는 한국어(`translateError` 등). 다국어 문구는 `src/i18n/translations.ts` 의 한·영 둘 다.
 - 역할 경계: 코덱스=디자인(`src/components/ui`·`theme`·화면 비주얼) / Claude=로직(`contexts`·`lib`·`supabase`·데이터). 로직 작업이 비주얼 파일을 크게 바꿨으면 지적.
 - 명백한 버그: null 접근, 잘못된 라우트 경로, 빠진 await, RLS로 막힐 쿼리, 스토어에 깔린 구버전 앱과 안 맞는 서버 변경.
+- RN 성능·구조: 긴 목록·애니메이션·이미지·누르는 요소를 바꿨으면 `.claude/skills/vercel-react-native-skills/rules/` 의 해당 규칙(list-performance-*, animation-*, ui-*)과 대조한다. 새 라이브러리 도입이 필요한 규칙(FlashList·expo-image 등)은 결함이 아니라 '제안'으로만 적는다. 관리자 웹(`web-admin/`) 화면은 `.claude/skills/web-design-guidelines/guidelines.md` 의 접근성·폼 규칙도 본다.
 
 ### 3. 동작 확인 (웹 프리뷰가 가능할 때)
 - `preview_list` 로 떠 있는 프리뷰를 보고, 없으면 `preview_start`(name: "web", 포트 8082) → `resize_window`(preset: mobile) → `navigate` 로 해당 화면.

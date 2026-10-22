@@ -114,6 +114,13 @@
 
 ---
 
+## 2026-10-23
+
+### Vercel 에이전트 스킬 2개 설치 (Claude·코덱스 공용)
+- **결정(사용자)**: 외부 도구 검토 끝에 "에이전트 스킬 설치". 우리 스택(Expo RN 앱 + Next.js 관리자 웹)과 맞는 Vercel 공식 스킬 2개만 넣음. 포니테일·그래피파이는 지금 불필요, 옴니라우트는 Claude 대신 다른 모델로 돌리고 코드가 바깥으로 나가서 쓰지 않음, Playwright 는 내장 브라우저와 겹쳐서 보류.
+- **만든 것**: `vercel-react-native-skills`(RN·Expo 규칙 — 목록 성능·애니메이션·Pressable·safe area 등), `web-design-guidelines`(웹 인터페이스 규칙 — 접근성·포커스·폼·애니메이션). Claude 는 `.claude/skills/`(커밋), 코덱스는 `.agents/skills/`(gitignore, 이 PC). `design-reviewer`·`qa-pickle` 가 이 규칙을 참고하게 한 줄씩 추가.
+- **메모/주의**: web-design-guidelines 원본은 쓸 때마다 인터넷에서 규칙을 받아 따르는 방식이라, 받아 둔 사본(`guidelines.md`, 커밋 4ecfb9f)을 읽게 고침 — 갱신 방법은 각 폴더 `SOURCE.md`. 영어 문구 규칙(Title Case 등)은 한국어 화면에 적용 안 함. FlashList·expo-image 처럼 새 라이브러리가 필요한 규칙은 '제안'으로만.
+
 ## 2026-10-22
 
 ### 앱 대회 상세 탭 재구성 — 대회정보·참가자·조편성·경기진행 (+ 경기진행 예선/본선)
