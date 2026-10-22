@@ -125,7 +125,8 @@
 ### Claude 스킬 9개 → 에이전트 8개로 전환
 - **결정(사용자)**: "skill을 없애고 에이전트를 만드는게 더 좋을꺼 같아". 반복 작업을 별도 맥락에서 돌려 메인 대화 맥락을 아낀다(이번 세션은 맥락이 넘쳐 요약됨). 새로 db-reviewer·device-qa·deploy-status·sales-researcher 를 고름.
 - **만든 것**: `.claude/agents/` — qa-pickle(웹 QA, 도구 이름 `mcp__Claude_Browser__*` 로 고침 + 화면 관례 점검 흡수) · device-qa(실기기 adb QA, run-app 흡수) · db-reviewer(DB 검토 + DEV 되돌림 시험, add-supabase-table 흡수) · deploy-status(읽기 전용 배포 현황) · release(Vercel 은 `web-admin/` 에서 — 옛 스킬의 루트 배포 오류 바로잡음) · recorder(worklog·handoff·qa-report·notion-log 통합) · sales-researcher · filing. `.claude/skills/` 삭제, `.claude/settings.json` 시작 안내 문구 수정.
-- **메모/주의**: `/worklog` 같은 슬래시 명령은 없어짐 — 말로 요청하면 Claude 가 에이전트를 부른다. 새 에이전트는 **다음 세션부터** 목록에 뜬다(이 세션에선 호출 안 됨 확인). 에이전트는 사용자에게 못 물으니 푸시·배포·파일 이동은 메인 세션이 승인받고 넘긴다. Metro·scrcpy 띄우기는 계속 메인 세션. Git Bash 에서 adb 는 `MSYS_NO_PATHCONV=1` 필요(폰 경로가 깨짐).
+- **메모/주의**: `/worklog` 같은 슬래시 명령은 없어짐 — 말로 요청하면 Claude 가 에이전트를 부른다. 새 에이전트는 만든 직후엔 불리지 않고("not found") 목록이 갱신된 뒤 불린다(같은 세션에서도 잠시 뒤 불림 확인). 에이전트는 사용자에게 못 물으니 푸시·배포·파일 이동은 메인 세션이 승인받고 넘긴다. Metro·scrcpy 띄우기는 계속 메인 세션. Git Bash 에서 adb 는 `MSYS_NO_PATHCONV=1` 필요(폰 경로가 깨짐).
+- **추가(같은 날, 사용자 결정)**: `design-reviewer`(디자인 검토, 읽기 전용) — 테마 값(`src/theme`)·공용 컴포넌트 사용, 화면 간 통일, 글자 대비·터치 크기·폴드 폭·큰 글꼴을 보고 코덱스에게 넘길 다듬기 목록을 만든다. 직접 고치는 디자이너는 코덱스(디자인)와 같은 파일을 고쳐 충돌하므로 만들지 않음.
 
 ## 2026-10-20
 

@@ -1,6 +1,6 @@
 # HANDOFF
 
-Last updated: 2026-10-22 (Claude: 앱 대회 상세 탭 재구성 — 대회정보·참가자·조편성·경기진행 + 경기진행 예선/본선)
+Last updated: 2026-10-22 (Claude: 디자인 검토 에이전트 추가 — 코덱스에게 다듬기 목록을 넘김)
 
 ## Purpose
 
@@ -22,6 +22,13 @@ At minimum, leave:
 If no code changed, still leave a short note when the session included an important decision, investigation, blocker, or user preference.
 
 ## Session Log
+
+### Claude -> Codex (2026-10-22, 디자인 검토 에이전트 추가)
+
+- **What changed**: Claude 쪽에 `design-reviewer` 에이전트(`.claude/agents/design-reviewer.md`)를 추가했습니다. 화면을 **고치지 않고** 검토만 해서 "코덱스에게 넘길 다듬기 목록"을 만듭니다. 보는 것은 테마 값(`src/theme`)·공용 컴포넌트 사용, 같은 역할 요소의 화면 간 통일, 글자 대비·터치 크기·폴드 접은/펼친 폭·큰 글꼴, 로딩·빈 화면·오류 상태입니다. 그 목록은 이 파일에 "Codex 요청"으로 남깁니다. 디자인 수정은 계속 코덱스 몫입니다.
+- **Files**: `.claude/agents/design-reviewer.md`, `docs/WORKLOG.md`.
+- **Validation**: 에이전트 frontmatter 파싱, 대비 계산식 실행 확인. 앱 코드 변경 없음.
+- **Codex 요청**: 이 파일 아래 "Design Tokens" 절은 밝은 팔레트(#F6F7F9 배경 등)로 남아 있어 지금 코드(`src/theme/colors.ts` 어두운 팔레트)와 다릅니다. 시간 날 때 지금 값으로 갱신해 주세요. 참고로 `AppColors.textMuted`(#707B87)는 `surface`(#10161D) 위에서 대비 4.22:1 이라 작은 글자 기준(4.5:1)에 조금 못 미칩니다.
 
 ### Claude -> Codex (2026-10-22, 앱 대회 상세 탭 재구성)
 
