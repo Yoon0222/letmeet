@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppAlert as Alert } from '@/lib/feedback';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,10 +21,12 @@ import { supabase } from '@/lib/supabase';
 import { TOURNAMENT_FORMAT_LABELS } from '@/lib/types';
 import type {
   EntryStatus,
+  MatchPhase,
   PartnerProfile,
   TournamentCourt,
   TournamentEntryWithProfile,
   TournamentMatch,
+  TournamentStatus,
   TournamentWithCounts,
 } from '@/lib/types';
 
@@ -35,6 +37,11 @@ const ENTRY_LABEL: Record<EntryStatus, string> = {
   withdrawn: '철회됨',
   waitlist: '대기열',
 };
+
+// 대회 상세 탭: 대회정보 · 참가자 · 조편성 · 경기진행 (단체전은 조편성 없이 3개)
+type DetailTab = 'info' | 'players' | 'groups' | 'progress';
+// 경기진행 탭에서 '다음 경기'·'끝난 경기'를 처음에 몇 개까지 보여 줄지
+const PROGRESS_PREVIEW = 8;
 
 export default function TournamentDetail() {
   const navigation = useNavigation();
@@ -50,7 +57,9 @@ export default function TournamentDetail() {
   const [clubNamesByUser, setClubNamesByUser] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
-  const [tab, setTab] = useState<'players' | 'prelim' | 'final' | 'register' | 'bracket'>('players');
+  const [tab, setTab] = useState<DetailTab>('info');
+  const [progressPhase, setProgressPhase] = useState<MatchPhase | null>(null); // 경기진행 탭의 예선·본선 (null = 자동)
+  const scrollRef = useRef<ScrollView>(null);
   const [groupTab, setGroupTab] = useState<number | null>(null);
   const [groupScrollHasMore, setGroupScrollHasMore] = useState(true);
   const initializedGroupTournamentRef = useRef<string | null>(null);
@@ -59,7 +68,6 @@ export default function TournamentDetail() {
   const [coverIdx, setCoverIdx] = useState(0); // 대회 사진 갤러리: 크게 볼 사진 인덱스
   const [nowMs, setNowMs] = useState(0); // 로드 시점 현재시각 (조추첨 공개/당일 판단용)
   const [teamRev, setTeamRev] = useState(0); // 단체전 오더 저장 시 대진뷰 새로고침 트리거
-  const [showInfoModal, setShowInfoModal] = useState(false);
 
   // 복식 파트너 검색/선택
   const [partnerQuery, setPartnerQuery] = useState('');
@@ -91,7 +99,8 @@ export default function TournamentDetail() {
     setT(tour ?? null);
     if (tour && initializedDetailTabRef.current !== id) {
       initializedDetailTabRef.current = id;
-      setTab(tour.format === 'team' ? 'register' : 'players');
+      // 대회 날(진행 중)에는 경기진행부터 보여 준다
+      setTab(tour.status === 'ongoing' ? 'progress' : 'info');
     }
     setEntries(entryRows);
     setMatches((ms as TournamentMatch[]) ?? []);
@@ -141,7 +150,6 @@ export default function TournamentDetail() {
   const canRegister = t?.status === 'registration' && matches.length === 0;
   const isDoubles = t?.discipline === 'doubles';
   const isTeam = t?.format === 'team'; // 단체전: 개인 신청 대신 팀 신청 UI
-  const showTournamentOverview = isTeam ? tab !== 'bracket' : tab === 'players';
   const isOrganizer = !!t && t.organizer_id === uid;
 
   // 조추첨 공개: 시합 전날 오후 7시부터 선수에게 공개 (운영자는 항상)
@@ -248,20 +256,52 @@ export default function TournamentDetail() {
   const slotsFull =
     !!t && entries.filter((e) => e.status === 'pending' || e.status === 'approved').length >= t.max_participants;
 
-  // 기본 정보는 탭 위에 항상 노출하고, 참가자와 대진만 탭으로 구분한다.
   const drawGenerated = matches.length > 0;
   const hasBracket = drawGenerated && drawRevealed;
-  const tabItems: { key: 'players' | 'prelim' | 'final'; label: string }[] = [
-    { key: 'players', label: `참가자 ${approved.length}` },
-    // KDK 는 조별 풀리그 개인순위가 결과라 '순위' 로 표기 (본선 없음)
-    ...(groupMatchesAll.length > 0 ? [{ key: 'prelim' as const, label: t?.format === 'kdk' ? '순위' : '예선' }] : []),
-    ...(koMatches.length > 0 ? [{ key: 'final' as const, label: '본선' }] : []),
-  ];
-  // 단체전은 참가/대진 탭으로 분리
-  const teamTabItems: { key: 'register' | 'bracket'; label: string }[] = [
-    { key: 'register', label: '참가' },
-    { key: 'bracket', label: '대진' },
-  ];
+  // 탭은 늘 같은 자리에 둔다. 대진 전에는 조편성·경기진행 탭에 안내만 보인다.
+  const tabItems: { key: DetailTab; label: string }[] = isTeam
+    ? [
+        { key: 'info', label: '대회정보' },
+        { key: 'players', label: `참가팀 ${t?.approved_count ?? 0}` },
+        { key: 'progress', label: '경기진행' },
+      ]
+    : [
+        { key: 'info', label: '대회정보' },
+        { key: 'players', label: `${isDoubles ? '참가팀' : '참가자'} ${approved.length}` },
+        // KDK 는 조별 풀리그 개인순위가 결과라 '순위' 로 표기 (본선 없음)
+        { key: 'groups', label: t?.format === 'kdk' ? '순위' : '조편성' },
+        { key: 'progress', label: '경기진행' },
+      ];
+  const changeTab = (next: DetailTab) => {
+    setTab(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
+
+  // 경기진행 탭: 예선·본선을 나눠 지금 코트에서 · 다음 경기 · 끝난 경기(예선) / 본선 대진표(본선)
+  //   예선·본선을 고르지 않았으면 본선에 양쪽 선수가 정해진 경기가 생긴 뒤부터 본선을 먼저 보여 준다
+  const knockoutStarted = koMatches.some((m) => m.entry1_id && m.entry2_id);
+  const showPhaseSwitch = groupMatchesAll.length > 0 && koMatches.length > 0;
+  const phaseShown: MatchPhase = showPhaseSwitch
+    ? progressPhase ?? (knockoutStarted ? 'knockout' : 'group')
+    : koMatches.length > 0 ? 'knockout' : 'group';
+  const groupDoneCount = groupMatchesAll.filter((m) => m.status === 'done').length;
+  const koDoneCount = koMatches.filter((m) => m.status === 'done').length;
+  const playOrder = (a: TournamentMatch, b: TournamentMatch) => (a.round_order ?? 0) - (b.round_order ?? 0) || a.slot - b.slot;
+  const courtOrder = new Map(courts.map((c, i) => [c.id, i]));
+  // 양쪽 선수가 정해진 경기만 — 부전승·빈 자리 제외
+  const playable = matches.filter((m) => m.phase === phaseShown && m.entry1_id && m.entry2_id && matchHit(m));
+  const onCourt = (m: TournamentMatch) => !!m.court_id && m.court_confirmed;
+  const liveShown = playable
+    .filter((m) => m.status !== 'done' && onCourt(m))
+    .sort((a, b) => (courtOrder.get(a.court_id ?? '') ?? 0) - (courtOrder.get(b.court_id ?? '') ?? 0));
+  const upcomingShown = playable.filter((m) => m.status !== 'done' && !onCourt(m)).sort(playOrder);
+  const doneShown = playable.filter((m) => m.status === 'done').sort(playOrder).reverse();
+
+  // 조추첨 공개 전(선수) 안내 — 대회정보·조편성·경기진행 탭에서 함께 쓴다
+  const revealNotice =
+    drawGenerated && !drawRevealed && drawRevealAt ? (
+      <Notice icon="lock-closed-outline" text={`조추첨은 ${formatMeetupTime(drawRevealAt.toISOString())}에 공개돼요`} />
+    ) : null;
 
   // 파트너 이름으로 회원 검색 (동명이인 대비 → 목록에서 선택). 300ms 디바운스.
   useEffect(() => {
@@ -384,32 +424,39 @@ export default function TournamentDetail() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {showTournamentOverview ? <View style={styles.headerArea}>
-          <View style={styles.heroCard}>
-            <View style={styles.heroTopRow}>
-              <View style={styles.badgeRow}>
-                <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#67A4FF" bg="rgba(56,132,255,0.14)" />
-                <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5B942" bg="rgba(245,166,35,0.16)" />
-                {t.dupr_certified ? <Badge label="DUPR 인증" color="#67A4FF" bg="rgba(45,107,214,0.12)" /> : null}
-                {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#A98BFF" bg="rgba(139,92,246,0.14)" /> : null}
+      <View style={styles.tabBar}>
+        {tabItems.map((it) => {
+          const active = tab === it.key;
+          return (
+            <Pressable key={it.key} onPress={() => changeTab(it.key)} style={styles.tabItem} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+              <View style={[styles.tabPill, active && styles.tabPillActive]}>
+                <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>{it.label}</Text>
               </View>
-              <View style={[styles.heroStatus, t.status !== 'registration' && styles.heroStatusMuted]}>
-                <View style={[styles.heroStatusDot, t.status !== 'registration' && styles.heroStatusDotMuted]} />
-                <Text style={[styles.heroStatusText, t.status !== 'registration' && styles.heroStatusTextMuted]}>
-                  {t.status === 'registration' ? '접수중' : t.status === 'ongoing' ? '진행중' : t.status === 'finished' ? '종료' : '취소됨'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.title} numberOfLines={3}>{t.title}</Text>
-            <View style={styles.heroMetaList}>
-              <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
-              <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
-            </View>
-          </View>
-        </View> : null}
-        {showTournamentOverview && (
+            </Pressable>
+          );
+        })}
+      </View>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {tab === 'info' ? (
           <>
+            <View style={styles.headerArea}>
+              <View style={styles.heroCard}>
+                <View style={styles.heroTopRow}>
+                  <View style={styles.badgeRow}>
+                    <Badge label={TOURNAMENT_FORMAT_LABELS[t.format]} color="#67A4FF" bg="rgba(56,132,255,0.14)" />
+                    <Badge label={t.discipline === 'doubles' ? '복식' : '단식'} color="#F5B942" bg="rgba(245,166,35,0.16)" />
+                    {t.dupr_certified ? <Badge label="DUPR 인증" color="#67A4FF" bg="rgba(45,107,214,0.12)" /> : null}
+                    {t.dupr_premium ? <Badge label="DUPR+ 전용" color="#A98BFF" bg="rgba(139,92,246,0.14)" /> : null}
+                  </View>
+                  <StatusPill status={t.status} />
+                </View>
+                <Text style={styles.title} numberOfLines={3}>{t.title}</Text>
+                <View style={styles.heroMetaList}>
+                  <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
+                  <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
+                </View>
+              </View>
+            </View>
             {t.images?.length ? (
               <View style={styles.gallery}>
                 <Image source={{ uri: t.images[coverIdx] ?? t.images[0] }} style={styles.cover} />
@@ -527,10 +574,10 @@ export default function TournamentDetail() {
                     </View>
                     {myNextMatch ? (
                       <Pressable
-                        onPress={() => setTab(myNextMatch.phase === 'knockout' ? 'final' : 'prelim')}
+                        onPress={() => changeTab('progress')}
                         style={styles.myNextRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.myStatLabel}>다음 경기</Text>
+                          <Text style={styles.myStatLabel}>{onCourt(myNextMatch) ? '지금 내 경기' : '다음 경기'}</Text>
                           <Text style={styles.myNextName} numberOfLines={1}>
                             vs {nameOf(myNextMatch.entry1_id === uid ? myNextMatch.entry2_id : myNextMatch.entry1_id)}
                           </Text>
@@ -678,43 +725,30 @@ export default function TournamentDetail() {
             )}
 
             {/* 조추첨 미공개 (선수) */}
-            {drawGenerated && !drawRevealed && drawRevealAt && (
-              <View style={styles.revealBox}>
-                <Ionicons name="lock-closed-outline" size={20} color="#AAB4C0" />
-                <Text style={styles.revealText}>조추첨은 {formatMeetupTime(drawRevealAt.toISOString())}에 공개돼요</Text>
-              </View>
-            )}
+            {revealNotice}
 
+            {/* 단체전: 팀 신청·내 팀은 참가팀 탭에서 */}
+            {isTeam && t.status === 'registration' ? (
+              <Pressable onPress={() => changeTab('players')} style={styles.teamLink} accessibilityRole="button">
+                <Ionicons name="people-outline" size={18} color="#16C784" />
+                <Text style={styles.teamLinkText}>팀 참가 신청과 내 팀은 &apos;참가팀&apos; 탭에서 볼 수 있어요</Text>
+                <Ionicons name="chevron-forward" size={16} color="#16C784" />
+              </Pressable>
+            ) : null}
           </>
-        )}
-
-        {!showTournamentOverview ? (
+        ) : (
           <View style={styles.compactTournamentBar}>
             <View style={styles.compactTournamentCopy}>
-              <Text style={styles.compactTournamentLabel}>{isTeam ? '단체전 대진' : tab === 'prelim' ? '예선 대진' : '본선 대진'}</Text>
+              <Text style={styles.compactTournamentLabel}>
+                {TOURNAMENT_FORMAT_LABELS[t.format]}{isTeam ? '' : ` · ${isDoubles ? '복식' : '단식'}`}
+              </Text>
               <Text style={styles.compactTournamentTitle} numberOfLines={1}>{t.title}</Text>
             </View>
-            <Pressable onPress={() => setShowInfoModal(true)} style={styles.infoButton} accessibilityRole="button" accessibilityLabel="대회 정보 보기">
-              <Ionicons name="information-circle-outline" size={18} color="#16C784" />
-              <Text style={styles.infoButtonText}>대회 정보</Text>
-            </Pressable>
+            <StatusPill status={t.status} />
           </View>
-        ) : null}
+        )}
 
-        <View style={styles.tabBar}>
-          {(isTeam ? teamTabItems : tabItems).map((it) => {
-            const active = tab === it.key;
-            return (
-              <Pressable key={it.key} onPress={() => setTab(it.key)} style={styles.tabItem}>
-                <View style={[styles.tabPill, active && styles.tabPillActive]}>
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{it.label}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {!isTeam && (approved.length > 0 || hasBracket) && (
+        {!isTeam && (tab === 'players' ? approved.length > 0 : tab !== 'info' && hasBracket) && (
           <View style={styles.searchBox}>
             <Ionicons name="search" size={16} color="#AAB4C0" />
             <TextInput
@@ -736,8 +770,8 @@ export default function TournamentDetail() {
           <View style={styles.section}>
             <View style={styles.playerSectionHead}>
               <View>
-                <Text style={styles.sectionTitle}>참가 팀</Text>
-                <Text style={styles.playerSectionSub}>팀명과 소속 클럽을 확인하세요</Text>
+                <Text style={styles.sectionTitle}>{isDoubles ? '참가 팀' : '참가 선수'}</Text>
+                <Text style={styles.playerSectionSub}>{isDoubles ? '팀명과 소속 클럽을 확인하세요' : '선수와 소속 클럽을 확인하세요'}</Text>
               </View>
               <View style={styles.playerCountBadge}>
                 <Text style={styles.playerCountText}>
@@ -752,7 +786,7 @@ export default function TournamentDetail() {
             ) : (
               <View style={styles.playerList}>
                 {approvedShown.map((e, index) => (
-                  <View key={e.user_id} style={styles.playerTeamCard}>
+                  <View key={e.user_id} style={[styles.playerTeamCard, isDoubles && styles.playerTeamCardDoubles]}>
                     <View style={styles.playerTeamNumberColumn}>
                       <Text style={styles.playerIndex}>{String(index + 1).padStart(2, '0')}</Text>
                     </View>
@@ -790,10 +824,10 @@ export default function TournamentDetail() {
           </View>
         )}
 
-        {/* 단체전: 참가 탭 */}
-        {isTeam && tab === 'register' && <TeamRegister tournament={t} uid={uid} onChange={() => setTeamRev((v) => v + 1)} />}
-        {/* 단체전: 대진 탭 */}
-        {isTeam && tab === 'bracket' && (
+        {/* 단체전: 참가팀 탭 */}
+        {isTeam && tab === 'players' && <TeamRegister tournament={t} uid={uid} onChange={() => setTeamRev((v) => v + 1)} />}
+        {/* 단체전: 경기진행 탭 (예선·본선 대진) */}
+        {isTeam && tab === 'progress' && (
           <TeamBracketView
             tournamentId={t.id}
             uid={uid}
@@ -802,8 +836,19 @@ export default function TournamentDetail() {
           />
         )}
 
-        {/* 예선 (조별리그) */}
-        {hasBracket && tab === 'prelim' && (
+        {/* 조편성 (조별리그 · KDK 순위) — 대진 전에는 안내만 */}
+        {!isTeam && tab === 'groups' && !hasBracket && (
+          revealNotice ?? (
+            <Notice
+              icon="grid-outline"
+              text={t.format === 'kdk' ? '순위는 대진이 나오면 여기에 표시돼요.' : '조편성은 대진이 나오면 여기에 표시돼요.'}
+            />
+          )
+        )}
+        {!isTeam && tab === 'groups' && hasBracket && groupMatchesAll.length === 0 && (
+          <Notice icon="grid-outline" text="조별 경기가 없는 대회예요." />
+        )}
+        {hasBracket && tab === 'groups' && groupMatchesAll.length > 0 && (
           <View style={styles.section}>
             <View style={styles.groupSectionHead}>
               <Text style={styles.groupSectionTitle}>조별 현황</Text>
@@ -869,7 +914,7 @@ export default function TournamentDetail() {
                   </View>
                   <View style={styles.groupMatchList}>
                     {shownGms.length > 0 ? shownGms.map((m) => (
-                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} />
+                      <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} live={m.status !== 'done' && onCourt(m)} />
                     )) : <Text style={styles.mutedText}>일치하는 경기가 없어요.</Text>}
                   </View>
                 </View>
@@ -878,59 +923,115 @@ export default function TournamentDetail() {
           </View>
         )}
 
-        {/* 본선 (토너먼트) */}
-        {hasBracket && tab === 'final' && (
-          <View style={styles.section}>
-            {q ? <Text style={[styles.pMeta, { marginBottom: 6 }]}>검색어와 일치하는 선수를 강조 표시해요.</Text> : null}
-            <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} highlightQuery={q} avatarOf={avatarOf} />
+        {/* 경기진행 — 내 다음 경기 · 코트에서 진행 중 · 다음 경기 · 본선 대진표 · 끝난 경기 */}
+        {!isTeam && tab === 'progress' && !hasBracket && (
+          revealNotice ?? <Notice icon="tennisball-outline" text="대진이 나오면 경기 순서와 코트가 여기에 표시돼요." />
+        )}
+        {hasBracket && tab === 'progress' && (
+          <View style={styles.progressWrap}>
+            {myEntry?.status === 'approved' && myNextMatch ? (
+              <View style={styles.myNextRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.myStatLabel}>{onCourt(myNextMatch) ? '지금 내 경기' : '내 다음 경기'} · {matchCaption(myNextMatch)}</Text>
+                  <Text style={styles.myNextName} numberOfLines={1}>
+                    vs {nameOf(myNextMatch.entry1_id === uid ? myNextMatch.entry2_id : myNextMatch.entry1_id)}
+                  </Text>
+                </View>
+                {courtLabelOf(myNextMatch.court_id) ? (
+                  <View style={[styles.myBadge, { backgroundColor: 'rgba(22,199,132,0.16)', flexShrink: 0 }]}>
+                    <Text numberOfLines={1} style={[styles.myBadgeTxt, { color: '#16C784' }]}>
+                      🏟 {courtLabelOf(myNextMatch.court_id)}{myNextMatch.court_confirmed ? '' : ' · 예정'}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.myHint}>코트 대기</Text>
+                )}
+              </View>
+            ) : null}
+
+            {showPhaseSwitch ? (
+              <View style={styles.phaseTabs}>
+                {(
+                  [
+                    { key: 'group', label: '예선', icon: 'grid-outline', meta: `${groupDoneCount}/${groupMatchesAll.length}경기` },
+                    {
+                      key: 'knockout',
+                      label: '본선',
+                      icon: 'git-network-outline',
+                      meta: knockoutStarted ? `${koDoneCount}/${koMatches.length}경기` : '대진 미정',
+                    },
+                  ] as const
+                ).map((p) => {
+                  const on = phaseShown === p.key;
+                  return (
+                    <Pressable
+                      key={p.key}
+                      onPress={() => setProgressPhase(p.key)}
+                      style={[styles.phaseTab, on && styles.phaseTabOn]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: on }}>
+                      <Ionicons name={p.icon} size={17} color={on ? '#16C784' : '#707B87'} />
+                      <View>
+                        <Text style={[styles.phaseTabText, on && styles.phaseTabTextOn]}>{p.label}</Text>
+                        <Text style={styles.phaseTabMeta}>{p.meta}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {phaseShown === 'knockout' && !knockoutStarted ? (
+              // 본선 선수가 아직 안 정해졌으면 빈 목록 대신 안내 한 줄 + 대진표
+              <Notice icon="git-network-outline" text="본선 대진은 예선이 끝나면 정해져요." />
+            ) : (
+              <>
+                <MatchSection
+                  key={`live-${phaseShown}`}
+                  title="지금 코트에서"
+                  items={liveShown}
+                  empty={q ? '일치하는 경기가 없어요.' : '코트에서 진행 중인 경기가 없어요.'}
+                  renderItem={(m) => (
+                    <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} caption={matchCaption(m)} live />
+                  )}
+                />
+                <MatchSection
+                  key={`next-${phaseShown}`}
+                  title="다음 경기"
+                  items={upcomingShown}
+                  limit={PROGRESS_PREVIEW}
+                  empty={q ? '일치하는 경기가 없어요.' : '남은 경기가 없어요.'}
+                  renderItem={(m) => (
+                    <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} caption={matchCaption(m)} />
+                  )}
+                />
+              </>
+            )}
+
+            {/* 본선은 대진표에 결과까지 나오니 끝난 경기 목록 대신 대진표 */}
+            {phaseShown === 'knockout' ? (
+              <View>
+                <Text style={styles.sectionTitle}>본선 대진표</Text>
+                {q ? <Text style={[styles.pMeta, { marginTop: 4 }]}>검색어와 일치하는 선수를 강조 표시해요.</Text> : null}
+                <View style={styles.progressBracket}>
+                  <BracketTree matches={koMatches} nameOf={nameOf} uid={uid} highlightQuery={q} avatarOf={avatarOf} />
+                </View>
+              </View>
+            ) : (
+              <MatchSection
+                title="끝난 경기"
+                items={doneShown}
+                limit={PROGRESS_PREVIEW}
+                empty={q ? '일치하는 경기가 없어요.' : '아직 끝난 경기가 없어요.'}
+                renderItem={(m) => (
+                  <MatchRow key={m.id} m={m} nameOf={nameOf} uid={uid} courtLabel={courtLabelOf(m.court_id)} avatarOf={avatarOf} caption={matchCaption(m)} />
+                )}
+              />
+            )}
           </View>
         )}
 
       </ScrollView>
-
-      <Modal visible={showInfoModal} transparent animationType="fade" onRequestClose={() => setShowInfoModal(false)}>
-        <View style={styles.infoModalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowInfoModal(false)} />
-          <View style={styles.infoModalCard}>
-            <View style={styles.infoModalHead}>
-              <View style={styles.infoModalHeadCopy}>
-                <Text style={styles.infoModalEyebrow}>TOURNAMENT INFO</Text>
-                <Text style={styles.infoModalTitle} numberOfLines={2}>{t.title}</Text>
-              </View>
-              <Pressable onPress={() => setShowInfoModal(false)} style={styles.infoModalClose} accessibilityLabel="대회 정보 닫기">
-                <Ionicons name="close" size={22} color="#F8FAFC" />
-              </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={styles.infoModalContent}>
-              <View style={styles.infoModalMeta}>
-                <Info icon="calendar-outline" text={formatMeetupTime(t.start_at)} compact />
-                <Info icon="location-outline" text={`${t.venue || '장소 미정'}${t.region ? ` · ${t.region}` : ''}`} compact />
-              </View>
-              <View style={styles.infoGrid}>
-                <InfoTile icon="ribbon-outline" label="참가 실력" value={skillRangeLabel(t.skill_min, t.skill_max)} />
-                <InfoTile icon="people-outline" label="참가 현황" value={`${t.approved_count + t.pending_count}/${t.max_participants}${t.format === 'team' || isDoubles ? '팀' : '명'}`} />
-                <InfoTile icon="cash-outline" label="참가비" value={t.fee > 0 ? `${t.fee.toLocaleString()}원` : '무료'} />
-                <InfoTile icon="hourglass-outline" label="접수 마감" value={t.registration_deadline ? formatMeetupTime(t.registration_deadline) : '별도 공지'} />
-              </View>
-              {courts.length > 0 ? (
-                <View style={styles.infoModalSection}>
-                  <Text style={styles.sectionTitle}>코트 {courts.length}면</Text>
-                  <View style={styles.courtWrap}>
-                    {courts.map((court) => (
-                      <View key={court.id} style={styles.courtChip}>
-                        <Text style={styles.courtName}>{court.name}</Text>
-                        <View style={[styles.courtTag, { backgroundColor: court.indoor ? 'rgba(56,132,255,0.14)' : 'rgba(245,166,35,0.16)' }]}>
-                          <Text style={[styles.courtTagText, { color: court.indoor ? '#67A4FF' : '#F5A623' }]}>{court.indoor ? '실내' : '실외'}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {!isTeam && (
       <View style={styles.actionBar}>
@@ -1025,6 +1126,73 @@ function InfoTile({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap
   );
 }
 
+// 대회 상태 배지 — 접수중만 강조
+function StatusPill({ status }: { status: TournamentStatus }) {
+  const muted = status !== 'registration';
+  return (
+    <View style={[styles.heroStatus, muted && styles.heroStatusMuted]}>
+      <View style={[styles.heroStatusDot, muted && styles.heroStatusDotMuted]} />
+      <Text style={[styles.heroStatusText, muted && styles.heroStatusTextMuted]}>
+        {status === 'registration' ? '접수중' : status === 'ongoing' ? '진행중' : status === 'finished' ? '종료' : '취소됨'}
+      </Text>
+    </View>
+  );
+}
+
+// 탭이 아직 비어 있을 때의 안내 상자
+function Notice({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  return (
+    <View style={styles.revealBox}>
+      <Ionicons name={icon} size={20} color="#AAB4C0" />
+      <Text style={styles.revealText}>{text}</Text>
+    </View>
+  );
+}
+
+// 경기 위치 표시: 예선은 'n조', 본선은 라운드 이름
+function matchCaption(m: TournamentMatch) {
+  return m.phase === 'group' ? `${m.group_no ?? 1}조` : m.round_name ?? '본선';
+}
+
+// 경기진행 탭의 경기 묶음: 제목·개수, 길면 앞부분만 보여 주고 '더 보기'
+function MatchSection({
+  title,
+  items,
+  empty,
+  renderItem,
+  limit,
+}: {
+  title: string;
+  items: TournamentMatch[];
+  empty: string;
+  renderItem: (m: TournamentMatch) => ReactNode;
+  limit?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const folded = !!limit && items.length > limit;
+  const shown = folded && !expanded ? items.slice(0, limit) : items;
+  return (
+    <View>
+      <View style={styles.progressHead}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.progressCount}>{items.length}</Text>
+      </View>
+      {items.length > 0 ? (
+        <View style={styles.progressList}>
+          {shown.map(renderItem)}
+          {folded ? (
+            <Pressable onPress={() => setExpanded((v) => !v)} style={styles.moreButton} accessibilityRole="button">
+              <Text style={styles.moreText}>{expanded ? '접기' : `${items.length - (limit ?? 0)}경기 더 보기`}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : (
+        <Text style={[styles.mutedText, styles.progressEmpty]}>{empty}</Text>
+      )}
+    </View>
+  );
+}
+
 // 경기 한 건: 양쪽 이름 + 점수(완료 시), 승자 강조, 내 경기 하이라이트
 function MatchRow({
   m,
@@ -1033,6 +1201,8 @@ function MatchRow({
   highlight = false,
   courtLabel,
   avatarOf,
+  caption,
+  live = false,
 }: {
   m: TournamentMatch;
   nameOf: (id: string | null) => string;
@@ -1040,6 +1210,8 @@ function MatchRow({
   highlight?: boolean;
   courtLabel?: string;
   avatarOf?: (id: string | null) => { uri: string | null; nickname: string } | null;
+  caption?: string; // 'n조' · 라운드 이름 (경기진행 탭)
+  live?: boolean; // 코트에서 진행 중
 }) {
   const done = m.status === 'done';
   const w1 = done && !!m.winner_id && m.winner_id === m.entry1_id;
@@ -1069,12 +1241,13 @@ function MatchRow({
         })}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        {caption ? <Text style={styles.matchCaption}>{caption}</Text> : null}
         {courtLabel ? (
           <View style={styles.matchCourt}>
             <Text style={styles.matchCourtText}>🏟 {courtLabel}</Text>
           </View>
         ) : null}
-        {!done && <Text style={styles.matchTag}>예정</Text>}
+        {!done && <Text style={[styles.matchTag, live && styles.matchTagLive]}>{live ? '경기 중' : '예정'}</Text>}
       </View>
     </View>
   );
@@ -1133,8 +1306,52 @@ const styles = StyleSheet.create({
   compactTournamentCopy: { flex: 1, minWidth: 0 },
   compactTournamentLabel: { color: '#16C784', fontSize: 10, fontWeight: '900' },
   compactTournamentTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '900', marginTop: 2 },
-  infoButton: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(22,199,132,0.35)', backgroundColor: 'rgba(22,199,132,0.08)' },
-  infoButtonText: { color: '#16C784', fontSize: 11, fontWeight: '900' },
+  teamLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: Spacing.two,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(22,199,132,0.35)',
+    backgroundColor: 'rgba(22,199,132,0.08)',
+  },
+  teamLinkText: { flex: 1, color: '#F8FAFC', fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  progressWrap: { gap: Spacing.four, marginTop: Spacing.one },
+  // 경기진행 예선·본선 전환 (단체전 대진 화면과 같은 모양)
+  phaseTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 4,
+    borderRadius: 8,
+    borderCurve: 'continuous',
+    backgroundColor: '#10161D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+  },
+  phaseTab: {
+    flex: 1,
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderCurve: 'continuous',
+  },
+  phaseTabOn: { backgroundColor: 'rgba(22,199,132,0.13)' },
+  phaseTabText: { color: '#AAB4C0', fontSize: 14, fontWeight: '900' },
+  phaseTabTextOn: { color: '#F8FAFC' },
+  phaseTabMeta: { color: '#707B87', fontSize: 10.5, fontWeight: '700', marginTop: 2 },
+  progressHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressCount: { color: '#16C784', fontSize: 15, fontWeight: '900' },
+  progressList: { gap: 7, marginTop: 8 },
+  progressEmpty: { marginTop: 8 },
+  progressBracket: { marginTop: 8 },
+  moreButton: { alignItems: 'center', paddingVertical: 10 },
+  moreText: { color: '#16C784', fontSize: 13, fontWeight: '800' },
   badgeRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   title: { fontSize: 23, lineHeight: 31, fontWeight: '900', color: '#F8FAFC' },
   gallery: { marginBottom: Spacing.three, gap: 8 },
@@ -1184,7 +1401,6 @@ const styles = StyleSheet.create({
   playerCountText: { fontSize: 13, fontWeight: '900', color: '#16C784' },
   playerList: { marginTop: 14, gap: 10 },
   playerTeamCard: {
-    minHeight: 122,
     flexDirection: 'row',
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -1193,6 +1409,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.11)',
   },
+  playerTeamCardDoubles: { minHeight: 122 }, // 복식은 두 줄(신청자 + 파트너)
   playerTeamNumberColumn: {
     width: 48,
     alignItems: 'center',
@@ -1378,6 +1595,8 @@ const styles = StyleSheet.create({
   matchName: { flex: 1, fontSize: 14, color: '#F8FAFC' },
   matchScore: { fontSize: 15, fontWeight: '800', minWidth: 18, textAlign: 'right' },
   matchTag: { fontSize: 12, fontWeight: '600', color: '#AAB4C0' },
+  matchTagLive: { color: '#16C784', fontWeight: '800' },
+  matchCaption: { fontSize: 11, fontWeight: '800', color: '#16C784' },
   matchCourt: { backgroundColor: '#151D25', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   matchCourtText: { fontSize: 11, fontWeight: '700', color: '#AAB4C0' },
   partnerRow: {
@@ -1390,14 +1609,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
-  infoModalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(0,0,0,0.72)' },
-  infoModalCard: { width: '100%', maxHeight: '82%', borderRadius: 8, borderCurve: 'continuous', overflow: 'hidden', backgroundColor: '#070A0D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  infoModalHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)' },
-  infoModalHeadCopy: { flex: 1 },
-  infoModalEyebrow: { color: '#16C784', fontSize: 10, fontWeight: '900' },
-  infoModalTitle: { color: '#F8FAFC', fontSize: 18, lineHeight: 24, fontWeight: '900', marginTop: 3 },
-  infoModalClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  infoModalContent: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.four },
-  infoModalMeta: { gap: 8 },
-  infoModalSection: { gap: 6 },
 });
